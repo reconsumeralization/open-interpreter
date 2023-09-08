@@ -114,7 +114,7 @@ class Interpreter:
     username = getpass.getuser()
     current_working_directory = os.getcwd()
     operating_system = platform.system()
-    
+
     info += f"[User Info]\nName: {username}\nCWD: {current_working_directory}\nOS: {operating_system}"
 
     if not self.local:
@@ -131,10 +131,10 @@ class Interpreter:
         if "function_call" in message and "parsed_arguments" in message["function_call"]:
           message_for_semantic_search["function_call"] = message["function_call"]["parsed_arguments"]
         query.append(message_for_semantic_search)
-              
+
       # Use them to query Open Procedures
       url = "https://open-procedures.replit.app/search/"
-      
+
       try:
         relevant_procedures = requests.get(url, data=json.dumps(query)).json()["procedures"]
         info += "\n\n# Recommended Procedures\n" + "\n---\n".join(relevant_procedures) + "\nIn your plan, include steps and, if present, **EXACT CODE SNIPPETS** (especially for depracation notices, **WRITE THEM INTO YOUR PLAN -- underneath each numbered step** as they will VANISH once you execute your first line of code, so WRITE THEM DOWN NOW if you need them) from the above procedures if they are relevant to the task. Again, include **VERBATIM CODE SNIPPETS** from the procedures above if they are relevent to the task **directly in your plan.**"
@@ -143,12 +143,9 @@ class Interpreter:
         # Since it's not stricly necessary, let's worry about that another day. Should probably log this somehow though.
         pass
 
-    elif self.local:
-
+    else:
       # Tell Code-Llama how to run code.
       info += "\n\nTo run code, write a fenced code block (i.e ```python or ```shell) in markdown. When you close it with ```, it will be run. You'll then be given its output."
-      # We make references in system_message.txt to the "function" it can call, "run_code".
-
     return info
 
   def reset(self):
@@ -168,16 +165,16 @@ class Interpreter:
     # ^ verify_api_key may set self.local to True, so we run this as an 'if', not 'elif':
     if self.local:
       self.model = "code-llama"
-      
+
       # Code-Llama
-      if self.llama_instance == None:
-        
+      if self.llama_instance is None:
+
         # Find or install Code-Llama
         try:
           self.llama_instance = get_llama_2_instance()
         except:
           # If it didn't work, apologize and switch to GPT-4
-          
+
           print(Markdown("".join([
             "> Failed to install `Code-LLama`.",
             "\n\n**We have likely not built the proper `Code-Llama` support for your system.**",
@@ -193,7 +190,7 @@ class Interpreter:
 
     # Display welcome message
     welcome_message = ""
-    
+
     if self.debug_mode:
       welcome_message += "> Entered debug mode"
 
@@ -201,17 +198,17 @@ class Interpreter:
     # (self.auto_run is like advanced usage, we display no messages)
     if not self.local and not self.auto_run:
       welcome_message += f"\n> Model set to `{self.model.upper()}`\n\n**Tip:** To run locally, use `interpreter --local`"
-    
+
     if self.local:
       welcome_message += f"\n> Model set to `Code-Llama`"
-    
+
     # If not auto_run, tell the user we'll ask permission to run code
     # We also tell them here how to exit Open Interpreter
     if not self.auto_run:
       welcome_message += "\n\n" + confirm_mode_message
 
     welcome_message = welcome_message.strip()
-      
+
     # Print welcome message with newlines on either side (aesthetic choice)
     # unless we're starting with a blockquote (aesthetic choice)
     if welcome_message != "":
@@ -225,7 +222,7 @@ class Interpreter:
       # If it was, we respond non-interactivley
       self.messages.append({"role": "user", "content": message})
       self.respond()
-      
+
     else:
       # If it wasn't, we start an interactive chat
       while True:
@@ -236,11 +233,11 @@ class Interpreter:
         except KeyboardInterrupt:
           print()  # Aesthetic choice
           break
-  
+
         # Use `readline` to let users up-arrow to previous user messages,
         # which is a common behavior in terminals.
         readline.add_history(user_input)
-  
+
         # Add the user message to self.messages
         self.messages.append({"role": "user", "content": user_input})
 
@@ -250,7 +247,7 @@ class Interpreter:
             print(self.messages)
             self.debug_mode = True
             continue
-  
+
         # Respond, but gracefully handle CTRL-C / KeyboardInterrupt
         try:
           self.respond()
@@ -313,36 +310,34 @@ class Interpreter:
       openai.api_type = "azure"
       openai.api_base = self.azure_api_base
       openai.api_version = self.azure_api_version
-      openai.api_key = self.api_key
-    else:
-      if self.api_key == None:
-        if 'OPENAI_API_KEY' in os.environ:
-          self.api_key = os.environ['OPENAI_API_KEY']
+    elif self.api_key is None:
+      if 'OPENAI_API_KEY' in os.environ:
+        self.api_key = os.environ['OPENAI_API_KEY']
+      else:
+        # This is probably their first time here!
+        print('', Markdown("**Welcome to Open Interpreter.**"), '')
+        time.sleep(1)
+
+        print(Rule(style="white"))
+
+        print(Markdown(missing_api_key_message), '', Rule(style="white"), '')
+        response = input("OpenAI API key: ")
+
+        if response == "":
+            # User pressed `enter`, requesting Code-Llama
+            self.local = True
+            print(Markdown("> Switching to `Code-Llama`...\n\n**Tip:** Run `interpreter --local` to automatically use `Code-Llama`."), '')
+            time.sleep(2)
+            print(Rule(style="white"))
+            return
+
         else:
-          # This is probably their first time here!
-          print('', Markdown("**Welcome to Open Interpreter.**"), '')
-          time.sleep(1)
+            self.api_key = response
+            print('', Markdown("**Tip:** To save this key for later, run `export OPENAI_API_KEY=your_api_key` on Mac/Linux or `setx OPENAI_API_KEY your_api_key` on Windows."), '')
+            time.sleep(2)
+            print(Rule(style="white"))
 
-          print(Rule(style="white"))
-
-          print(Markdown(missing_api_key_message), '', Rule(style="white"), '')
-          response = input("OpenAI API key: ")
-
-          if response == "":
-              # User pressed `enter`, requesting Code-Llama
-              self.local = True
-              print(Markdown("> Switching to `Code-Llama`...\n\n**Tip:** Run `interpreter --local` to automatically use `Code-Llama`."), '')
-              time.sleep(2)
-              print(Rule(style="white"))
-              return
-
-          else:
-              self.api_key = response
-              print('', Markdown("**Tip:** To save this key for later, run `export OPENAI_API_KEY=your_api_key` on Mac/Linux or `setx OPENAI_API_KEY your_api_key` on Windows."), '')
-              time.sleep(2)
-              print(Rule(style="white"))
-
-      openai.api_key = self.api_key
+    openai.api_key = self.api_key
 
   def end_active_block(self):
     if self.active_block:
@@ -359,14 +354,14 @@ class Interpreter:
     if self.local:
       self.system_message = "\n".join(self.system_message.split("\n")[:3])
       self.system_message += "\nOnly do what the user asks you to do, then ask what they'd like to do next."
-    
+
     system_message = self.system_message + "\n\n" + info
 
     if self.local:
       messages = tt.trim(self.messages, max_tokens=1048, system_message=system_message)
     else:
       messages = tt.trim(self.messages, self.model, system_message=system_message)
-    
+
     if self.debug_mode:
       print("\n", "Sending `messages` to LLM:", "\n")
       print(messages)
@@ -375,10 +370,10 @@ class Interpreter:
     # Make LLM call
     if not self.local:
       # GPT
-      
+
       for _ in range(3):  # 3 retries
         try:
-          
+
             if self.use_azure:
               response = openai.ChatCompletion.create(
                   engine=self.azure_deployment_name,
@@ -395,19 +390,19 @@ class Interpreter:
                 stream=True,
                 temperature=self.temperature,
               )
-              
+
             break
         except openai.error.RateLimitError:
             # Rate limit hit. Retrying in 3 seconds
             time.sleep(3)
       else:
         raise openai.error.RateLimitError("RateLimitError: Max retries reached")
-            
+
     elif self.local:
       # Code-Llama
-      
-      
-          
+
+
+
       # Convert messages to prompt
       # (This only works if the first message is the only system message)
 
@@ -420,23 +415,23 @@ class Interpreter:
           # Happens if it immediatly writes code
           if "role" not in message:
             message["role"] = "assistant"
-        
+
         # Loop starting from the first user message
         for index, item in enumerate(messages[1:]):
             role = item['role']
             content = item['content']
-            
+
             if role == 'user':
                 formatted_messages += f"{content} [/INST] "
             elif role == 'function':
                 formatted_messages += f"Output: {content} [/INST] "
             elif role == 'assistant':
                 formatted_messages += f"{content} </s><s>[INST] "
-    
+
         # Remove the trailing '<s>[INST] ' from the final output
         if formatted_messages.endswith("<s>[INST] "):
             formatted_messages = formatted_messages[:-10]
-        
+
         return formatted_messages
 
       prompt = messages_to_prompt(messages)
@@ -447,7 +442,7 @@ class Interpreter:
         prompt += "Given the output of the code I just ran, "
       elif messages[-1]["role"] == "function" and messages[-1]["content"] == "No output":
         prompt += "Given the fact that the code I just ran produced no output, "
-        
+
 
       if self.debug_mode:
         # we have to use builtins bizarrely! because rich.print interprets "[INST]" as something meaningful
@@ -455,7 +450,7 @@ class Interpreter:
         builtins.print("TEXT PROMPT SEND TO LLM:\n", prompt)
 
       # Run Code-Llama
-            
+
       response = self.llama_instance(
         prompt,
         stream=True,
@@ -511,7 +506,7 @@ class Interpreter:
           # Print newline if it was just a code block or user message
           # (this just looks nice)
           last_role = self.messages[-2]["role"]
-          if last_role == "user" or last_role == "function":
+          if last_role in ["user", "function"]:
             print()
 
           # then create a new code block
@@ -543,19 +538,19 @@ class Interpreter:
             if "```" in content:
               # Split by "```" to get the last open code block
               blocks = content.split("```")
-  
+
               current_code_block = blocks[-1]
-          
+
               lines = current_code_block.split("\n")
-  
+
               if content.strip() == "```": # Hasn't outputted a language yet
                 language = None
               else:
                 language = lines[0].strip() if lines[0] != "" else "python"
-          
+
               # Join all lines except for the language line
               code = '\n'.join(lines[1:]).strip("` \n")
-          
+
               arguments = {"code": code}
               if language: # We only add this if we have it-- the second we have it, an interpreter gets fired up (I think? maybe I'm wrong)
                 arguments["language"] = language
@@ -563,7 +558,7 @@ class Interpreter:
             # Code-Llama won't make a "function_call" property for us to store this under, so:
             if "function_call" not in self.messages[-1]:
               self.messages[-1]["function_call"] = {}
-              
+
             self.messages[-1]["function_call"]["parsed_arguments"] = arguments            
 
       else:
@@ -581,7 +576,7 @@ class Interpreter:
         in_function_call = False
 
         # If there's no active block,
-        if self.active_block == None:
+        if self.active_block is None:
 
           # Create a message block
           self.active_block = MessageBlock()
@@ -638,7 +633,7 @@ class Interpreter:
 
             # After collecting some data via the below instruction to users,
             # This is the most common failure pattern: https://github.com/KillianLucas/open-interpreter/issues/41
-            
+
             # print("> Function call could not be parsed.\n\nPlease open an issue on Github (openinterpreter.com, click Github) and paste the following:")
             # print("\n", self.messages[-1]["function_call"], "\n")
             # time.sleep(2)
@@ -646,7 +641,7 @@ class Interpreter:
 
             # Since it can't really be fixed without something complex,
             # let's just berate the LLM then go around again.
-            
+
             self.messages.append({
               "role": "function",
               "name": "run_code",
@@ -689,6 +684,6 @@ class Interpreter:
             self.messages[-1]["content"] = self.messages[-1]["content"].strip().rstrip("#")
             self.active_block.update_from_message(self.messages[-1])
             time.sleep(0.1)
-            
+
           self.active_block.end()
           return
