@@ -13,7 +13,7 @@ def get_llama_2_instance():
 
     # First, we ask them which model they want to use.
     print('', Markdown("**Open Interpreter** will use `Code Llama` for local execution. Use your arrow keys to set up the model."), '')
-        
+
     models = {
         '7B': {
             'Low': {'URL': 'https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GGUF/resolve/main/codellama-7b-instruct.Q3_K_S.gguf', 'Size': '3.01 GB', 'RAM': '5.51 GB'},
@@ -31,18 +31,19 @@ def get_llama_2_instance():
             'High': {'URL': 'https://huggingface.co/TheBloke/CodeLlama-34B-Instruct-GGUF/resolve/main/codellama-34b-instruct.Q8_0.gguf', 'Size': '35.79 GB', 'RAM': '38.29 GB'}
         }
     }
-    
+
     # First stage: Select parameter size
     parameter_choices = list(models.keys())
     questions = [inquirer.List('param', message="Parameter count (smaller is faster, larger is more capable)", choices=parameter_choices)]
     answers = inquirer.prompt(questions)
     chosen_param = answers['param']
-    
+
     # Second stage: Select quality level
     def format_quality_choice(quality, model):
         return f"{quality} | Size: {model['Size']}, RAM usage: {model['RAM']}"
+
     quality_choices = [format_quality_choice(quality, models[chosen_param][quality]) for quality in models[chosen_param]]
-  
+
     questions = [inquirer.List('quality', message="Quality (lower is faster, higher is more capable)", choices=quality_choices)]
     answers = inquirer.prompt(questions)
     chosen_quality = answers['quality'].split(' ')[0]  # Extracting the 'small', 'medium', or 'large' from the selected choice
@@ -81,7 +82,7 @@ def get_llama_2_instance():
     else:
         # If the file was not found, ask for confirmation to download it
         download_path = os.path.join(default_path, file_name)
-        message = f"This instance of `Code-Llama` was not found. Would you like to download it?"
+        message = "This instance of `Code-Llama` was not found. Would you like to download it?"
         if confirm_action(message):
             wget.download(url, download_path)
             model_path = download_path
@@ -96,11 +97,11 @@ def get_llama_2_instance():
         # Ask for confirmation to install the required pip package
         message = "`Code-Llama` interface package not found. Install `llama-cpp-python`?"
         if confirm_action(message):
-            
+
             # We're going to build llama-cpp-python correctly for the system we're on
 
             import platform
-            
+
             def check_command(command):
                 try:
                     subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -109,12 +110,12 @@ def get_llama_2_instance():
                     return False
                 except FileNotFoundError:
                     return False
-            
+
             def install_llama(backend):
                 env_vars = {
                     "FORCE_CMAKE": "1"
                 }
-                
+
                 if backend == "cuBLAS":
                     env_vars["CMAKE_ARGS"] = "-DLLAMA_CUBLAS=on"
                 elif backend == "hipBLAS":
@@ -123,12 +124,12 @@ def get_llama_2_instance():
                     env_vars["CMAKE_ARGS"] = "-DLLAMA_METAL=on"
                 else:  # Default to OpenBLAS
                     env_vars["CMAKE_ARGS"] = "-DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS"
-                
+
                 try:
                     subprocess.run([sys.executable, "-m", "pip", "install", "llama-cpp-python"], env=env_vars, check=True)
                 except subprocess.CalledProcessError as e:
                     print(f"Error during installation with {backend}: {e}")
-            
+
             def supports_metal():
                 # Check for macOS version
                 if platform.system() == "Darwin":
@@ -137,7 +138,7 @@ def get_llama_2_instance():
                     if mac_version >= (10, 11):
                         return True
                 return False
-            
+
             # Check system capabilities
             if check_command(["nvidia-smi"]):
                 install_llama("cuBLAS")
@@ -147,7 +148,7 @@ def get_llama_2_instance():
                 install_llama("Metal")
             else:
                 install_llama("OpenBLAS")
-          
+
             from llama_cpp import Llama
             print('', Markdown("Finished downloading `Code-Llama` interface."), '')
 
@@ -167,14 +168,14 @@ def get_llama_2_instance():
                         print("2. Install it:")
                         print("bash Miniforge3-MacOSX-arm64.sh")
                         print("")
-      
+
         else:
             print('', "Installation cancelled. Exiting.", '')
             return None
 
     # Initialize and return Code-Llama
     llama_2 = Llama(model_path=model_path, n_gpu_layers=n_gpu_layers, verbose=False, n_ctx=1048) # n_ctx = context window. smaller is faster
-      
+
     return llama_2
 
 def confirm_action(message):
