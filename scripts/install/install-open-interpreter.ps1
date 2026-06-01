@@ -4,7 +4,12 @@ param(
     [string[]]$RemainingArgs
 )
 
-$scriptDir = Split-Path -Parent $PSCommandPath
+$scriptDir = $null
+$scriptName = "install.ps1"
+if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+    $scriptDir = Split-Path -Parent $PSCommandPath
+    $scriptName = Split-Path -Leaf $PSCommandPath
+}
 
 if ([string]::IsNullOrWhiteSpace($env:CODEX_GITHUB_REPO)) {
     $env:CODEX_GITHUB_REPO = if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_GITHUB_REPO)) {
@@ -64,4 +69,20 @@ if (-not [string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_NONINTERACTIVE)) {
     $env:CODEX_NON_INTERACTIVE = $env:OPEN_INTERPRETER_NONINTERACTIVE
 }
 
-& (Join-Path $scriptDir "install.ps1") @RemainingArgs
+if (-not [string]::IsNullOrWhiteSpace($scriptDir)) {
+    $genericInstaller = Join-Path $scriptDir "install-codex.ps1"
+    if (Test-Path -LiteralPath $genericInstaller -PathType Leaf) {
+        & $genericInstaller @RemainingArgs
+        exit $LASTEXITCODE
+    }
+
+    $siblingInstaller = Join-Path $scriptDir "install.ps1"
+    if ($scriptName -ne "install.ps1" -and (Test-Path -LiteralPath $siblingInstaller -PathType Leaf)) {
+        & $siblingInstaller @RemainingArgs
+        exit $LASTEXITCODE
+    }
+}
+
+$installerText = Invoke-RestMethod -Uri "https://github.com/$env:CODEX_GITHUB_REPO/releases/latest/download/install-codex.ps1"
+$installer = [scriptblock]::Create($installerText)
+& $installer @RemainingArgs

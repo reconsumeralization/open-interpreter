@@ -1196,8 +1196,15 @@ jobs:
       - name: Stage installer scripts
         if: ${{ env.SIGN_MACOS == 'true' }}
         run: |
-          cp scripts/install/install.sh dist/install.sh
-          cp scripts/install/install.ps1 dist/install.ps1
+          if [[ "${GITHUB_REPOSITORY}" == "KillianLucas/oix" ]]; then
+            cp scripts/install/install-open-interpreter.sh dist/install.sh
+            cp scripts/install/install-open-interpreter.ps1 dist/install.ps1
+            cp scripts/install/install.sh dist/install-codex.sh
+            cp scripts/install/install.ps1 dist/install-codex.ps1
+          else
+            cp scripts/install/install.sh dist/install.sh
+            cp scripts/install/install.ps1 dist/install.ps1
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
