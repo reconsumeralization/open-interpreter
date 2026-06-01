@@ -65,7 +65,7 @@ def build_source_binaries(
             cmd.extend(["--bin", binary])
 
         cargo_env = None
-        if entrypoint_bin is None:
+        if variant.v8_runtime_required:
             codex_v8_env = resolve_codex_v8_cargo_env(spec)
             if codex_v8_env:
                 cargo_env = {**os.environ, **codex_v8_env}

@@ -32,6 +32,7 @@ class PackageVariant:
     cargo_bin: str
     executable_stem: str
     managed_codex_required: bool = False
+    v8_runtime_required: bool = False
 
     def entrypoint_name(self, spec: TargetSpec) -> str:
         return f"{self.executable_stem}{spec.exe_suffix}"
