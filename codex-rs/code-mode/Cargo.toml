@@ -28,7 +28,7 @@ v8 = { workspace = true, optional = true }
 # its tool schema/description helpers and returns a clear execution error.
 # Enable when actually shipping code mode: --features codex-code-mode/v8-runtime
 default = []
-sandbox = ["v8/v8_enable_sandbox"]
+sandbox = ["v8?/v8_enable_sandbox"]
 v8-runtime = ["dep:v8", "dep:deno_core_icudata"]
 
 [dev-dependencies]
