@@ -11,36 +11,16 @@ const OPEN_INTERPRETER_INSTALLER_URL: &str =
     "https://github.com/KillianLucas/oix/releases/latest/download/install.sh";
 const CODEX_INSTALL_COMMAND: &str = "curl -fsSL https://chatgpt.com/codex/install.sh | sh";
 const OPEN_INTERPRETER_INSTALL_COMMAND: &str = "\
-curl -fsSL https://github.com/KillianLucas/oix/releases/latest/download/install.sh | \
-CODEX_NON_INTERACTIVE=1 \
-CODEX_GITHUB_REPO=KillianLucas/oix \
-CODEX_INSTALL_PRODUCT_NAME='Open Interpreter' \
-CODEX_PACKAGE_ASSET_STEM=open-interpreter-package \
-CODEX_COMMAND_NAME=interpreter \
-CODEX_RELEASE_TAG_PREFIX=rust-v \
-sh";
+curl -fsSL https://github.com/KillianLucas/oix/releases/latest/download/install.sh | sh";
 const CODEX_STANDALONE_UNIX_UPDATE_COMMAND: &str =
     "curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh";
 const OPEN_INTERPRETER_STANDALONE_UNIX_UPDATE_COMMAND: &str = "\
 curl -fsSL https://github.com/KillianLucas/oix/releases/latest/download/install.sh | \
-CODEX_NON_INTERACTIVE=1 \
-CODEX_GITHUB_REPO=KillianLucas/oix \
-CODEX_INSTALL_PRODUCT_NAME='Open Interpreter' \
-CODEX_PACKAGE_ASSET_STEM=open-interpreter-package \
-CODEX_COMMAND_NAME=interpreter \
-CODEX_RELEASE_TAG_PREFIX=rust-v \
-sh";
+CODEX_NON_INTERACTIVE=1 sh";
 const CODEX_STANDALONE_WINDOWS_UPDATE_COMMAND: &str =
     "$env:CODEX_NON_INTERACTIVE=1; irm https://chatgpt.com/codex/install.ps1 | iex";
 const OPEN_INTERPRETER_STANDALONE_WINDOWS_UPDATE_COMMAND: &str = "\
 $env:CODEX_NON_INTERACTIVE=1; \
-$env:CODEX_GITHUB_REPO='KillianLucas/oix'; \
-$env:CODEX_INSTALL_PRODUCT_NAME='Open Interpreter'; \
-$env:CODEX_PACKAGE_ASSET_STEM='open-interpreter-package'; \
-$env:CODEX_COMMAND_NAME='interpreter'; \
-$env:CODEX_RELEASE_TAG_PREFIX='rust-v'; \
-if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) { $env:CODEX_HOME = Join-Path $HOME '.openinterpreter' }; \
-if ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_DIR)) { $env:CODEX_INSTALL_DIR = Join-Path $env:LOCALAPPDATA 'Programs\\Open Interpreter\\bin' }; \
 irm https://github.com/KillianLucas/oix/releases/latest/download/install.ps1 | iex";
 const CODEX_STANDALONE_UNIX_UPDATE_ARGS: &[&str] = &["-c", CODEX_STANDALONE_UNIX_UPDATE_COMMAND];
 const OPEN_INTERPRETER_STANDALONE_UNIX_UPDATE_ARGS: &[&str] =
@@ -105,14 +85,7 @@ impl Product {
     pub fn installer_env(self) -> &'static [(&'static str, &'static str)] {
         match self {
             Product::Codex => &[],
-            Product::OpenInterpreter => &[
-                ("CODEX_NON_INTERACTIVE", "1"),
-                ("CODEX_GITHUB_REPO", "KillianLucas/oix"),
-                ("CODEX_INSTALL_PRODUCT_NAME", "Open Interpreter"),
-                ("CODEX_PACKAGE_ASSET_STEM", "open-interpreter-package"),
-                ("CODEX_COMMAND_NAME", "interpreter"),
-                ("CODEX_RELEASE_TAG_PREFIX", "rust-v"),
-            ],
+            Product::OpenInterpreter => &[("CODEX_NON_INTERACTIVE", "1")],
         }
     }
 
@@ -173,18 +146,11 @@ mod tests {
         assert!(
             Product::OpenInterpreter
                 .install_command()
-                .contains("CODEX_PACKAGE_ASSET_STEM=open-interpreter-package")
+                .contains("github.com/KillianLucas/oix/releases/latest/download/install.sh")
         );
         assert_eq!(
             Product::OpenInterpreter.installer_env(),
-            &[
-                ("CODEX_NON_INTERACTIVE", "1"),
-                ("CODEX_GITHUB_REPO", "KillianLucas/oix"),
-                ("CODEX_INSTALL_PRODUCT_NAME", "Open Interpreter"),
-                ("CODEX_PACKAGE_ASSET_STEM", "open-interpreter-package"),
-                ("CODEX_COMMAND_NAME", "interpreter"),
-                ("CODEX_RELEASE_TAG_PREFIX", "rust-v"),
-            ]
+            &[("CODEX_NON_INTERACTIVE", "1")]
         );
     }
 }
