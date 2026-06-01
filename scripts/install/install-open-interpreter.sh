@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -eu
+
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+export CODEX_GITHUB_REPO="${OPEN_INTERPRETER_GITHUB_REPO:-${CODEX_GITHUB_REPO:-KillianLucas/oix}}"
+export CODEX_INSTALL_PRODUCT_NAME="${CODEX_INSTALL_PRODUCT_NAME:-Open Interpreter}"
+export CODEX_PACKAGE_ASSET_STEM="${CODEX_PACKAGE_ASSET_STEM:-open-interpreter-package}"
+export CODEX_COMMAND_NAME="${CODEX_COMMAND_NAME:-interpreter}"
+export CODEX_RELEASE_TAG_PREFIX="${CODEX_RELEASE_TAG_PREFIX:-rust-v}"
+export CODEX_HOME="${OPEN_INTERPRETER_HOME:-${CODEX_HOME:-$HOME/.openinterpreter}}"
+export CODEX_INSTALL_DIR="${OPEN_INTERPRETER_INSTALL_DIR:-${CODEX_INSTALL_DIR:-$HOME/.local/bin}}"
+export CODEX_RELEASE="${OPEN_INTERPRETER_RELEASE:-${CODEX_RELEASE:-latest}}"
+export CODEX_NON_INTERACTIVE="${OPEN_INTERPRETER_NONINTERACTIVE:-${CODEX_NON_INTERACTIVE:-false}}"
+
+exec "$script_dir/install.sh" "$@"
