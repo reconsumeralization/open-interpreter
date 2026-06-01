@@ -266,7 +266,8 @@ function Get-CurrentInstalledVersion {
         [string]$StandaloneCurrentDir
     )
 
-    $standaloneVersion = Get-VersionFromBinary -CodexPath (Join-Path $StandaloneCurrentDir "bin\$CommandName.exe")
+    $packageEntrypoint = Get-PackageEntrypointPath -PackageDir $StandaloneCurrentDir
+    $standaloneVersion = Get-VersionFromBinary -CodexPath $packageEntrypoint
     if (-not [string]::IsNullOrWhiteSpace($standaloneVersion)) {
         return $standaloneVersion
     }
@@ -530,6 +531,62 @@ function Ensure-Junction {
     throw "Refusing to replace file at $LinkPath with a junction."
 }
 
+function Get-PackageMetadata {
+    param(
+        [string]$PackageDir
+    )
+
+    $metadataPath = Join-Path $PackageDir "codex-package.json"
+    if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        return Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+}
+
+function Test-PackageRelativeFile {
+    param(
+        [string]$PackageDir,
+        [string]$RelativePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RelativePath)) {
+        return $false
+    }
+    if ([IO.Path]::IsPathRooted($RelativePath)) {
+        return $false
+    }
+
+    $parts = $RelativePath -split '[\\/]'
+    if ($parts -contains "..") {
+        return $false
+    }
+
+    return Test-Path -LiteralPath (Join-Path $PackageDir $RelativePath) -PathType Leaf
+}
+
+function Get-PackageEntrypointPath {
+    param(
+        [string]$PackageDir
+    )
+
+    $metadata = Get-PackageMetadata -PackageDir $PackageDir
+    if ($null -ne $metadata -and (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $metadata.entrypoint)) {
+        return Join-Path $PackageDir $metadata.entrypoint
+    }
+
+    $binEntrypoint = Join-Path $PackageDir "bin\$CommandName.exe"
+    if (Test-Path -LiteralPath $binEntrypoint -PathType Leaf) {
+        return $binEntrypoint
+    }
+
+    return Join-Path $PackageDir "$CommandName.exe"
+}
+
 function Test-PackageContentsAreComplete {
     param(
         [string]$PackageDir
@@ -539,16 +596,30 @@ function Test-PackageContentsAreComplete {
         return $false
     }
 
+    $metadata = Get-PackageMetadata -PackageDir $PackageDir
+    if ($null -eq $metadata) {
+        return $false
+    }
+
+    if (-not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $metadata.entrypoint)) {
+        return $false
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($metadata.managedCodex) -and
+        -not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $metadata.managedCodex)) {
+        return $false
+    }
+
+    $pathDir = if ([string]::IsNullOrWhiteSpace($metadata.pathDir)) { "codex-path" } else { $metadata.pathDir }
+    $resourcesDir = if ([string]::IsNullOrWhiteSpace($metadata.resourcesDir)) { "codex-resources" } else { $metadata.resourcesDir }
+
     $expectedFiles = @(
-        "codex-package.json",
-        "bin\codex.exe",
-        "bin\$CommandName.exe",
-        "codex-path\rg.exe",
-        "codex-resources\codex-command-runner.exe",
-        "codex-resources\codex-windows-sandbox-setup.exe"
+        "$pathDir\rg.exe",
+        "$resourcesDir\codex-command-runner.exe",
+        "$resourcesDir\codex-windows-sandbox-setup.exe"
     )
     foreach ($name in $expectedFiles) {
-        if (-not (Test-Path -LiteralPath (Join-Path $PackageDir $name) -PathType Leaf)) {
+        if (-not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $name)) {
             return $false
         }
     }
