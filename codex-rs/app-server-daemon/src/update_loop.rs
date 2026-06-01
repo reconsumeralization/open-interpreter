@@ -42,7 +42,7 @@ use crate::managed_install::executable_identity;
 #[cfg(unix)]
 use crate::managed_install::resolved_managed_codex_bin;
 #[cfg(unix)]
-use crate::product_install::InstallProduct;
+use codex_product_info::Product;
 
 #[cfg(unix)]
 const INITIAL_UPDATE_DELAY: Duration = Duration::from_secs(5 * 60);
@@ -157,7 +157,7 @@ pub(crate) fn reexec_managed_updater(managed_codex_bin: &std::path::Path) -> Res
 
 #[cfg(unix)]
 async fn install_latest_standalone() -> Result<()> {
-    let product = InstallProduct::current();
+    let product = Product::current();
     let script = reqwest::get(product.installer_url())
         .await
         .context("failed to fetch standalone Codex updater")?

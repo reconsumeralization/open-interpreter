@@ -1,7 +1,6 @@
 mod backend;
 mod client;
 mod managed_install;
-mod product_install;
 mod remote_control_client;
 mod settings;
 mod update_loop;
@@ -658,7 +657,7 @@ impl Daemon {
         }
 
         let managed_codex_path = self.managed_codex_bin.display();
-        let install_command = product_install::InstallProduct::current().install_command();
+        let install_command = codex_product_info::Product::current().install_command();
         Err(anyhow!(
             "managed standalone Codex install not found at {managed_codex_path}\n\n\
              This command requires the standalone install managed by the Codex installer, because \
