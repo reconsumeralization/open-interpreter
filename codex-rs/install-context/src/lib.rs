@@ -43,6 +43,7 @@ pub struct InstallContext {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PackageMetadata {
+    entrypoint: Option<PathBuf>,
     managed_codex: Option<PathBuf>,
 }
 
@@ -215,7 +216,10 @@ impl CodexPackageLayout {
 pub fn managed_codex_bin_from_package_dir(package_dir: &Path) -> Option<AbsolutePathBuf> {
     let package_dir = canonical_absolute_path(package_dir)?;
     let metadata = read_package_metadata(&package_dir)?;
-    let managed_codex = metadata.managed_codex.as_deref()?;
+    let managed_codex = metadata
+        .managed_codex
+        .as_deref()
+        .or(metadata.entrypoint.as_deref())?;
     package_relative_file(&package_dir, managed_codex)
 }
 
@@ -540,6 +544,30 @@ mod tests {
             managed_codex_bin_from_package_dir(package_dir.path()),
             Some(AbsolutePathBuf::from_absolute_path(
                 managed_codex.canonicalize()?
+            )?)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn package_metadata_falls_back_to_entrypoint_for_managed_codex_path() -> std::io::Result<()> {
+        let package_dir = tempfile::tempdir()?;
+        let bin_dir = package_dir.path().join(BIN_DIRNAME);
+        fs::create_dir_all(&bin_dir)?;
+        let entrypoint = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+        fs::write(&entrypoint, "")?;
+        fs::write(
+            package_dir.path().join(PACKAGE_METADATA_FILENAME),
+            format!(
+                "{{\"entrypoint\":\"bin/{}\"}}",
+                if cfg!(windows) { "codex.exe" } else { "codex" }
+            ),
+        )?;
+
+        assert_eq!(
+            managed_codex_bin_from_package_dir(package_dir.path()),
+            Some(AbsolutePathBuf::from_absolute_path(
+                entrypoint.canonicalize()?
             )?)
         );
         Ok(())

@@ -105,13 +105,6 @@ fi
 mv "$staging_dir" "$package_dir"
 cleanup_staging=false
 
-if [[ -x "$package_dir/bin/codex" ]]; then
-  ln -sf "bin/codex" "$package_dir/codex"
-fi
-if [[ -x "$package_dir/bin/interpreter" ]]; then
-  ln -sf "bin/interpreter" "$package_dir/interpreter"
-fi
-
 replace_symlink "$package_dir" "$current_link"
 replace_symlink "$current_link/bin/interpreter" "$install_dir/interpreter"
 replace_symlink "$current_link/bin/interpreter" "$install_dir/i"

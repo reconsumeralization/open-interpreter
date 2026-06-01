@@ -692,12 +692,6 @@ install_package_release() {
   if [ -f "$stage_release/codex-resources/bwrap" ]; then
     chmod 0755 "$stage_release/codex-resources/bwrap"
   fi
-  if [ -f "$stage_release/bin/codex" ]; then
-    ln -sf "bin/codex" "$stage_release/codex"
-  fi
-  command_relative_path="$(package_entrypoint_relative_path "$stage_release")"
-  ln -sf "$command_relative_path" "$stage_release/$COMMAND_NAME"
-
   if [ -e "$release_dir" ] || [ -L "$release_dir" ]; then
     rm -rf "$release_dir"
   fi
@@ -744,8 +738,7 @@ release_dir_is_complete() {
   case "$layout" in
     package)
       [ -f "$release_dir/codex-package.json" ] &&
-        [ -x "$release_dir/$COMMAND_NAME" ] &&
-        [ -x "$release_dir/codex" ] &&
+        [ -x "$release_dir/$(package_entrypoint_relative_path "$release_dir")" ] &&
         [ -x "$release_dir/codex-path/rg" ] ||
         return 1
       ;;

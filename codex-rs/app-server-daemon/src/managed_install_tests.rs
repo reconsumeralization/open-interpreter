@@ -54,6 +54,29 @@ fn managed_codex_bin_prefers_package_metadata() {
 }
 
 #[test]
+fn managed_codex_bin_uses_package_entrypoint_when_managed_codex_is_missing() {
+    let codex_home = TempDir::new().expect("codex home");
+    let current_dir = codex_home.path().join("packages/standalone/current");
+    let bin_dir = current_dir.join("bin");
+    std::fs::create_dir_all(&bin_dir).expect("create package bin");
+    let entrypoint = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    std::fs::write(&entrypoint, "").expect("write package entrypoint");
+    std::fs::write(
+        current_dir.join("codex-package.json"),
+        format!(
+            "{{\"entrypoint\":\"bin/{}\"}}",
+            if cfg!(windows) { "codex.exe" } else { "codex" }
+        ),
+    )
+    .expect("write package metadata");
+
+    assert_eq!(
+        managed_codex_bin(codex_home.path()),
+        entrypoint.canonicalize().expect("canonical entrypoint")
+    );
+}
+
+#[test]
 fn managed_codex_bin_falls_back_to_legacy_current_path() {
     let codex_home = TempDir::new().expect("codex home");
 
