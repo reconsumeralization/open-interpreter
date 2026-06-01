@@ -1,6 +1,7 @@
 mod backend;
 mod client;
 mod managed_install;
+mod product_install;
 mod remote_control_client;
 mod settings;
 mod update_loop;
@@ -657,11 +658,12 @@ impl Daemon {
         }
 
         let managed_codex_path = self.managed_codex_bin.display();
+        let install_command = product_install::InstallProduct::current().install_command();
         Err(anyhow!(
             "managed standalone Codex install not found at {managed_codex_path}\n\n\
              This command requires the standalone install managed by the Codex installer, because \
              the daemon starts and updates app-server from that fixed path.\n\n\
-             Install it with:\n  curl -fsSL https://chatgpt.com/codex/install.sh | sh\n\n\
+             Install it with:\n  {install_command}\n\n\
              Then rerun the command you just tried."
         ))
     }

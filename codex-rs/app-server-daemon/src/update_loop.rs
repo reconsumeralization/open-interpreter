@@ -41,6 +41,8 @@ use crate::managed_install::ExecutableIdentity;
 use crate::managed_install::executable_identity;
 #[cfg(unix)]
 use crate::managed_install::resolved_managed_codex_bin;
+#[cfg(unix)]
+use crate::product_install::InstallProduct;
 
 #[cfg(unix)]
 const INITIAL_UPDATE_DELAY: Duration = Duration::from_secs(5 * 60);
@@ -155,7 +157,8 @@ pub(crate) fn reexec_managed_updater(managed_codex_bin: &std::path::Path) -> Res
 
 #[cfg(unix)]
 async fn install_latest_standalone() -> Result<()> {
-    let script = reqwest::get("https://chatgpt.com/codex/install.sh")
+    let product = InstallProduct::current();
+    let script = reqwest::get(product.installer_url())
         .await
         .context("failed to fetch standalone Codex updater")?
         .error_for_status()
@@ -166,6 +169,7 @@ async fn install_latest_standalone() -> Result<()> {
 
     let mut child = Command::new("/bin/sh")
         .arg("-s")
+        .envs(product.installer_env().iter().copied())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

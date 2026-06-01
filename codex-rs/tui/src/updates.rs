@@ -4,6 +4,7 @@ use crate::legacy_core::config::Config;
 use crate::npm_registry;
 use crate::npm_registry::NpmPackageInfo;
 use crate::update_action;
+use crate::update_action::ProductUpdateSource;
 use crate::update_action::UpdateAction;
 use crate::update_versions::extract_version_from_latest_tag;
 use crate::update_versions::is_newer;
@@ -63,7 +64,6 @@ struct VersionInfo {
 const VERSION_FILENAME: &str = "version.json";
 // We use the latest version from the cask if installation is via homebrew - homebrew does not immediately pick up the latest release and can lag behind.
 const HOMEBREW_CASK_API_URL: &str = "https://formulae.brew.sh/api/cask/codex.json";
-const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/openai/codex/releases/latest";
 
 #[derive(Deserialize, Debug, Clone)]
 struct ReleaseInfo {
@@ -97,7 +97,8 @@ async fn check_for_update(version_file: &Path, action: Option<UpdateAction>) -> 
             version
         }
         Some(UpdateAction::NpmGlobalLatest) | Some(UpdateAction::BunGlobalLatest) => {
-            let latest_version = fetch_latest_github_release_version().await?;
+            let latest_version =
+                fetch_latest_github_release_version(ProductUpdateSource::Codex).await?;
             let package_info = create_client()
                 .get(npm_registry::PACKAGE_URL)
                 .send()
@@ -109,7 +110,7 @@ async fn check_for_update(version_file: &Path, action: Option<UpdateAction>) -> 
             latest_version
         }
         Some(UpdateAction::StandaloneUnix) | Some(UpdateAction::StandaloneWindows) | None => {
-            fetch_latest_github_release_version().await?
+            fetch_latest_github_release_version(ProductUpdateSource::current()).await?
         }
     };
 
@@ -129,11 +130,13 @@ async fn check_for_update(version_file: &Path, action: Option<UpdateAction>) -> 
     Ok(())
 }
 
-async fn fetch_latest_github_release_version() -> anyhow::Result<String> {
+async fn fetch_latest_github_release_version(
+    source: ProductUpdateSource,
+) -> anyhow::Result<String> {
     let ReleaseInfo {
         tag_name: latest_tag_name,
     } = create_client()
-        .get(LATEST_RELEASE_URL)
+        .get(source.latest_release_url())
         .send()
         .await?
         .error_for_status()?
