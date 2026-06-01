@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "v8-runtime"), allow(dead_code))]
+
 mod description;
 mod response;
 mod runtime;

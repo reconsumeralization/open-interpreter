@@ -28,6 +28,7 @@ use crate::runtime::RuntimeCommand;
 use crate::runtime::RuntimeControlCommand;
 use crate::runtime::RuntimeEvent;
 use crate::runtime::RuntimeResponse;
+use crate::runtime::RuntimeTerminateHandle;
 use crate::runtime::WaitOutcome;
 use crate::runtime::WaitRequest;
 use crate::runtime::WaitToPendingOutcome;
@@ -480,7 +481,7 @@ struct CellControlContext {
     runtime_tx: std::sync::mpsc::Sender<RuntimeCommand>,
     runtime_control_tx: std::sync::mpsc::Sender<RuntimeControlCommand>,
     pending_mode: PendingRuntimeMode,
-    runtime_terminate_handle: v8::IsolateHandle,
+    runtime_terminate_handle: RuntimeTerminateHandle,
     cancellation_token: CancellationToken,
 }
 
@@ -781,7 +782,7 @@ async fn run_cell_control(
                         yield_timer = None;
                         let _ = runtime_tx.send(RuntimeCommand::Terminate);
                         terminate_paused_runtime(&runtime_control_tx, pending_mode);
-                        let _ = runtime_terminate_handle.terminate_execution();
+                        runtime_terminate_handle.terminate_execution();
                         if runtime_closed {
                             if let Some(response_tx) = response_tx.take() {
                                 let response = RuntimeResponse::Terminated {
@@ -846,7 +847,7 @@ fn terminate_paused_runtime(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "v8-runtime"))]
 mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;

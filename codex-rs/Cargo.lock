@@ -3609,6 +3609,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "codex-root-tui"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "codex-app-server-daemon",
+ "codex-arg0",
+ "codex-config",
+ "codex-tui",
+ "codex-utils-absolute-path",
+ "codex-utils-cli",
+ "pretty_assertions",
+ "tempfile",
+]
+
+[[package]]
 name = "codex-sandboxing"
 version = "0.0.0"
 dependencies = [
