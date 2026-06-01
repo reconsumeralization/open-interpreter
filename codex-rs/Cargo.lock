@@ -2018,6 +2018,7 @@ dependencies = [
  "anyhow",
  "codex-app-server-protocol",
  "codex-app-server-transport",
+ "codex-install-context",
  "codex-product-info",
  "codex-uds",
  "codex-utils-home-dir",
@@ -3055,6 +3056,8 @@ dependencies = [
  "codex-utils-absolute-path",
  "codex-utils-home-dir",
  "pretty_assertions",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

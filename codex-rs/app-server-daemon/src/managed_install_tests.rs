@@ -1,6 +1,8 @@
 use pretty_assertions::assert_eq;
+use tempfile::TempDir;
 
 use super::executable_identity_from_bytes;
+use super::managed_codex_bin;
 use super::parse_codex_version;
 
 #[test]
@@ -24,4 +26,42 @@ fn executable_identity_uses_binary_contents() {
 
     assert_eq!(old, same);
     assert_ne!(old, new);
+}
+
+#[test]
+fn managed_codex_bin_prefers_package_metadata() {
+    let codex_home = TempDir::new().expect("codex home");
+    let current_dir = codex_home.path().join("packages/standalone/current");
+    let bin_dir = current_dir.join("bin");
+    std::fs::create_dir_all(&bin_dir).expect("create package bin");
+    let managed_codex = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    std::fs::write(&managed_codex, "").expect("write managed codex");
+    std::fs::write(
+        current_dir.join("codex-package.json"),
+        format!(
+            "{{\"managedCodex\":\"bin/{}\"}}",
+            if cfg!(windows) { "codex.exe" } else { "codex" }
+        ),
+    )
+    .expect("write package metadata");
+
+    assert_eq!(
+        managed_codex_bin(codex_home.path()),
+        managed_codex
+            .canonicalize()
+            .expect("canonical managed codex")
+    );
+}
+
+#[test]
+fn managed_codex_bin_falls_back_to_legacy_current_path() {
+    let codex_home = TempDir::new().expect("codex home");
+
+    assert_eq!(
+        managed_codex_bin(codex_home.path()),
+        codex_home
+            .path()
+            .join("packages/standalone/current")
+            .join(if cfg!(windows) { "codex.exe" } else { "codex" })
+    );
 }

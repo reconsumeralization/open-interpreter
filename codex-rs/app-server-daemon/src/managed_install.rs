@@ -17,11 +17,17 @@ use tokio::fs;
 use tokio::process::Command;
 
 pub(crate) fn managed_codex_bin(codex_home: &Path) -> PathBuf {
-    codex_home
+    let package_dir = codex_home
         .join("packages")
         .join("standalone")
-        .join("current")
-        .join(managed_codex_file_name())
+        .join("current");
+    if let Some(managed_codex) =
+        codex_install_context::managed_codex_bin_from_package_dir(&package_dir)
+    {
+        return managed_codex.into_path_buf();
+    }
+
+    package_dir.join(managed_codex_file_name())
 }
 
 #[cfg(unix)]
