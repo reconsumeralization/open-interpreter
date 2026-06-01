@@ -30,8 +30,10 @@ artifacts; pass a GNU Linux target explicitly for native glibc local builds. If
 prints its path after the package is built.
 
 The `--variant` flag selects the package entrypoint. Supported variants are
-`codex` and `codex-app-server`. The `version` field in `codex-package.json` is
-read from `[workspace.package].version` in `codex-rs/Cargo.toml`.
+`codex`, `codex-app-server`, and `open-interpreter`. The `open-interpreter`
+variant packages the `interpreter` entrypoint and a managed internal `codex`
+binary for the app-server daemon. The `version` field in `codex-package.json`
+is read from `[workspace.package].version` in `codex-rs/Cargo.toml`.
 
 ## Source-built artifacts
 
@@ -59,9 +61,11 @@ after signing instead of rebuilding resources.
 When the builder source-builds an entrypoint for a Darwin or Linux target, it
 downloads and verifies the matching Codex-built V8 release pair before invoking
 Cargo and sets `RUSTY_V8_ARCHIVE` plus `RUSTY_V8_SRC_BINDING_PATH` for that
-build. Windows targets keep Cargo's release-build MSVC artifact path. Explicit
-overrides remain authoritative when both variables are already set. Set
-`V8_FROM_SOURCE=1` to leave the build with the `v8` crate source-build path.
+build. Those environment variables are inert for package variants whose selected
+binaries do not enable the V8 runtime. Windows targets keep Cargo's release-build
+MSVC artifact path. Explicit overrides remain authoritative when both variables
+are already set. Set `V8_FROM_SOURCE=1` to leave the build with the `v8` crate
+source-build path.
 
 `rg` is not built from this repository, so the builder fetches it from the
 DotSlash manifest at `scripts/codex_package/rg`. Downloaded archives are cached

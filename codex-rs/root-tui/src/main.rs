@@ -5,6 +5,7 @@ use clap::Parser;
 use codex_app_server_daemon::LifecycleCommand;
 use codex_arg0::Arg0DispatchPaths;
 use codex_arg0::arg0_dispatch_or_else;
+use codex_product_info::OPEN_INTERPRETER_BRAND_ENV_VAR;
 use codex_tui::AppExitInfo;
 use codex_tui::ExitReason;
 use codex_tui::RemoteAppServerEndpoint;
@@ -16,7 +17,6 @@ use std::path::PathBuf;
 const CODEX_HOME_ENV_VAR: &str = "CODEX_HOME";
 const INTERPRETER_HOME_ENV_VAR: &str = "INTERPRETER_HOME";
 const OPEN_INTERPRETER_HOME_ENV_VAR: &str = "OPEN_INTERPRETER_HOME";
-const OPEN_INTERPRETER_BRAND_ENV_VAR: &str = "OPEN_INTERPRETER_BRAND";
 const DEFAULT_OPEN_INTERPRETER_HOME_DIR: &str = ".openinterpreter";
 
 #[derive(Parser, Debug)]

@@ -2018,6 +2018,7 @@ dependencies = [
  "anyhow",
  "codex-app-server-protocol",
  "codex-app-server-transport",
+ "codex-product-info",
  "codex-uds",
  "codex-utils-home-dir",
  "futures",
@@ -3452,6 +3453,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "codex-product-info"
+version = "0.0.0"
+
+[[package]]
 name = "codex-protocol"
 version = "0.0.0"
 dependencies = [
@@ -3617,6 +3622,7 @@ dependencies = [
  "codex-app-server-daemon",
  "codex-arg0",
  "codex-config",
+ "codex-product-info",
  "codex-tui",
  "codex-utils-absolute-path",
  "codex-utils-cli",
@@ -3858,6 +3864,7 @@ dependencies = [
  "codex-models-manager",
  "codex-otel",
  "codex-plugin",
+ "codex-product-info",
  "codex-protocol",
  "codex-realtime-webrtc",
  "codex-rollout",
