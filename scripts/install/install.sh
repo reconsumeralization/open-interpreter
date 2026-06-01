@@ -289,11 +289,48 @@ resolve_version() {
     return
   fi
 
-  release_json="$(download_text "https://api.github.com/repos/$GITHUB_REPO/releases/latest")"
-  tag="$(printf '%s\n' "$release_json" | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+  if [ -z "$RELEASE_TAG_PREFIX" ]; then
+    release_json="$(download_text "https://api.github.com/repos/$GITHUB_REPO/releases/latest")"
+  else
+    release_json="$(download_text "https://api.github.com/repos/$GITHUB_REPO/releases?per_page=100")"
+  fi
+  tag="$(printf '%s\n' "$release_json" |
+    awk -v prefix="$RELEASE_TAG_PREFIX" '
+      /"tag_name":[[:space:]]*"[^"]+"/ {
+        tag = $0
+        sub(/^.*"tag_name":[[:space:]]*"/, "", tag)
+        sub(/".*$/, "", tag)
+      }
+
+      /"draft":[[:space:]]*(true|false)/ {
+        draft = $0
+        sub(/^.*"draft":[[:space:]]*/, "", draft)
+        sub(/[,[:space:]].*$/, "", draft)
+      }
+
+      /"prerelease":[[:space:]]*(true|false)/ {
+        prerelease = $0
+        sub(/^.*"prerelease":[[:space:]]*/, "", prerelease)
+        sub(/[,[:space:]].*$/, "", prerelease)
+      }
+
+      tag != "" && draft != "" && prerelease != "" {
+        if (draft == "false" && prerelease == "false" && index(tag, prefix) == 1) {
+          print tag
+          exit
+        }
+        tag = ""
+        draft = ""
+        prerelease = ""
+      }
+    ' | head -n 1)"
+  if [ -z "$tag" ]; then
+    echo "Failed to resolve the latest $PRODUCT_NAME release version." >&2
+    exit 1
+  fi
   resolved="$(normalize_version "$tag")"
 
-  if [ -z "$resolved" ]; then
+  if [ -z "$resolved" ] || [ "$resolved" = "latest" ]; then
     echo "Failed to resolve the latest $PRODUCT_NAME release version." >&2
     exit 1
   fi

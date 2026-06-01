@@ -228,13 +228,24 @@ function Resolve-Version {
         return $normalizedVersion
     }
 
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
+    if ([string]::IsNullOrWhiteSpace($ReleaseTagPrefix)) {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
+    } else {
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=100"
+        $release = $releases |
+            Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -like "$ReleaseTagPrefix*" } |
+            Select-Object -First 1
+    }
     if (-not $release.tag_name) {
         Write-Error "Failed to resolve the latest $ProductName release version."
         exit 1
     }
 
     $resolvedVersion = Normalize-Version -RawVersion $release.tag_name
+    if ($resolvedVersion -eq "latest") {
+        Write-Error "Failed to resolve the latest $ProductName release version."
+        exit 1
+    }
     Assert-ValidReleaseVersion -Version $resolvedVersion
     return $resolvedVersion
 }
