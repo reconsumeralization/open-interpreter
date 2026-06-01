@@ -31,14 +31,19 @@ class PackageVariant:
     name: str
     cargo_bin: str
     executable_stem: str
+    managed_codex_required: bool = False
 
     def entrypoint_name(self, spec: TargetSpec) -> str:
         return f"{self.executable_stem}{spec.exe_suffix}"
+
+    def managed_codex_name(self, spec: TargetSpec) -> str:
+        return f"codex{spec.exe_suffix}"
 
 
 @dataclass(frozen=True)
 class PackageInputs:
     entrypoint_bin: Path
+    managed_codex_bin: Path | None
     rg_bin: Path
     zsh_bin: Path | None
     bwrap_bin: Path | None
@@ -56,6 +61,12 @@ PACKAGE_VARIANTS: dict[str, PackageVariant] = {
         name="codex-app-server",
         cargo_bin="codex-app-server",
         executable_stem="codex-app-server",
+    ),
+    "open-interpreter": PackageVariant(
+        name="open-interpreter",
+        cargo_bin="interpreter-root-tui",
+        executable_stem="interpreter",
+        managed_codex_required=True,
     ),
 }
 

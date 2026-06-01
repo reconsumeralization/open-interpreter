@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: build-codex-package-archive.sh \
   --target <rust-target> \
-  --bundle <primary|app-server> \
+  --bundle <primary|app-server|open-interpreter> \
   --entrypoint-dir <dir> \
   --archive-dir <dir> \
   [--bwrap-bin <path>] \
@@ -96,6 +96,11 @@ case "$bundle" in
     entrypoint="codex-app-server"
     archive_stem="codex-app-server-package"
     ;;
+  open-interpreter)
+    variant="open-interpreter"
+    entrypoint="interpreter-root-tui"
+    archive_stem="open-interpreter-package"
+    ;;
   *)
     echo "No Codex package variant for bundle: $bundle" >&2
     exit 1
@@ -164,6 +169,9 @@ python_args=(
   --archive-output "$gzip_archive_path"
   --archive-output "$zstd_archive_path"
 )
+if [[ "$bundle" == "open-interpreter" ]]; then
+  python_args+=(--managed-codex-bin "${entrypoint_dir%/}/codex${exe_suffix}")
+fi
 if ((${#resource_args[@]} > 0)); then
   python_args+=("${resource_args[@]}")
 fi

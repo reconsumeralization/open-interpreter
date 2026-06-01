@@ -49,6 +49,14 @@ def build_package_dir(
         bin_dir / entrypoint_name,
         is_windows=spec.is_windows,
     )
+    if variant.managed_codex_required:
+        if inputs.managed_codex_bin is None:
+            raise RuntimeError(f"{variant.name} packages require a managed Codex binary.")
+        copy_executable(
+            inputs.managed_codex_bin,
+            bin_dir / variant.managed_codex_name(spec),
+            is_windows=spec.is_windows,
+        )
     copy_executable(inputs.rg_bin, path_dir / spec.rg_name, is_windows=spec.is_windows)
 
     if inputs.zsh_bin is not None:
@@ -84,6 +92,8 @@ def build_package_dir(
         "resourcesDir": "codex-resources",
         "pathDir": "codex-path",
     }
+    if variant.managed_codex_required:
+        metadata["managedCodex"] = f"bin/{variant.managed_codex_name(spec)}"
     write_json(package_dir / "codex-package.json", metadata)
 
 
@@ -131,6 +141,11 @@ def validate_package_dir(
         Path("codex-path") / spec.rg_name,
     ]
     executable_files = list(required_files)
+
+    if variant.managed_codex_required:
+        managed_codex_path = Path("bin") / variant.managed_codex_name(spec)
+        required_files.append(managed_codex_path)
+        executable_files.append(managed_codex_path)
 
     if include_zsh:
         zsh_path = Path("codex-resources") / ZSH_RESOURCE_PATH

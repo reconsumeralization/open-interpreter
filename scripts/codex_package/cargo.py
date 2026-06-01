@@ -17,6 +17,7 @@ CODEX_RS_ROOT = REPO_ROOT / "codex-rs"
 @dataclass(frozen=True)
 class SourceBuildOutputs:
     entrypoint_bin: Path
+    managed_codex_bin: Path | None
     bwrap_bin: Path | None
     codex_command_runner_bin: Path | None
     codex_windows_sandbox_setup_bin: Path | None
@@ -29,6 +30,7 @@ def build_source_binaries(
     cargo: str,
     profile: str,
     entrypoint_bin: Path | None,
+    managed_codex_bin: Path | None,
     bwrap_bin: Path | None,
     codex_command_runner_bin: Path | None,
     codex_windows_sandbox_setup_bin: Path | None,
@@ -43,6 +45,7 @@ def build_source_binaries(
         spec,
         variant,
         build_entrypoint=entrypoint_bin is None,
+        build_managed_codex=variant.managed_codex_required and managed_codex_bin is None,
         build_bwrap=spec.is_linux and bwrap_bin is None,
         build_codex_command_runner=spec.is_windows
         and codex_command_runner_bin is None,
@@ -81,6 +84,12 @@ def build_source_binaries(
             entrypoint_bin,
             output_dir / variant.entrypoint_name(spec),
         ),
+        managed_codex_bin=resolve_output_path(
+            managed_codex_bin,
+            output_dir / variant.managed_codex_name(spec)
+            if variant.managed_codex_required
+            else None,
+        ),
         bwrap_bin=resolve_output_path(
             bwrap_bin,
             output_dir / "bwrap" if spec.is_linux else None,
@@ -103,6 +112,7 @@ def source_binaries_for_target(
     variant: PackageVariant,
     *,
     build_entrypoint: bool,
+    build_managed_codex: bool,
     build_bwrap: bool,
     build_codex_command_runner: bool,
     build_codex_windows_sandbox_setup: bool,
@@ -110,6 +120,8 @@ def source_binaries_for_target(
     binaries = []
     if build_entrypoint:
         binaries.append(variant.cargo_bin)
+    if build_managed_codex:
+        binaries.append("codex")
     if build_bwrap:
         binaries.append("bwrap")
     if build_codex_command_runner:
@@ -173,6 +185,7 @@ def cargo_profile_dirname(profile: str) -> str:
 def validate_source_outputs(outputs: SourceBuildOutputs) -> None:
     for path in [
         outputs.entrypoint_bin,
+        outputs.managed_codex_bin,
         outputs.bwrap_bin,
         outputs.codex_command_runner_bin,
         outputs.codex_windows_sandbox_setup_bin,

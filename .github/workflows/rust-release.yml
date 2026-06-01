@@ -168,6 +168,12 @@ jobs:
             binaries: "codex-app-server"
             build_dmg: "false"
           - runner: macos-15-xlarge
+            target: aarch64-apple-darwin
+            bundle: open-interpreter
+            artifact_name: aarch64-apple-darwin-open-interpreter
+            binaries: "codex interpreter-root-tui"
+            build_dmg: "false"
+          - runner: macos-15-xlarge
             target: x86_64-apple-darwin
             bundle: primary
             artifact_name: x86_64-apple-darwin
@@ -178,6 +184,12 @@ jobs:
             bundle: app-server
             artifact_name: x86_64-apple-darwin-app-server
             binaries: "codex-app-server"
+            build_dmg: "false"
+          - runner: macos-15-xlarge
+            target: x86_64-apple-darwin
+            bundle: open-interpreter
+            artifact_name: x86_64-apple-darwin-open-interpreter
+            binaries: "codex interpreter-root-tui"
             build_dmg: "false"
           # Release artifacts intentionally ship MUSL-linked Linux binaries.
           - runner: codex-linux-x64-xl
@@ -192,6 +204,12 @@ jobs:
             artifact_name: x86_64-unknown-linux-musl-app-server
             binaries: "codex-app-server"
             build_dmg: "false"
+          - runner: codex-linux-x64-xl
+            target: x86_64-unknown-linux-musl
+            bundle: open-interpreter
+            artifact_name: x86_64-unknown-linux-musl-open-interpreter
+            binaries: "codex interpreter-root-tui bwrap"
+            build_dmg: "false"
           - runner: codex-linux-arm64
             target: aarch64-unknown-linux-musl
             bundle: primary
@@ -203,6 +221,12 @@ jobs:
             bundle: app-server
             artifact_name: aarch64-unknown-linux-musl-app-server
             binaries: "codex-app-server"
+            build_dmg: "false"
+          - runner: codex-linux-arm64
+            target: aarch64-unknown-linux-musl
+            bundle: open-interpreter
+            artifact_name: aarch64-unknown-linux-musl-open-interpreter
+            binaries: "codex interpreter-root-tui bwrap"
             build_dmg: "false"
 
     steps:
@@ -599,6 +623,11 @@ jobs:
             artifact_name: aarch64-apple-darwin-app-server
             binaries: "codex-app-server"
             build_dmg: "false"
+          - target: aarch64-apple-darwin
+            bundle: open-interpreter
+            artifact_name: aarch64-apple-darwin-open-interpreter
+            binaries: "codex interpreter-root-tui"
+            build_dmg: "false"
           - target: x86_64-apple-darwin
             bundle: primary
             artifact_name: x86_64-apple-darwin
@@ -608,6 +637,11 @@ jobs:
             bundle: app-server
             artifact_name: x86_64-apple-darwin-app-server
             binaries: "codex-app-server"
+            build_dmg: "false"
+          - target: x86_64-apple-darwin
+            bundle: open-interpreter
+            artifact_name: x86_64-apple-darwin-open-interpreter
+            binaries: "codex interpreter-root-tui"
             build_dmg: "false"
 
     steps:
@@ -1024,8 +1058,10 @@ jobs:
             ! -name '*-apple-darwin*-unsigned' \
             ! -name 'aarch64-unknown-linux-musl' \
             ! -name 'aarch64-unknown-linux-musl-app-server' \
+            ! -name 'aarch64-unknown-linux-musl-open-interpreter' \
             ! -name 'x86_64-unknown-linux-musl' \
             ! -name 'x86_64-unknown-linux-musl-app-server' \
+            ! -name 'x86_64-unknown-linux-musl-open-interpreter' \
             ! -name 'aarch64-pc-windows-msvc' \
             ! -name 'x86_64-pc-windows-msvc' \
             -exec rm -rf {} +
@@ -1053,7 +1089,7 @@ jobs:
           manifest="dist/codex-package_SHA256SUMS"
           tmp_manifest="$(mktemp)"
           find dist -type f \
-            \( -name 'codex-package-*.tar.gz' -o -name 'codex-app-server-package-*.tar.gz' \) \
+            \( -name 'codex-package-*.tar.gz' -o -name 'codex-app-server-package-*.tar.gz' -o -name 'open-interpreter-package-*.tar.gz' \) \
             -print |
             sort |
             while IFS= read -r archive; do

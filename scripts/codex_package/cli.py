@@ -85,6 +85,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--managed-codex-bin",
+        type=Path,
+        help=(
+            "Optional prebuilt Codex CLI executable for package variants that "
+            "need an internal managed Codex daemon command."
+        ),
+    )
+    parser.add_argument(
         "--bwrap-bin",
         type=Path,
         help=(
@@ -142,6 +150,11 @@ def main() -> int:
             "prebuilt entrypoint executable",
             "--entrypoint-bin",
         ),
+        managed_codex_bin=resolve_optional_input_path(
+            args.managed_codex_bin,
+            "prebuilt managed Codex executable",
+            "--managed-codex-bin",
+        ),
         bwrap_bin=resolve_optional_input_path(
             args.bwrap_bin,
             "prebuilt Linux bwrap executable",
@@ -158,9 +171,14 @@ def main() -> int:
             "--codex-windows-sandbox-setup-bin",
         ),
     )
+    if not variant.managed_codex_required and source_outputs.managed_codex_bin is not None:
+        raise RuntimeError(
+            f"--managed-codex-bin is not supported for {variant.name} packages."
+        )
     version = read_workspace_version()
     inputs = PackageInputs(
         entrypoint_bin=source_outputs.entrypoint_bin,
+        managed_codex_bin=source_outputs.managed_codex_bin,
         rg_bin=resolve_rg_bin(spec, args.rg_bin),
         zsh_bin=resolve_zsh_bin(spec),
         bwrap_bin=source_outputs.bwrap_bin,

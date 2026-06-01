@@ -20,6 +20,7 @@ class SourceBinariesForTargetTest(unittest.TestCase):
                 TARGET_SPECS["aarch64-apple-darwin"],
                 PACKAGE_VARIANTS["codex"],
                 build_entrypoint=False,
+                build_managed_codex=False,
                 build_bwrap=False,
                 build_codex_command_runner=False,
                 build_codex_windows_sandbox_setup=False,
@@ -33,6 +34,7 @@ class SourceBinariesForTargetTest(unittest.TestCase):
                 TARGET_SPECS["x86_64-unknown-linux-musl"],
                 PACKAGE_VARIANTS["codex"],
                 build_entrypoint=False,
+                build_managed_codex=False,
                 build_bwrap=False,
                 build_codex_command_runner=False,
                 build_codex_windows_sandbox_setup=False,
@@ -46,6 +48,7 @@ class SourceBinariesForTargetTest(unittest.TestCase):
                 TARGET_SPECS["x86_64-pc-windows-msvc"],
                 PACKAGE_VARIANTS["codex"],
                 build_entrypoint=False,
+                build_managed_codex=False,
                 build_bwrap=False,
                 build_codex_command_runner=False,
                 build_codex_windows_sandbox_setup=False,
@@ -59,6 +62,7 @@ class SourceBinariesForTargetTest(unittest.TestCase):
                 TARGET_SPECS["x86_64-pc-windows-msvc"],
                 PACKAGE_VARIANTS["codex"],
                 build_entrypoint=False,
+                build_managed_codex=False,
                 build_bwrap=False,
                 build_codex_command_runner=True,
                 build_codex_windows_sandbox_setup=True,
@@ -79,6 +83,7 @@ class SourceBinariesForTargetTest(unittest.TestCase):
                 cargo=str(root / "cargo-that-should-not-run"),
                 profile="release",
                 entrypoint_bin=entrypoint,
+                managed_codex_bin=None,
                 bwrap_bin=None,
                 codex_command_runner_bin=command_runner,
                 codex_windows_sandbox_setup_bin=sandbox_setup,
@@ -87,6 +92,20 @@ class SourceBinariesForTargetTest(unittest.TestCase):
         self.assertEqual(outputs.entrypoint_bin, entrypoint)
         self.assertEqual(outputs.codex_command_runner_bin, command_runner)
         self.assertEqual(outputs.codex_windows_sandbox_setup_bin, sandbox_setup)
+
+    def test_open_interpreter_package_builds_managed_codex_when_missing(self) -> None:
+        self.assertEqual(
+            source_binaries_for_target(
+                TARGET_SPECS["aarch64-apple-darwin"],
+                PACKAGE_VARIANTS["open-interpreter"],
+                build_entrypoint=False,
+                build_managed_codex=True,
+                build_bwrap=False,
+                build_codex_command_runner=False,
+                build_codex_windows_sandbox_setup=False,
+            ),
+            ["codex"],
+        )
 
 
 def touch_file(path: Path) -> Path:
