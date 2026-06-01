@@ -660,8 +660,8 @@ impl Daemon {
         let install_command = codex_product_info::Product::current().install_command();
         Err(anyhow!(
             "managed standalone Codex install not found at {managed_codex_path}\n\n\
-             This command requires the standalone install managed by the Codex installer, because \
-             the daemon starts and updates app-server from that fixed path.\n\n\
+             This command requires the standalone install managed by the product installer, because \
+             the daemon starts and updates app-server from the resolved managed binary path.\n\n\
              Install it with:\n  {install_command}\n\n\
              Then rerun the command you just tried."
         ))
