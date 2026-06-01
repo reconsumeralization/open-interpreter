@@ -13,7 +13,15 @@ INSTALL_SH = REPO_ROOT / "scripts" / "install" / "install.sh"
 
 
 class InstallShLatestResolutionTests(unittest.TestCase):
-    def run_installer_with_release_list(self, release_list: str) -> subprocess.CompletedProcess[str]:
+    def run_installer_with_release_list(
+        self,
+        release_list: str,
+        *,
+        repo: str = "KillianLucas/oix",
+        product_name: str = "Open Interpreter",
+        package_asset_stem: str = "open-interpreter-package",
+        command_name: str = "interpreter",
+    ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
             release_list_path = tmp / "releases.json"
@@ -33,6 +41,9 @@ class InstallShLatestResolutionTests(unittest.TestCase):
                       */releases/tags/rust-v0.2.0)
                         printf '{{"assets":[]}}\\n'
                         ;;
+                      */releases/tags/rust-v0.135.0)
+                        printf '{{"assets":[]}}\\n'
+                        ;;
                       *)
                         echo "unexpected curl URL: $url" >&2
                         exit 42
@@ -47,10 +58,10 @@ class InstallShLatestResolutionTests(unittest.TestCase):
             env = {
                 **os.environ,
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
-                "CODEX_GITHUB_REPO": "KillianLucas/oix",
-                "CODEX_INSTALL_PRODUCT_NAME": "Open Interpreter",
-                "CODEX_PACKAGE_ASSET_STEM": "open-interpreter-package",
-                "CODEX_COMMAND_NAME": "interpreter",
+                "CODEX_GITHUB_REPO": repo,
+                "CODEX_INSTALL_PRODUCT_NAME": product_name,
+                "CODEX_PACKAGE_ASSET_STEM": package_asset_stem,
+                "CODEX_COMMAND_NAME": command_name,
                 "CODEX_RELEASE_TAG_PREFIX": "rust-v",
                 "CODEX_NON_INTERACTIVE": "1",
                 "CODEX_HOME": str(tmp / "home"),
@@ -114,6 +125,33 @@ class InstallShLatestResolutionTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Could not find Open Interpreter release assets for 0.2.0.", result.stderr)
+
+    def test_default_codex_latest_skips_prereleases(self) -> None:
+        result = self.run_installer_with_release_list(
+            textwrap.dedent(
+                """\
+                [
+                  {
+                    "tag_name": "rust-v0.136.0-alpha.2",
+                    "draft": false,
+                    "prerelease": true
+                  },
+                  {
+                    "tag_name": "rust-v0.135.0",
+                    "draft": false,
+                    "prerelease": false
+                  }
+                ]
+                """
+            ),
+            repo="openai/codex",
+            product_name="Codex CLI",
+            package_asset_stem="codex-package",
+            command_name="codex",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Could not find Codex CLI release assets for 0.135.0.", result.stderr)
 
 
 if __name__ == "__main__":
