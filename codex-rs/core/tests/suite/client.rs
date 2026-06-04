@@ -909,6 +909,8 @@ async fn send_provider_auth_request(server: &MockServer, auth: ModelProviderAuth
         /*enable_request_compression*/ false,
         /*include_timing_metrics*/ false,
         /*beta_features_header*/ None,
+        codex_tools::Harness::Native,
+        /*harness_guidance*/ true,
         /*attestation_provider*/ None,
     );
     let mut client_session = client.new_session();
@@ -2366,6 +2368,8 @@ async fn azure_responses_request_includes_store_and_reasoning_ids() {
         /*enable_request_compression*/ false,
         /*include_timing_metrics*/ false,
         /*beta_features_header*/ None,
+        codex_tools::Harness::Native,
+        /*harness_guidance*/ true,
         /*attestation_provider*/ None,
     );
     let mut client_session = client.new_session();

@@ -51,6 +51,8 @@ pub(super) async fn resolve_provider_auth(
             token: Some(token),
             account_id: None,
             is_fedramp_account: false,
+            token_header_name: None,
+            use_bearer_prefix: true,
         })),
         BedrockAuthMethod::AwsSdkAuth { context } => {
             Ok(Arc::new(BedrockMantleSigV4AuthProvider::new(context)))
@@ -180,6 +182,8 @@ mod tests {
             token: Some(token),
             account_id: None,
             is_fedramp_account: false,
+            token_header_name: None,
+            use_bearer_prefix: true,
         };
         let mut headers = http::HeaderMap::new();
 

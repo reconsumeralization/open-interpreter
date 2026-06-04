@@ -215,6 +215,10 @@ async fn run_remote_compact_task_inner_impl(
         personality: turn_context.personality,
         output_schema: None,
         output_schema_strict: true,
+        cwd: turn_context
+            .environments
+            .primary()
+            .map(|turn_environment| turn_environment.cwd.to_path_buf()),
     };
 
     let window_id = sess.services.model_client.current_window_id();

@@ -2627,7 +2627,8 @@ mod tests {
                 "params": {
                     "limit": null,
                     "cursor": null,
-                    "includeHidden": null
+                    "includeHidden": null,
+                    "modelProvider": null
                 }
             }),
             serde_json::to_value(&request)?,

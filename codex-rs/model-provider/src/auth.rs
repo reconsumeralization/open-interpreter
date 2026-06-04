@@ -93,14 +93,24 @@ fn bearer_auth_for_provider(
     provider: &ModelProviderInfo,
 ) -> codex_protocol::error::Result<Option<BearerAuthProvider>> {
     if let Some(api_key) = provider.api_key()? {
-        return Ok(Some(BearerAuthProvider::new(api_key)));
+        return Ok(Some(provider_auth_token(api_key, provider)));
     }
 
     if let Some(token) = provider.experimental_bearer_token.clone() {
-        return Ok(Some(BearerAuthProvider::new(token)));
+        return Ok(Some(provider_auth_token(token, provider)));
     }
 
     Ok(None)
+}
+
+fn provider_auth_token(token: String, provider: &ModelProviderInfo) -> BearerAuthProvider {
+    BearerAuthProvider {
+        token: Some(token),
+        account_id: None,
+        is_fedramp_account: false,
+        token_header_name: provider.is_anthropic_provider().then_some("x-api-key"),
+        use_bearer_prefix: !provider.is_anthropic_provider(),
+    }
 }
 
 /// Builds request-header auth for a first-party Codex auth snapshot.
@@ -114,6 +124,8 @@ pub fn auth_provider_from_auth(auth: &CodexAuth) -> SharedAuthProvider {
                 token: auth.get_token().ok(),
                 account_id: auth.get_account_id(),
                 is_fedramp_account: auth.is_fedramp_account(),
+                token_header_name: None,
+                use_bearer_prefix: true,
             })
         }
     }

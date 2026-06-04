@@ -4,6 +4,9 @@
 //! into another, especially while Plan mode is active.
 
 use super::*;
+use codex_model_provider_info::WireApi;
+use codex_model_provider_info::bundled_provider_catalog_entry;
+use codex_model_provider_info::default_harness_for_provider_model;
 
 impl ChatWidget {
     /// Open a popup to choose a quick auto model. Selecting "All models"
@@ -17,17 +20,80 @@ impl ChatWidget {
             return;
         }
 
-        let presets: Vec<ModelPreset> = match self.model_catalog.try_list_models() {
-            Ok(models) => models,
-            Err(_) => {
-                self.add_info_message(
-                    "Models are being updated; please try /model again in a moment.".to_string(),
-                    /*hint*/ None,
-                );
-                return;
-            }
-        };
-        self.open_model_popup_with_presets(presets);
+        self.open_model_provider_popup();
+    }
+
+    pub(crate) fn open_current_harness_popup(&mut self) {
+        if !self.is_session_configured() {
+            self.add_info_message(
+                "Harness selection is disabled until startup completes.".to_string(),
+                /*hint*/ None,
+            );
+            return;
+        }
+
+        self.open_harness_popup(
+            self.current_model().to_string(),
+            self.effective_reasoning_effort(),
+        );
+    }
+
+    fn open_model_provider_popup(&mut self) {
+        let mut providers: Vec<_> = self
+            .config
+            .model_providers
+            .iter()
+            .map(|(provider_id, provider)| (provider_id.clone(), provider.clone()))
+            .collect();
+        providers.sort_by(|left, right| {
+            let left_current = left.0 == self.config.model_provider_id;
+            let right_current = right.0 == self.config.model_provider_id;
+            right_current
+                .cmp(&left_current)
+                .then_with(|| {
+                    provider_sort_priority(left.0.as_str())
+                        .cmp(&provider_sort_priority(right.0.as_str()))
+                })
+                .then_with(|| {
+                    left.1
+                        .name
+                        .to_ascii_lowercase()
+                        .cmp(&right.1.name.to_ascii_lowercase())
+                })
+        });
+
+        let items: Vec<SelectionItem> = providers
+            .into_iter()
+            .map(|(provider_id, provider)| {
+                let provider_name = provider.name.clone();
+                let description = provider_description(provider_id.as_str(), &provider);
+                let search_value = Some(format!("{provider_id} {provider_name} {description}"));
+                SelectionItem {
+                    name: provider_name.clone(),
+                    description: Some(description),
+                    is_current: provider_id == self.config.model_provider_id,
+                    actions: vec![Box::new(move |tx| {
+                        tx.send(AppEvent::LoadProviderModels {
+                            provider_id: provider_id.clone(),
+                            provider_name: provider_name.clone(),
+                        });
+                    })],
+                    dismiss_on_select: true,
+                    search_value,
+                    ..Default::default()
+                }
+            })
+            .collect();
+
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            title: Some("Select Provider".to_string()),
+            subtitle: Some("Choose a provider for the next chat.".to_string()),
+            footer_hint: Some("Type to filter • Enter to continue • Esc to dismiss".into()),
+            items,
+            is_searchable: true,
+            search_placeholder: Some("Filter providers".to_string()),
+            ..Default::default()
+        });
     }
 
     fn model_menu_header(&self, title: &str, subtitle: &str) -> Box<dyn Renderable> {
@@ -69,6 +135,7 @@ impl ChatWidget {
         Some(trimmed.to_string())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn open_model_popup_with_presets(&mut self, presets: Vec<ModelPreset>) {
         let presets: Vec<ModelPreset> = presets
             .into_iter()
@@ -154,10 +221,12 @@ impl ChatWidget {
         });
     }
 
+    #[allow(dead_code)]
     fn is_auto_model(model: &str) -> bool {
         model.starts_with("codex-auto-")
     }
 
+    #[allow(dead_code)]
     fn auto_model_order(model: &str) -> usize {
         match model {
             "codex-auto-fast" => 0,
@@ -213,6 +282,7 @@ impl ChatWidget {
         });
     }
 
+    #[allow(dead_code)]
     fn model_selection_actions(
         model_for_action: String,
         effort_for_action: Option<ReasoningEffortConfig>,
@@ -227,9 +297,7 @@ impl ChatWidget {
                 return;
             }
 
-            tx.send(AppEvent::UpdateModel(model_for_action.clone()));
-            tx.send(AppEvent::UpdateReasoningEffort(effort_for_action));
-            tx.send(AppEvent::PersistModelSelection {
+            tx.send(AppEvent::OpenHarnessPopup {
                 model: model_for_action.clone(),
                 effort: effort_for_action,
             });
@@ -475,9 +543,7 @@ impl ChatWidget {
                         effort: choice_effort,
                     });
                 } else {
-                    tx.send(AppEvent::UpdateModel(model_for_action.clone()));
-                    tx.send(AppEvent::UpdateReasoningEffort(choice_effort));
-                    tx.send(AppEvent::PersistModelSelection {
+                    tx.send(AppEvent::OpenHarnessPopup {
                         model: model_for_action.clone(),
                         effort: choice_effort,
                     });
@@ -534,5 +600,523 @@ impl ChatWidget {
         self.apply_model_and_effort_without_persist(model.clone(), effort);
         self.app_event_tx
             .send(AppEvent::PersistModelSelection { model, effort });
+    }
+
+    pub(crate) fn open_model_popup_for_provider(
+        &mut self,
+        provider_id: String,
+        provider_name: String,
+        presets: Vec<ModelPreset>,
+    ) {
+        let mut presets: Vec<ModelPreset> = presets
+            .into_iter()
+            .filter(|preset| preset.show_in_picker)
+            .collect();
+        presets.sort_by(|left, right| left.model.cmp(&right.model));
+
+        let mut items: Vec<SelectionItem> = presets
+            .into_iter()
+            .map(|preset| {
+                let provider_id_for_action = provider_id.clone();
+                let provider_name_for_action = provider_name.clone();
+                let single_supported_effort = single_supported_reasoning_effort(&preset);
+                let actions: Vec<SelectionAction> = if let Some(effort) = single_supported_effort {
+                    let model = preset.model.clone();
+                    vec![Box::new(move |tx| {
+                        tx.send(AppEvent::OpenHarnessPopupForProvider {
+                            provider_id: provider_id_for_action.clone(),
+                            provider_name: provider_name_for_action.clone(),
+                            model: model.clone(),
+                            effort,
+                        });
+                    })]
+                } else {
+                    let preset_for_action = preset.clone();
+                    vec![Box::new(move |tx| {
+                        tx.send(AppEvent::OpenReasoningPopupForProvider {
+                            provider_id: provider_id_for_action.clone(),
+                            provider_name: provider_name_for_action.clone(),
+                            model: preset_for_action.clone(),
+                        });
+                    })]
+                };
+                SelectionItem {
+                    name: preset.model.clone(),
+                    description: provider_model_description(
+                        self.config.model_providers.get(provider_id.as_str()),
+                        provider_id.as_str(),
+                        provider_name.as_str(),
+                        preset.model.as_str(),
+                        preset.description.as_str(),
+                    ),
+                    is_current: provider_id == self.config.model_provider_id
+                        && preset.model == self.current_model(),
+                    is_default: preset.is_default,
+                    actions,
+                    dismiss_on_select: single_supported_effort.is_some(),
+                    search_value: Some(format!(
+                        "{} {} {}",
+                        preset.model, preset.display_name, preset.description
+                    )),
+                    ..Default::default()
+                }
+            })
+            .collect();
+
+        let provider_id_for_action = provider_id;
+        let provider_name_for_action = provider_name.clone();
+        items.push(SelectionItem {
+            name: "Custom model name".to_string(),
+            description: Some("Type a model id that this provider accepts.".to_string()),
+            actions: vec![Box::new(move |tx| {
+                tx.send(AppEvent::OpenCustomProviderModelPrompt {
+                    provider_id: provider_id_for_action.clone(),
+                    provider_name: provider_name_for_action.clone(),
+                    initial_text: None,
+                });
+            })],
+            dismiss_on_select: true,
+            keep_visible_during_search: true,
+            search_value: Some("custom manual typed model".to_string()),
+            ..Default::default()
+        });
+
+        let header = self.model_menu_header(
+            &format!("Select Model for {provider_name}"),
+            "Choose a listed model or type a model id.",
+        );
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            footer_hint: Some("Type to filter • Enter to select • Esc to dismiss".into()),
+            items,
+            header,
+            is_searchable: true,
+            search_placeholder: Some("Filter models".to_string()),
+            ..Default::default()
+        });
+    }
+
+    pub(crate) fn open_custom_model_prompt_for_provider(
+        &mut self,
+        provider_id: String,
+        provider_name: String,
+        initial_text: Option<String>,
+    ) {
+        let tx = self.app_event_tx.clone();
+        let view = CustomPromptView::new(
+            format!("{provider_name} model name"),
+            "Type any model id, then press Enter".to_string(),
+            initial_text.unwrap_or_default(),
+            Some("This will start a new chat with the selected provider.".to_string()),
+            Box::new(move |model: String| {
+                let model = model.trim().to_string();
+                if model.is_empty() {
+                    return;
+                }
+                tx.send(AppEvent::OpenHarnessPopupForProvider {
+                    provider_id: provider_id.clone(),
+                    provider_name: provider_name.clone(),
+                    model,
+                    effort: None,
+                });
+            }),
+        );
+        self.bottom_pane.show_view(Box::new(view));
+    }
+
+    pub(crate) fn open_reasoning_popup_for_provider(
+        &mut self,
+        provider_id: String,
+        provider_name: String,
+        preset: ModelPreset,
+    ) {
+        let default_effort = preset.default_reasoning_effort;
+        let supported = preset.supported_reasoning_efforts;
+        if supported.is_empty() {
+            self.app_event_tx
+                .send(AppEvent::OpenHarnessPopupForProvider {
+                    provider_id,
+                    provider_name,
+                    model: preset.model,
+                    effort: None,
+                });
+            return;
+        }
+
+        let choices: Vec<_> = ReasoningEffortConfig::iter()
+            .filter(|effort| supported.iter().any(|option| option.effort == *effort))
+            .map(|effort| {
+                let mut label = Self::reasoning_effort_label(effort).to_string();
+                if effort == default_effort {
+                    label.push_str(" (default)");
+                }
+                let description = supported
+                    .iter()
+                    .find(|option| option.effort == effort)
+                    .map(|option| option.description.to_string())
+                    .filter(|text| !text.is_empty());
+                (label, Some(effort), description)
+            })
+            .collect();
+        let initial_selected_idx = choices
+            .iter()
+            .position(|(_, effort, _)| *effort == Some(default_effort));
+
+        let mut items = Vec::new();
+        for (label, effort, description) in choices {
+            let provider_id_for_action = provider_id.clone();
+            let provider_name_for_action = provider_name.clone();
+            let model = preset.model.clone();
+            items.push(SelectionItem {
+                name: label,
+                description,
+                actions: vec![Box::new(move |tx| {
+                    tx.send(AppEvent::OpenHarnessPopupForProvider {
+                        provider_id: provider_id_for_action.clone(),
+                        provider_name: provider_name_for_action.clone(),
+                        model: model.clone(),
+                        effort,
+                    });
+                })],
+                dismiss_on_select: true,
+                ..Default::default()
+            });
+        }
+
+        let header = self.model_menu_header(
+            &format!("Select Reasoning Level for {}", preset.model),
+            &format!("{provider_name} will start a new chat with this selection."),
+        );
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            header,
+            footer_hint: Some(standard_popup_hint_line()),
+            items,
+            initial_selected_idx,
+            ..Default::default()
+        });
+    }
+
+    pub(crate) fn open_harness_popup(
+        &mut self,
+        model: String,
+        effort: Option<ReasoningEffortConfig>,
+    ) {
+        let provider_id = self.config.model_provider_id.clone();
+        let provider_name = self
+            .config
+            .model_providers
+            .get(provider_id.as_str())
+            .map(|provider| provider.name.clone())
+            .unwrap_or_else(|| provider_id.clone());
+        let provider = self.config.model_providers.get(provider_id.as_str());
+        let items = harness_selection_items(
+            provider_id,
+            provider_name.clone(),
+            provider,
+            model.clone(),
+            effort,
+            /*include_all_harnesses*/ true,
+        );
+        let header = self.model_menu_header(
+            "Select Tool Harness",
+            &format!("{provider_name} / {model} will start a new chat."),
+        );
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            footer_hint: Some(standard_popup_hint_line()),
+            items,
+            header,
+            ..Default::default()
+        });
+    }
+
+    pub(crate) fn open_harness_popup_for_provider(
+        &mut self,
+        provider_id: String,
+        provider_name: String,
+        model: String,
+        effort: Option<ReasoningEffortConfig>,
+    ) {
+        let provider = self.config.model_providers.get(provider_id.as_str());
+        let items = harness_selection_items(
+            provider_id,
+            provider_name.clone(),
+            provider,
+            model.clone(),
+            effort,
+            /*include_all_harnesses*/ false,
+        );
+        let header = self.model_menu_header(
+            "Select Tool Harness",
+            &format!("{provider_name} / {model} will start a new chat."),
+        );
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            footer_hint: Some(standard_popup_hint_line()),
+            items,
+            header,
+            ..Default::default()
+        });
+    }
+}
+
+fn provider_sort_priority(provider_id: &str) -> u16 {
+    bundled_provider_catalog_entry(provider_id).map_or(u16::MAX, |entry| entry.sort_priority)
+}
+
+fn single_supported_reasoning_effort(
+    preset: &ModelPreset,
+) -> Option<Option<ReasoningEffortConfig>> {
+    if preset.supported_reasoning_efforts.is_empty() {
+        return Some(None);
+    }
+
+    let mut choices = ReasoningEffortConfig::iter().filter(|effort| {
+        preset
+            .supported_reasoning_efforts
+            .iter()
+            .any(|option| option.effort == *effort)
+    });
+    let first = choices.next()?;
+    if choices.next().is_none() {
+        Some(Some(first))
+    } else {
+        None
+    }
+}
+
+fn provider_description(
+    provider_id: &str,
+    provider: &codex_model_provider_info::ModelProviderInfo,
+) -> String {
+    let description = if provider.requires_openai_auth {
+        "Sign in with ChatGPT".to_string()
+    } else if let Some(env_key) = provider.env_key.as_deref() {
+        format!("Use {env_key} or paste a key")
+    } else if provider.auth.is_some() || provider.experimental_bearer_token.is_some() {
+        "Auth configured".to_string()
+    } else {
+        match provider.wire_api {
+            WireApi::Responses => "No API key required".to_string(),
+            WireApi::Chat => "Chat-compatible endpoint".to_string(),
+            WireApi::Messages => "Anthropic Messages endpoint".to_string(),
+        }
+    };
+    let harness = default_harness_for_provider_model(provider_id, provider, None);
+    harness.map_or(description.clone(), |harness| {
+        format!("{description} | Harness: {harness}")
+    })
+}
+
+fn provider_model_description(
+    provider: Option<&codex_model_provider_info::ModelProviderInfo>,
+    provider_id: &str,
+    provider_name: &str,
+    model: &str,
+    description: &str,
+) -> Option<String> {
+    let harness = provider.and_then(|provider| {
+        default_harness_for_provider_model(provider_id, provider, Some(model))
+    });
+    match (description.is_empty(), harness) {
+        (true, None) => None,
+        (true, Some(harness)) => Some(format!("Harness: {harness}")),
+        (false, None) => Some(description.to_string()),
+        (false, Some(harness)) => Some(format!("{description} | Harness: {harness}")),
+    }
+    .or_else(|| Some(format!("Provider: {provider_name}")))
+}
+
+fn harness_selection_items(
+    provider_id: String,
+    provider_name: String,
+    provider: Option<&codex_model_provider_info::ModelProviderInfo>,
+    model: String,
+    effort: Option<ReasoningEffortConfig>,
+    include_all_harnesses: bool,
+) -> Vec<SelectionItem> {
+    let choices = harness_choices_for_provider_model(
+        provider_id.as_str(),
+        provider,
+        model.as_str(),
+        include_all_harnesses,
+    );
+    choices
+        .into_iter()
+        .map(|choice| {
+            let provider_id = provider_id.clone();
+            let provider_name = provider_name.clone();
+            let model = model.clone();
+            let harness = choice.stored.clone();
+            let actions: Vec<SelectionAction> = vec![Box::new(move |tx| {
+                tx.send(AppEvent::PersistProviderModelSelection {
+                    provider_id: provider_id.clone(),
+                    provider_name: provider_name.clone(),
+                    model: model.clone(),
+                    effort,
+                    harness: harness.clone(),
+                });
+            })];
+            SelectionItem {
+                name: choice.label,
+                description: Some(choice.description),
+                is_current: false,
+                actions,
+                dismiss_on_select: true,
+                ..Default::default()
+            }
+        })
+        .collect()
+}
+
+struct HarnessChoice {
+    stored: Option<String>,
+    label: String,
+    description: String,
+}
+
+fn harness_choices_for_provider_model(
+    provider_id: &str,
+    provider: Option<&codex_model_provider_info::ModelProviderInfo>,
+    model: &str,
+    include_all_harnesses: bool,
+) -> Vec<HarnessChoice> {
+    let wire_api = provider
+        .map(|provider| provider.wire_api)
+        .unwrap_or_default();
+    let recommended = provider
+        .and_then(|provider| default_harness_for_provider_model(provider_id, provider, Some(model)))
+        .unwrap_or("");
+    let all_harnesses = [
+        "",
+        "claude-code",
+        "claude-code-bare",
+        "kimi-cli",
+        "qwen-code",
+        "deepseek-tui",
+        "mini-swe-agent",
+        "opencode",
+        "swe-agent",
+        "terminus-2",
+        "minimal",
+    ];
+    let mut choices = if include_all_harnesses {
+        all_harnesses.to_vec()
+    } else {
+        match wire_api {
+            WireApi::Messages => vec!["claude-code", "claude-code-bare"],
+            WireApi::Chat => all_harnesses.to_vec(),
+            WireApi::Responses => vec![""],
+        }
+    };
+    choices.sort_by_key(|harness| usize::from(*harness != recommended));
+    choices
+        .into_iter()
+        .map(|harness| harness_choice(harness, harness == recommended))
+        .collect()
+}
+
+fn harness_choice(harness: &str, is_recommended: bool) -> HarnessChoice {
+    let base_label = match harness {
+        "" => "Codex",
+        "claude-code" => "Claude Code",
+        "claude-code-bare" => "Claude Code Bare",
+        "kimi-cli" => "Kimi CLI",
+        "qwen-code" => "Qwen Code",
+        "deepseek-tui" => "DeepSeek TUI",
+        "mini-swe-agent" => "mini-swe-agent",
+        "opencode" => "opencode",
+        "swe-agent" => "SWE-agent",
+        "terminus-2" => "Terminus 2",
+        "minimal" => "Minimal",
+        other => other,
+    };
+    let label = if is_recommended {
+        format!("{base_label} (recommended)")
+    } else {
+        base_label.to_string()
+    };
+    let description = match harness {
+        "" => "Use the native Codex tool harness.",
+        "claude-code" => "Use the Claude Code-style tool harness.",
+        "claude-code-bare" => "Use the lean Claude Code-style harness.",
+        "kimi-cli" => "Use the Kimi CLI-style tool harness.",
+        "qwen-code" => "Use the Qwen Code-style tool harness.",
+        "deepseek-tui" => "Use the DeepSeek TUI-style tool harness.",
+        "mini-swe-agent" => "Use the mini-swe-agent-style tool harness.",
+        "opencode" => "Use the opencode-style tool harness.",
+        "swe-agent" => "Use the SWE-agent-style tool harness.",
+        "terminus-2" => "Use the Terminus 2-style terminal harness.",
+        "minimal" => "Use a minimal shell-oriented tool harness.",
+        _ => "Use this configured tool harness.",
+    }
+    .to_string();
+    HarnessChoice {
+        stored: (!harness.is_empty()).then(|| harness.to_string()),
+        label,
+        description,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use codex_model_provider_info::ModelProviderInfo;
+    use codex_model_provider_info::WireApi;
+
+    use super::harness_choices_for_provider_model;
+
+    #[test]
+    fn standalone_harness_picker_shows_all_harnesses_for_responses_models() {
+        let provider = ModelProviderInfo {
+            wire_api: WireApi::Responses,
+            ..Default::default()
+        };
+
+        let choices = harness_choices_for_provider_model(
+            "openai",
+            Some(&provider),
+            "gpt-5.5",
+            /*include_all_harnesses*/ true,
+        )
+        .into_iter()
+        .map(|choice| choice.label)
+        .collect::<Vec<_>>();
+
+        assert_eq!(
+            choices,
+            vec![
+                "Codex (recommended)",
+                "Claude Code",
+                "Claude Code Bare",
+                "Kimi CLI",
+                "Qwen Code",
+                "DeepSeek TUI",
+                "mini-swe-agent",
+                "opencode",
+                "SWE-agent",
+                "Terminus 2",
+                "Minimal",
+            ]
+        );
+    }
+
+    #[test]
+    fn provider_scoped_harness_picker_keeps_responses_native_only() {
+        let provider = ModelProviderInfo {
+            wire_api: WireApi::Responses,
+            ..Default::default()
+        };
+
+        let choices = harness_choices_for_provider_model(
+            "openai",
+            Some(&provider),
+            "gpt-5.5",
+            /*include_all_harnesses*/ false,
+        );
+
+        assert_eq!(
+            choices
+                .into_iter()
+                .map(|choice| choice.label)
+                .collect::<Vec<_>>(),
+            vec!["Codex (recommended)"]
+        );
     }
 }

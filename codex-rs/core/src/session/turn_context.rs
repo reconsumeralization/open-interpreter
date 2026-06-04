@@ -401,6 +401,8 @@ impl Session {
         let config = session_configuration.original_config_do_not_use.clone();
         let mut per_turn_config = (*config).clone();
         per_turn_config.cwd = cwd;
+        per_turn_config.model_provider_id = session_configuration.model_provider_id.clone();
+        per_turn_config.model_provider = session_configuration.provider.clone();
         per_turn_config.workspace_roots = session_configuration.workspace_roots.clone();
         per_turn_config
             .permissions
@@ -659,14 +661,13 @@ impl Session {
                 .await;
         }
 
-        Ok(self
-            .new_turn_from_configuration(
-                sub_id,
-                session_configuration,
-                updates.final_output_json_schema,
-                turn_environments,
-            )
-            .await)
+        Ok(Box::pin(self.new_turn_from_configuration(
+            sub_id,
+            session_configuration,
+            updates.final_output_json_schema,
+            turn_environments,
+        ))
+        .await)
     }
 
     fn resolve_turn_environments(
@@ -698,14 +699,20 @@ impl Session {
                 .set_permission_profile(session_configuration.permission_profile());
         }
 
-        let model_info = self
-            .services
-            .models_manager
-            .get_model_info(
+        let model_info = {
+            let models_manager_config = per_turn_config.to_models_manager_config();
+            let remote_models = self
+                .services
+                .models_manager
+                .try_get_remote_models()
+                .unwrap_or_default();
+            codex_models_manager::provider_catalog_models::provider_model_info(
+                &session_configuration.provider,
                 session_configuration.collaboration_mode.model(),
-                &per_turn_config.to_models_manager_config(),
+                &models_manager_config,
+                &remote_models,
             )
-            .await;
+        };
         let plugin_outcome = self
             .services
             .plugins_manager

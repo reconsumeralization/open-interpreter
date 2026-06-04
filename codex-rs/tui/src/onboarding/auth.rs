@@ -16,6 +16,7 @@ use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::LoginAccountParams;
 use codex_app_server_protocol::LoginAccountResponse;
 use codex_login::read_openai_api_key_from_env;
+use codex_product_info::Product;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
@@ -389,7 +390,7 @@ impl AuthModeWidget {
         let mut lines: Vec<Line> = vec![
             Line::from(vec![
                 "  ".into(),
-                "Sign in with ChatGPT to use Codex as part of your paid plan".into(),
+                chatgpt_sign_in_intro(Product::current()).into(),
             ]),
             Line::from(vec![
                 "  ".into(),
@@ -605,7 +606,7 @@ impl AuthModeWidget {
         let lines = vec![
             "✓ API key configured".fg(Color::Green).into(),
             "".into(),
-            "  Codex will use usage-based billing with your API key.".into(),
+            api_key_billing_copy(Product::current()).into(),
         ];
 
         Paragraph::new(lines)
@@ -964,6 +965,22 @@ impl StepStateProvider for AuthModeWidget {
     }
 }
 
+fn chatgpt_sign_in_intro(product: Product) -> &'static str {
+    match product {
+        Product::Codex => "Sign in with ChatGPT to use Codex as part of your paid plan",
+        Product::OpenInterpreter => {
+            "Sign in with ChatGPT to use Open Interpreter as part of your paid plan"
+        }
+    }
+}
+
+fn api_key_billing_copy(product: Product) -> String {
+    format!(
+        "  {} will use usage-based billing with your API key.",
+        product.display_name()
+    )
+}
+
 impl WidgetRef for AuthModeWidget {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let sign_in_state = self.sign_in_state.read().unwrap();
@@ -1223,6 +1240,30 @@ mod tests {
         );
 
         assert_eq!(widget.should_suppress_animations(), true);
+    }
+
+    #[test]
+    fn auth_intro_copy_follows_product() {
+        assert_eq!(
+            chatgpt_sign_in_intro(Product::Codex),
+            "Sign in with ChatGPT to use Codex as part of your paid plan"
+        );
+        assert_eq!(
+            chatgpt_sign_in_intro(Product::OpenInterpreter),
+            "Sign in with ChatGPT to use Open Interpreter as part of your paid plan"
+        );
+    }
+
+    #[test]
+    fn api_key_billing_copy_follows_product() {
+        assert_eq!(
+            api_key_billing_copy(Product::Codex),
+            "  OpenAI Codex will use usage-based billing with your API key."
+        );
+        assert_eq!(
+            api_key_billing_copy(Product::OpenInterpreter),
+            "  Open Interpreter will use usage-based billing with your API key."
+        );
     }
 
     #[tokio::test]

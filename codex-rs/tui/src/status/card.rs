@@ -695,12 +695,16 @@ fn status_approval_label(
 impl HistoryCell for StatusHistoryCell {
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = Vec::new();
-        lines.push(Line::from(vec![
+        let product = codex_product_info::Product::current();
+        let mut title_spans = vec![
             Span::from(format!("{}>_ ", FieldFormatter::INDENT)).dim(),
-            Span::from("OpenAI Codex").bold(),
-            Span::from(" ").dim(),
-            Span::from(format!("(v{CODEX_CLI_VERSION})")).dim(),
-        ]));
+            Span::from(product.display_name()).bold(),
+        ];
+        if product == codex_product_info::Product::Codex || CODEX_CLI_VERSION.trim() != "0.0.0" {
+            title_spans.push(Span::from(" ").dim());
+            title_spans.push(Span::from(format!("(v{CODEX_CLI_VERSION})")).dim());
+        }
+        lines.push(Line::from(title_spans));
 
         let available_inner_width = usize::from(width.saturating_sub(4));
         if available_inner_width == 0 {

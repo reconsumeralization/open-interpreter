@@ -337,15 +337,10 @@ async fn reasoning_selection_in_plan_mode_without_effort_change_does_not_open_sc
     assert!(
         events.iter().any(|event| matches!(
             event,
-            AppEvent::UpdateModel(model) if model == "gpt-5.4"
+            AppEvent::OpenHarnessPopup { model, effort }
+                if model == "gpt-5.4" && *effort == Some(ReasoningEffortConfig::Medium)
         )),
-        "expected model update event; events: {events:?}"
-    );
-    assert!(
-        events
-            .iter()
-            .any(|event| matches!(event, AppEvent::UpdateReasoningEffort(Some(_)))),
-        "expected reasoning update event; events: {events:?}"
+        "expected harness popup event; events: {events:?}"
     );
 }
 
@@ -469,15 +464,16 @@ async fn reasoning_selection_in_plan_mode_model_switch_does_not_open_scope_promp
     assert!(
         events.iter().any(|event| matches!(
             event,
-            AppEvent::UpdateModel(model) if model == "gpt-5.2"
+            AppEvent::OpenHarnessPopup { model, effort }
+                if model == "gpt-5.2" && *effort == Some(ReasoningEffortConfig::Medium)
         )),
-        "expected model update event; events: {events:?}"
+        "expected harness popup event; events: {events:?}"
     );
     assert!(
-        events
+        !events
             .iter()
-            .any(|event| matches!(event, AppEvent::UpdateReasoningEffort(Some(_)))),
-        "expected reasoning update event; events: {events:?}"
+            .any(|event| matches!(event, AppEvent::OpenPlanReasoningScopePrompt { .. })),
+        "did not expect plan reasoning scope event; events: {events:?}"
     );
 }
 

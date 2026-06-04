@@ -7,6 +7,7 @@ use anyhow::Context;
 use anyhow::Result;
 #[cfg(unix)]
 use anyhow::anyhow;
+use codex_install_context::InstallContext;
 #[cfg(unix)]
 use sha2::Digest;
 #[cfg(unix)]
@@ -17,6 +18,23 @@ use tokio::fs;
 use tokio::process::Command;
 
 pub(crate) fn managed_codex_bin(codex_home: &Path) -> PathBuf {
+    managed_codex_bin_for_package_dir(
+        codex_home,
+        InstallContext::current()
+            .package_layout
+            .as_ref()
+            .map(|layout| layout.package_dir.as_path()),
+    )
+}
+
+fn managed_codex_bin_for_package_dir(codex_home: &Path, package_dir: Option<&Path>) -> PathBuf {
+    if let Some(package_dir) = package_dir
+        && let Some(managed_codex) =
+            codex_install_context::managed_codex_bin_from_package_dir(package_dir)
+    {
+        return managed_codex.into_path_buf();
+    }
+
     let package_dir = codex_home
         .join("packages")
         .join("standalone")

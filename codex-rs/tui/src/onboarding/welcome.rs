@@ -1,3 +1,4 @@
+use codex_product_info::Product;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use ratatui::buffer::Buffer;
@@ -91,12 +92,7 @@ impl WidgetRef for &WelcomeWidget {
             lines.extend(frame.lines().map(Into::into));
             lines.push("".into());
         }
-        lines.push(Line::from(vec![
-            "  ".into(),
-            "Welcome to ".into(),
-            "Codex".bold(),
-            ", OpenAI's command-line coding agent".into(),
-        ]));
+        lines.push(welcome_line(Product::current()));
 
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
@@ -110,6 +106,22 @@ impl StepStateProvider for WelcomeWidget {
             true => StepState::Hidden,
             false => StepState::Complete,
         }
+    }
+}
+
+fn welcome_line(product: Product) -> Line<'static> {
+    match product {
+        Product::Codex => Line::from(vec![
+            "  ".into(),
+            "Welcome to ".into(),
+            "Codex".bold(),
+            ", OpenAI's command-line coding agent".into(),
+        ]),
+        Product::OpenInterpreter => Line::from(vec![
+            "  ".into(),
+            "Welcome to ".into(),
+            "Open Interpreter".bold(),
+        ]),
     }
 }
 
@@ -165,6 +177,29 @@ mod tests {
 
         let welcome_row = row_containing(&buf, "Welcome");
         assert_eq!(welcome_row, Some(0));
+    }
+
+    #[test]
+    fn welcome_copy_follows_product() {
+        assert_eq!(
+            welcome_line(Product::Codex).spans,
+            Line::from(vec![
+                "  ".into(),
+                "Welcome to ".into(),
+                "Codex".bold(),
+                ", OpenAI's command-line coding agent".into(),
+            ])
+            .spans
+        );
+        assert_eq!(
+            welcome_line(Product::OpenInterpreter).spans,
+            Line::from(vec![
+                "  ".into(),
+                "Welcome to ".into(),
+                "Open Interpreter".bold()
+            ])
+            .spans
+        );
     }
 
     #[test]

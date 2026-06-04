@@ -91,12 +91,16 @@ rm -rf "$staging_dir"
 
 (
   cd "$repo_root"
-  CARGO_BUILD_JOBS="$build_jobs" python3 scripts/build_codex_package.py \
-    "${target_args[@]}" \
-    --variant open-interpreter \
-    --cargo-profile release \
-    --package-dir "$staging_dir" \
+  package_args=(
+    --variant open-interpreter
+    --cargo-profile release
+    --package-dir "$staging_dir"
     --force
+  )
+  if [[ -n "$target" ]]; then
+    package_args=(--target "$target" "${package_args[@]}")
+  fi
+  CARGO_BUILD_JOBS="$build_jobs" python3 scripts/build_codex_package.py "${package_args[@]}"
 )
 
 if [[ -e "$package_dir" || -L "$package_dir" ]]; then

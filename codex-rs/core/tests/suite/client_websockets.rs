@@ -2160,6 +2160,8 @@ async fn websocket_harness_with_provider_options(
         /*enable_request_compression*/ false,
         runtime_metrics_enabled,
         /*beta_features_header*/ None,
+        codex_tools::Harness::Native,
+        /*harness_guidance*/ true,
         /*attestation_provider*/ None,
     );
 

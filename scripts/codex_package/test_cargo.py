@@ -139,7 +139,7 @@ class SourceBinariesForTargetTest(unittest.TestCase):
 
         self.assertEqual(
             outputs.entrypoint_bin,
-            target_dir / "aarch64-apple-darwin" / "release" / "interpreter",
+            target_dir / "aarch64-apple-darwin" / "release" / "interpreter-root-tui",
         )
         self.assertEqual(
             outputs.managed_codex_bin,
@@ -177,7 +177,7 @@ def write_fake_cargo(path: Path) -> Path:
                 "done",
                 'out="${CARGO_TARGET_DIR}/${target}/${profile}"',
                 'mkdir -p "$out"',
-                'touch "$out/interpreter" "$out/codex"',
+                'touch "$out/interpreter-root-tui" "$out/codex"',
                 "",
             ]
         ),

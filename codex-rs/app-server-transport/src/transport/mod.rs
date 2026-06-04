@@ -4,12 +4,21 @@ use crate::outgoing_message::ConnectionId;
 use crate::outgoing_message::OutgoingError;
 use crate::outgoing_message::OutgoingMessage;
 use crate::outgoing_message::QueuedOutgoingMessage;
+#[cfg(unix)]
+use base64::Engine;
+#[cfg(unix)]
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use codex_app_server_protocol::JSONRPCErrorError;
 use codex_app_server_protocol::JSONRPCMessage;
 use codex_core::config::find_codex_home;
 use codex_utils_absolute_path::AbsolutePathBuf;
+#[cfg(unix)]
+use sha2::Digest;
+#[cfg(unix)]
+use sha2::Sha256;
 use std::net::SocketAddr;
 use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
@@ -46,13 +55,19 @@ const OVERLOADED_ERROR_CODE: i64 = -32001;
 const APP_SERVER_CONTROL_SOCKET_DIR_NAME: &str = "app-server-control";
 const APP_SERVER_CONTROL_SOCKET_FILE_NAME: &str = "app-server-control.sock";
 const APP_SERVER_STARTUP_LOCK_FILE_NAME: &str = "app-server-startup.lock";
+#[cfg(unix)]
+const MAX_UNIX_SOCKET_PATH_BYTES: usize = 100;
 
 pub fn app_server_control_socket_path(codex_home: &Path) -> std::io::Result<AbsolutePathBuf> {
-    AbsolutePathBuf::from_absolute_path(
-        codex_home
-            .join(APP_SERVER_CONTROL_SOCKET_DIR_NAME)
-            .join(APP_SERVER_CONTROL_SOCKET_FILE_NAME),
-    )
+    let default_path = codex_home
+        .join(APP_SERVER_CONTROL_SOCKET_DIR_NAME)
+        .join(APP_SERVER_CONTROL_SOCKET_FILE_NAME);
+    let socket_path = if unix_socket_path_fits(&default_path) {
+        default_path
+    } else {
+        short_control_socket_path(codex_home)
+    };
+    AbsolutePathBuf::from_absolute_path(socket_path)
 }
 
 pub fn app_server_startup_lock_path(codex_home: &Path) -> std::io::Result<AbsolutePathBuf> {
@@ -61,6 +76,36 @@ pub fn app_server_startup_lock_path(codex_home: &Path) -> std::io::Result<Absolu
             .join(APP_SERVER_CONTROL_SOCKET_DIR_NAME)
             .join(APP_SERVER_STARTUP_LOCK_FILE_NAME),
     )
+}
+
+#[cfg(unix)]
+fn unix_socket_path_fits(path: &Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+
+    path.as_os_str().as_bytes().len() < MAX_UNIX_SOCKET_PATH_BYTES
+}
+
+#[cfg(not(unix))]
+fn unix_socket_path_fits(_path: &Path) -> bool {
+    true
+}
+
+#[cfg(unix)]
+fn short_control_socket_path(codex_home: &Path) -> PathBuf {
+    use std::os::unix::ffi::OsStrExt;
+
+    let digest = Sha256::digest(codex_home.as_os_str().as_bytes());
+    let home_hash = URL_SAFE_NO_PAD.encode(&digest[..16]);
+    PathBuf::from("/tmp")
+        .join(format!("codex-app-server-control-{home_hash}"))
+        .join("control.sock")
+}
+
+#[cfg(not(unix))]
+fn short_control_socket_path(codex_home: &Path) -> PathBuf {
+    codex_home
+        .join(APP_SERVER_CONTROL_SOCKET_DIR_NAME)
+        .join(APP_SERVER_CONTROL_SOCKET_FILE_NAME)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

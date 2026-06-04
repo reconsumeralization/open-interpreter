@@ -40,6 +40,7 @@ impl ToolSearchInfo {
                 LoadableToolSpec::Namespace(namespace)
             }
             ToolSpec::ToolSearch { .. }
+            | ToolSpec::LocalShell { .. }
             | ToolSpec::ImageGeneration { .. }
             | ToolSpec::WebSearch { .. }
             | ToolSpec::Freeform(_) => return None,

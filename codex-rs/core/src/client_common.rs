@@ -6,6 +6,7 @@ use codex_protocol::models::ResponseItem;
 use codex_tools::ToolSpec;
 use futures::Stream;
 use serde_json::Value;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -33,6 +34,8 @@ pub struct Prompt {
     /// Whether parallel tool calls are permitted for this prompt.
     pub(crate) parallel_tool_calls: bool,
 
+    pub(crate) cwd: Option<PathBuf>,
+
     pub base_instructions: BaseInstructions,
 
     /// Optionally specify the personality of the model.
@@ -51,6 +54,7 @@ impl Default for Prompt {
             input: Vec::new(),
             tools: Vec::new(),
             parallel_tool_calls: false,
+            cwd: None,
             base_instructions: BaseInstructions::default(),
             personality: None,
             output_schema: None,

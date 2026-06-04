@@ -10,6 +10,9 @@ use crate::hook_runtime::run_post_compact_hooks;
 use crate::hook_runtime::run_pre_compact_hooks;
 #[cfg(test)]
 use crate::session::PreviousTurnSettings;
+
+pub(crate) const KIMI_CLI_COMPACTION_SYSTEM_PROMPT: &str =
+    "You are a helpful assistant that compacts conversation context.";
 use crate::session::session::Session;
 use crate::session::turn::get_last_assistant_message_from_turn;
 use crate::session::turn_context::TurnContext;
@@ -207,6 +210,10 @@ async fn run_compact_task_inner_impl(
             input: turn_input,
             base_instructions: sess.get_base_instructions().await,
             personality: turn_context.personality,
+            cwd: turn_context
+                .environments
+                .primary()
+                .map(|environment| environment.cwd.to_path_buf()),
             ..Default::default()
         };
         let window_id = sess.services.model_client.current_window_id();

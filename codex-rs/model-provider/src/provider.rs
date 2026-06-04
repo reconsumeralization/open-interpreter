@@ -10,6 +10,7 @@ use codex_model_provider_info::ModelProviderInfo;
 use codex_models_manager::manager::OpenAiModelsManager;
 use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::manager::StaticModelsManager;
+use codex_models_manager::provider_catalog_models::bundled_provider_model_infos;
 use codex_protocol::account::ProviderAccount;
 use codex_protocol::openai_models::ModelsResponse;
 
@@ -250,10 +251,11 @@ impl ModelProvider for ConfiguredModelProvider {
                     self.info.clone(),
                     self.auth_manager.clone(),
                 ));
-                Arc::new(OpenAiModelsManager::new(
+                Arc::new(OpenAiModelsManager::new_with_base_models(
                     codex_home,
                     endpoint,
                     self.auth_manager.clone(),
+                    bundled_provider_model_infos(&self.info),
                 ))
             }
         }

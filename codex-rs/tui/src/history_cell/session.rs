@@ -87,7 +87,7 @@ struct TooltipHistoryCell {
 impl TooltipHistoryCell {
     fn new(tip: String, cwd: &Path) -> Self {
         Self {
-            tip,
+            tip: productize_tip(tip, codex_product_info::Product::current()),
             cwd: cwd.to_path_buf(),
         }
     }
@@ -113,6 +113,15 @@ impl HistoryCell for TooltipHistoryCell {
 
     fn raw_lines(&self) -> Vec<Line<'static>> {
         vec![Line::from(format!("Tip: {}", self.tip))]
+    }
+}
+
+pub(super) fn productize_tip(tip: String, product: codex_product_info::Product) -> String {
+    match product {
+        codex_product_info::Product::Codex => tip,
+        codex_product_info::Product::OpenInterpreter => tip
+            .replace("OpenAI Codex", product.display_name())
+            .replace("Codex", product.display_name()),
     }
 }
 
@@ -146,6 +155,7 @@ pub(crate) fn new_session_info(
     auth_plan: Option<PlanType>,
     show_fast_status: bool,
 ) -> SessionInfoCell {
+    let product = codex_product_info::Product::current();
     // Header box rendered as history (so it appears at the very top)
     let header = SessionHeaderHistoryCell::new(
         session.model.clone(),
@@ -153,6 +163,7 @@ pub(crate) fn new_session_info(
         show_fast_status,
         config.cwd.to_path_buf(),
         CODEX_CLI_VERSION,
+        product,
     )
     .with_yolo_mode(has_yolo_permissions(
         session.approval_policy,
@@ -170,7 +181,11 @@ pub(crate) fn new_session_info(
             Line::from(vec![
                 "  ".into(),
                 "/init".into(),
-                " - create an AGENTS.md file with instructions for Codex".dim(),
+                format!(
+                    " - create an AGENTS.md file with instructions for {}",
+                    product.display_name()
+                )
+                .dim(),
             ]),
             Line::from(vec![
                 "  ".into(),
@@ -180,12 +195,12 @@ pub(crate) fn new_session_info(
             Line::from(vec![
                 "  ".into(),
                 "/permissions".into(),
-                " - choose what Codex is allowed to do".dim(),
+                format!(" - choose what {} is allowed to do", product.display_name()).dim(),
             ]),
             Line::from(vec![
                 "  ".into(),
                 "/model".into(),
-                " - choose what model and reasoning effort to use".dim(),
+                " - choose provider, model, reasoning effort, and harness".dim(),
             ]),
             Line::from(vec![
                 "  ".into(),
@@ -240,6 +255,7 @@ pub(crate) fn has_yolo_permissions(
 #[derive(Debug)]
 pub(crate) struct SessionHeaderHistoryCell {
     version: &'static str,
+    product: codex_product_info::Product,
     model: String,
     model_style: Style,
     reasoning_effort: Option<ReasoningEffortConfig>,
@@ -255,6 +271,7 @@ impl SessionHeaderHistoryCell {
         show_fast_status: bool,
         directory: PathBuf,
         version: &'static str,
+        product: codex_product_info::Product,
     ) -> Self {
         Self::new_with_style(
             model,
@@ -263,6 +280,7 @@ impl SessionHeaderHistoryCell {
             show_fast_status,
             directory,
             version,
+            product,
         )
     }
 
@@ -273,9 +291,11 @@ impl SessionHeaderHistoryCell {
         show_fast_status: bool,
         directory: PathBuf,
         version: &'static str,
+        product: codex_product_info::Product,
     ) -> Self {
         Self {
             version,
+            product,
             model,
             model_style,
             reasoning_effort,
@@ -331,19 +351,25 @@ impl SessionHeaderHistoryCell {
 
 impl HistoryCell for SessionHeaderHistoryCell {
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
+        if self.product == codex_product_info::Product::OpenInterpreter {
+            return self.open_interpreter_display_lines();
+        }
+
         let Some(inner_width) = card_inner_width(width, SESSION_HEADER_MAX_INNER_WIDTH) else {
             return Vec::new();
         };
 
         let make_row = |spans: Vec<Span<'static>>| Line::from(spans);
 
-        // Title line rendered inside the box: ">_ OpenAI Codex (vX)"
-        let title_spans: Vec<Span<'static>> = vec![
+        // Title line rendered as ">_ Product Name (vX)" for real releases.
+        let mut title_spans: Vec<Span<'static>> = vec![
             Span::from(">_ ").dim(),
-            Span::from("OpenAI Codex").bold(),
-            Span::from(" ").dim(),
-            Span::from(format!("(v{})", self.version)).dim(),
+            Span::from(self.product.display_name()).bold(),
         ];
+        if should_show_version(self.product, self.version) {
+            title_spans.push(Span::from(" ").dim());
+            title_spans.push(Span::from(format!("(v{})", self.version)).dim());
+        }
 
         const CHANGE_MODEL_HINT_COMMAND: &str = "/model";
         const CHANGE_MODEL_HINT_EXPLANATION: &str = " to change";
@@ -406,8 +432,17 @@ impl HistoryCell for SessionHeaderHistoryCell {
     }
 
     fn raw_lines(&self) -> Vec<Line<'static>> {
+        if self.product == codex_product_info::Product::OpenInterpreter {
+            return self.open_interpreter_display_lines();
+        }
+
+        let title = if should_show_version(self.product, self.version) {
+            format!("{} (v{})", self.product.display_name(), self.version)
+        } else {
+            self.product.display_name().to_string()
+        };
         let mut lines = vec![
-            Line::from(format!("OpenAI Codex (v{})", self.version)),
+            Line::from(title),
             Line::from(format!(
                 "model: {}{}",
                 self.model,
@@ -424,5 +459,38 @@ impl HistoryCell for SessionHeaderHistoryCell {
             lines.push(Line::from("permissions: YOLO mode"));
         }
         lines
+    }
+}
+
+impl SessionHeaderHistoryCell {
+    fn open_interpreter_display_lines(&self) -> Vec<Line<'static>> {
+        const HEADER_INDENT: &str = "  ";
+        let mut title_spans: Vec<Span<'static>> = vec![
+            Span::from(HEADER_INDENT).dim(),
+            Span::from(self.product.display_name()).bold(),
+        ];
+        if should_show_version(self.product, self.version) {
+            title_spans.push(Span::from(" ").dim());
+            title_spans.push(Span::from(format!("(v{})", self.version)).dim());
+        }
+
+        let mut lines = vec![Line::from(""), Line::from(title_spans)];
+        if self.yolo_mode {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::from(HEADER_INDENT).dim(),
+                Span::from("permissions: ").dim(),
+                "YOLO mode".magenta().bold(),
+            ]));
+        }
+        lines
+    }
+}
+
+fn should_show_version(product: codex_product_info::Product, version: &str) -> bool {
+    match product {
+        codex_product_info::Product::Codex | codex_product_info::Product::OpenInterpreter => {
+            !version.trim().is_empty()
+        }
     }
 }

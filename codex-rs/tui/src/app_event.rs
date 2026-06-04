@@ -633,6 +633,62 @@ pub(crate) enum AppEvent {
         effort: Option<ReasoningEffort>,
     },
 
+    /// Load the model catalog for a provider selected in `/model`.
+    LoadProviderModels {
+        provider_id: String,
+        provider_name: String,
+    },
+
+    /// Result of loading the provider-specific model catalog for `/model`.
+    ProviderModelsLoaded {
+        provider_id: String,
+        provider_name: String,
+        result: Result<Vec<ModelPreset>, String>,
+    },
+
+    /// Open the custom model prompt for a selected provider.
+    OpenCustomProviderModelPrompt {
+        provider_id: String,
+        provider_name: String,
+        initial_text: Option<String>,
+    },
+
+    /// Open the reasoning picker for a provider/model selection.
+    OpenReasoningPopupForProvider {
+        provider_id: String,
+        provider_name: String,
+        model: ModelPreset,
+    },
+
+    /// Open the harness picker for the current provider/model selection.
+    OpenHarnessPopup {
+        model: String,
+        effort: Option<ReasoningEffort>,
+    },
+
+    /// Open the harness picker for a provider/model selection.
+    OpenHarnessPopupForProvider {
+        provider_id: String,
+        provider_name: String,
+        model: String,
+        effort: Option<ReasoningEffort>,
+    },
+
+    /// Persist provider, model, reasoning, and harness, then start a fresh thread.
+    PersistProviderModelSelection {
+        provider_id: String,
+        provider_name: String,
+        model: String,
+        effort: Option<ReasoningEffort>,
+        harness: Option<String>,
+    },
+
+    /// Persist the selected harness for the current provider/model.
+    #[allow(dead_code)]
+    PersistHarnessSelection {
+        harness: Option<String>,
+    },
+
     /// Persist the selected personality to the appropriate config.
     PersistPersonalitySelection {
         personality: Personality,
@@ -683,6 +739,7 @@ pub(crate) enum AppEvent {
     },
 
     /// Open the full model picker (non-auto models).
+    #[allow(dead_code)]
     OpenAllModelsPopup {
         models: Vec<ModelPreset>,
     },

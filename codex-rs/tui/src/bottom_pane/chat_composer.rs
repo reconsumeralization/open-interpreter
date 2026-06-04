@@ -150,7 +150,6 @@ use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
-use ratatui::widgets::Block;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::StatefulWidgetRef;
 use ratatui::widgets::WidgetRef;
@@ -4380,7 +4379,27 @@ impl ChatComposer {
             }
         }
         let style = user_message_style();
-        Block::default().style(style).render_ref(composer_rect, buf);
+        let transparent_style = Style::default()
+            .fg(ratatui::style::Color::Reset)
+            .bg(ratatui::style::Color::Reset);
+        for y in composer_rect.y..composer_rect.y.saturating_add(composer_rect.height) {
+            for x in composer_rect.x..composer_rect.x.saturating_add(composer_rect.width) {
+                buf[(x, y)].set_symbol(" ").set_style(transparent_style);
+            }
+        }
+        if composer_rect.width > 0 && composer_rect.height > 0 {
+            Line::from("─".repeat(usize::from(composer_rect.width)))
+                .dim()
+                .render_ref(
+                    Rect {
+                        x: composer_rect.x,
+                        y: composer_rect.y,
+                        width: composer_rect.width,
+                        height: 1,
+                    },
+                    buf,
+                );
+        }
         if !remote_images_rect.is_empty() {
             Paragraph::new(self.attachments.remote_image_lines())
                 .style(style)
@@ -4531,6 +4550,50 @@ mod tests {
             "",
             "expected blank spacing row above hints but saw: {spacing_row:?}",
         );
+    }
+
+    #[test]
+    fn transparent_composer_clears_stale_cells_and_draws_separator() {
+        let (tx, _rx) = unbounded_channel::<AppEvent>();
+        let sender = AppEventSender::new(tx);
+        let composer = ChatComposer::new(
+            /*has_input_focus*/ true,
+            sender,
+            /*enhanced_keys_supported*/ false,
+            "Ask Codex to do anything".to_string(),
+            /*disable_paste_burst*/ false,
+        );
+
+        let area = Rect::new(0, 0, 40, 6);
+        let mut buf = Buffer::empty(area);
+        let stale_style = Style::default()
+            .fg(ratatui::style::Color::Green)
+            .bg(ratatui::style::Color::Red);
+        for y in area.y..area.y.saturating_add(area.height) {
+            for x in area.x..area.x.saturating_add(area.width) {
+                buf[(x, y)].set_symbol("S").set_style(stale_style);
+            }
+        }
+
+        composer.render(area, &mut buf);
+
+        let composer_rows = 4;
+        let rendered = (0..composer_rows)
+            .map(|y| {
+                (0..area.width)
+                    .map(|x| buf[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            !rendered.contains('S'),
+            "expected stale cells to be cleared before composer render:\n{rendered}",
+        );
+        assert_eq!(buf[(0, 0)].symbol(), "─");
+        assert_eq!(buf[(0, 1)].symbol(), "›");
+        assert_eq!(buf[(0, 1)].style().bg, Some(ratatui::style::Color::Reset));
     }
 
     #[test]

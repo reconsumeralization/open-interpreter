@@ -560,8 +560,9 @@ impl ChatWidget {
     /// git metadata.
     pub(super) fn status_line_value_for_item(&mut self, item: StatusLineItem) -> Option<String> {
         match item {
-            StatusLineItem::ModelName => Some(self.model_display_name().to_string()),
+            StatusLineItem::ModelName => Some(self.model_display_label()),
             StatusLineItem::ModelWithReasoning => Some(self.model_with_reasoning_display_name()),
+            StatusLineItem::Harness => Some(self.status_line_harness_label()),
             StatusLineItem::CurrentDir => {
                 Some(format_directory_display(
                     self.status_line_cwd(),
@@ -694,6 +695,7 @@ impl ChatWidget {
             StatusSurfacePreviewItem::RawOutput => StatusLineItem::RawOutput,
             StatusSurfacePreviewItem::Model => StatusLineItem::ModelName,
             StatusSurfacePreviewItem::ModelWithReasoning => StatusLineItem::ModelWithReasoning,
+            StatusSurfacePreviewItem::Harness => StatusLineItem::Harness,
         };
         self.status_line_value_for_item(status_line_item)
     }
@@ -756,7 +758,7 @@ impl ChatWidget {
                 /*max_chars*/ 32,
             )),
             TerminalTitleItem::ModelWithReasoning => Some(Self::truncate_terminal_title_part(
-                self.model_with_reasoning_display_name(),
+                self.model_with_reasoning_display_name_for(self.model_display_name()),
                 /*max_chars*/ 32,
             )),
             TerminalTitleItem::TaskProgress => self.terminal_title_task_progress(),
@@ -764,6 +766,10 @@ impl ChatWidget {
     }
 
     fn model_with_reasoning_display_name(&self) -> String {
+        self.model_with_reasoning_display_name_for(&self.model_display_label())
+    }
+
+    fn model_with_reasoning_display_name_for(&self, model_label: &str) -> String {
         let label = Self::status_line_reasoning_effort_label(self.effective_reasoning_effort());
         let service_tier_label = self
             .current_service_tier()
@@ -776,7 +782,7 @@ impl ChatWidget {
             .filter(|_| self.has_chatgpt_account)
             .map(|tier| format!(" {tier}"))
             .unwrap_or_default();
-        format!("{} {label}{service_tier_label}", self.model_display_name())
+        format!("{model_label} {label}{service_tier_label}")
     }
 
     /// Computes the compact runtime status label used by word-based status items.
@@ -985,33 +991,46 @@ fn matches_window_label(window: &RateLimitWindowDisplay, label: &str) -> bool {
         == Some(label)
 }
 
+impl ChatWidget {
+    fn status_line_harness_label(&self) -> String {
+        self.config
+            .harness
+            .as_deref()
+            .filter(|harness| !harness.is_empty())
+            .unwrap_or("native")
+            .to_string()
+    }
+}
+
 fn permissions_display(config: &Config) -> String {
     let active_permission_profile = config.permissions.active_permission_profile();
-    if let Some(active_permission_profile) = active_permission_profile.as_ref()
-        && !active_permission_profile.id.starts_with(':')
-    {
-        return active_permission_profile.id.clone();
-    }
-
     let permission_profile = config.permissions.effective_permission_profile();
+    let network_enabled = permission_profile.network_sandbox_policy().is_enabled();
     let workspace_roots = config.effective_workspace_roots();
     let summary =
         summarize_permission_profile(&permission_profile, &config.cwd, workspace_roots.as_slice());
-    if let Some(details) = summary.strip_prefix("read-only")
-        && !details.contains("(network access enabled)")
-    {
-        return "Read Only".to_string();
-    }
-    if let Some(details) = summary.strip_prefix("workspace-write")
-        && !details.contains("(network access enabled)")
-    {
-        return "Workspace".to_string();
-    }
-    if permission_profile == PermissionProfile::Disabled {
-        return "Full Access".to_string();
-    }
 
-    "Custom permissions".to_string()
+    let base = if permission_profile == PermissionProfile::Disabled {
+        "full-access".to_string()
+    } else if let Some(active_permission_profile) = active_permission_profile.as_ref()
+        && !active_permission_profile.id.starts_with(':')
+    {
+        active_permission_profile.id.clone()
+    } else if summary.starts_with("read-only") {
+        "read-only".to_string()
+    } else if summary.starts_with("workspace-write") {
+        "workspace-write".to_string()
+    } else if summary.starts_with("external sandbox") {
+        "external-sandbox".to_string()
+    } else {
+        "custom permissions".to_string()
+    };
+
+    if network_enabled {
+        base
+    } else {
+        format!("{base}, no-network")
+    }
 }
 
 fn approval_mode_display(config: &Config) -> String {

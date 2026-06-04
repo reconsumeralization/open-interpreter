@@ -11,6 +11,7 @@ use codex_protocol::permissions::FileSystemPath;
 use codex_protocol::permissions::FileSystemSpecialPath;
 use codex_protocol::protocol::ThreadSource;
 use codex_protocol::protocol::TurnEnvironmentSelection;
+use codex_tools::Harness;
 use tokio::sync::Semaphore;
 
 /// Context for an initialized model agent
@@ -42,6 +43,7 @@ pub(crate) struct Session {
 #[derive(Clone)]
 pub(crate) struct SessionConfiguration {
     /// Provider identifier ("openai", "openrouter", ...).
+    pub(super) model_provider_id: String,
     pub(super) provider: ModelProviderInfo,
 
     pub(super) collaboration_mode: CollaborationMode,
@@ -174,7 +176,7 @@ impl SessionConfiguration {
     pub(super) fn thread_config_snapshot(&self) -> ThreadConfigSnapshot {
         ThreadConfigSnapshot {
             model: self.collaboration_mode.model().to_string(),
-            model_provider_id: self.original_config_do_not_use.model_provider_id.clone(),
+            model_provider_id: self.model_provider_id.clone(),
             service_tier: self.service_tier.clone(),
             approval_policy: self.approval_policy.value(),
             approvals_reviewer: self.approvals_reviewer,
@@ -222,6 +224,21 @@ impl SessionConfiguration {
                 });
         if let Some(collaboration_mode) = updates.collaboration_mode.clone() {
             next_configuration.collaboration_mode = collaboration_mode;
+        }
+        if let Some(model_provider_id) = updates.model_provider.clone() {
+            let provider = next_configuration
+                .original_config_do_not_use
+                .model_providers
+                .get(&model_provider_id)
+                .cloned()
+                .ok_or_else(|| ConstraintError::InvalidValue {
+                    field_name: "model_provider",
+                    candidate: model_provider_id.clone(),
+                    allowed: "configured model provider id".to_string(),
+                    requirement_source: codex_config::RequirementSource::Unknown,
+                })?;
+            next_configuration.model_provider_id = model_provider_id;
+            next_configuration.provider = provider;
         }
         if let Some(summary) = updates.reasoning_summary {
             next_configuration.model_reasoning_summary = Some(summary);
@@ -425,6 +442,7 @@ pub(crate) struct SessionSettingsUpdate {
     pub(crate) permission_profile: Option<PermissionProfile>,
     pub(crate) active_permission_profile: Option<ActivePermissionProfile>,
     pub(crate) windows_sandbox_level: Option<WindowsSandboxLevel>,
+    pub(crate) model_provider: Option<String>,
     pub(crate) collaboration_mode: Option<CollaborationMode>,
     pub(crate) reasoning_summary: Option<ReasoningSummaryConfig>,
     pub(crate) service_tier: Option<Option<String>>,
@@ -1044,6 +1062,8 @@ impl Session {
                     config.features.enabled(Feature::EnableRequestCompression),
                     config.features.enabled(Feature::RuntimeMetrics),
                     Self::build_model_client_beta_features_header(config.as_ref()),
+                    Harness::from_config_name(config.harness.as_deref()),
+                    config.harness_guidance,
                     attestation_provider,
                 )
                 .with_prompt_cache_key_override(

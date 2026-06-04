@@ -46,7 +46,10 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Stylize;
 use ratatui::text::Line;
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Widget;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -1771,6 +1774,17 @@ impl BottomPane {
 impl Renderable for BottomPane {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         self.as_renderable().render(area, buf);
+        if self.active_view().is_some() && area.width > 0 && area.height > 0 {
+            Paragraph::new(Line::from("─".repeat(usize::from(area.width))).dim()).render(
+                Rect {
+                    x: area.x,
+                    y: area.y,
+                    width: area.width,
+                    height: 1,
+                },
+                buf,
+            );
+        }
     }
     fn desired_height(&self, width: u16) -> u16 {
         self.as_renderable().desired_height(width)

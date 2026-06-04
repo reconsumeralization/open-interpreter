@@ -201,6 +201,10 @@ impl ChatWidget {
         self.config.personality = Some(personality);
     }
 
+    pub(crate) fn set_harness(&mut self, harness: Option<String>) {
+        self.config.harness = harness;
+    }
+
     pub(crate) fn status_account_display(&self) -> Option<&StatusAccountDisplay> {
         self.status_account_display.as_ref()
     }
@@ -605,6 +609,13 @@ impl ChatWidget {
         } else {
             model
         }
+    }
+
+    pub(super) fn model_display_label(&self) -> String {
+        crate::model_display::provider_model_label(
+            &self.config.model_provider_id,
+            self.model_display_name(),
+        )
     }
 
     /// Get the label for the current collaboration mode.

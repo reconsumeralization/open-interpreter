@@ -774,6 +774,102 @@ impl App {
             AppEvent::OpenReasoningPopup { model } => {
                 self.chat_widget.open_reasoning_popup(model);
             }
+            AppEvent::LoadProviderModels {
+                provider_id,
+                provider_name,
+            } => {
+                let request_handle = app_server.request_handle();
+                let tx = self.app_event_tx.clone();
+                tokio::spawn(async move {
+                    let request_id =
+                        RequestId::String(format!("provider-model-list-{}", Uuid::new_v4()));
+                    let result = request_handle
+                        .request_typed::<ModelListResponse>(ClientRequest::ModelList {
+                            request_id,
+                            params: ModelListParams {
+                                cursor: None,
+                                limit: None,
+                                include_hidden: Some(true),
+                                model_provider: Some(provider_id.clone()),
+                            },
+                        })
+                        .await
+                        .map(|response| {
+                            response
+                                .data
+                                .into_iter()
+                                .map(crate::app_server_session::model_preset_from_api_model)
+                                .collect()
+                        })
+                        .map_err(|err| err.to_string());
+                    tx.send(AppEvent::ProviderModelsLoaded {
+                        provider_id,
+                        provider_name,
+                        result,
+                    });
+                });
+            }
+            AppEvent::ProviderModelsLoaded {
+                provider_id,
+                provider_name,
+                result,
+            } => match result {
+                Ok(models) => {
+                    self.chat_widget.open_model_popup_for_provider(
+                        provider_id,
+                        provider_name,
+                        models,
+                    );
+                }
+                Err(err) => {
+                    self.chat_widget.add_error_message(format!(
+                        "Failed to load models for {provider_name}: {err}"
+                    ));
+                    self.chat_widget.open_custom_model_prompt_for_provider(
+                        provider_id,
+                        provider_name,
+                        None,
+                    );
+                }
+            },
+            AppEvent::OpenCustomProviderModelPrompt {
+                provider_id,
+                provider_name,
+                initial_text,
+            } => {
+                self.chat_widget.open_custom_model_prompt_for_provider(
+                    provider_id,
+                    provider_name,
+                    initial_text,
+                );
+            }
+            AppEvent::OpenReasoningPopupForProvider {
+                provider_id,
+                provider_name,
+                model,
+            } => {
+                self.chat_widget.open_reasoning_popup_for_provider(
+                    provider_id,
+                    provider_name,
+                    model,
+                );
+            }
+            AppEvent::OpenHarnessPopup { model, effort } => {
+                self.chat_widget.open_harness_popup(model, effort);
+            }
+            AppEvent::OpenHarnessPopupForProvider {
+                provider_id,
+                provider_name,
+                model,
+                effort,
+            } => {
+                self.chat_widget.open_harness_popup_for_provider(
+                    provider_id,
+                    provider_name,
+                    model,
+                    effort,
+                );
+            }
             AppEvent::OpenPlanReasoningScopePrompt { model, effort } => {
                 self.chat_widget
                     .open_plan_reasoning_scope_prompt(model, effort);
@@ -1316,6 +1412,99 @@ impl App {
                         );
                         self.chat_widget
                             .add_error_message(format!("Failed to save default model: {err}"));
+                    }
+                }
+            }
+            AppEvent::PersistHarnessSelection { harness } => {
+                match crate::config_update::write_config_batch(
+                    app_server.request_handle(),
+                    vec![crate::config_update::build_harness_selection_edit(
+                        harness.as_deref(),
+                    )],
+                )
+                .await
+                {
+                    Ok(_) => {
+                        self.config.harness = harness.clone();
+                        self.chat_widget.set_harness(harness.clone());
+                        self.start_fresh_session_with_summary_hint(
+                            tui, app_server, /*session_start_source*/ None,
+                            /*initial_user_message*/ None,
+                        )
+                        .await;
+                        let harness_label = harness.as_deref().unwrap_or("Codex");
+                        self.chat_widget.add_info_message(
+                            format!("Harness changed to {harness_label}. Started a new chat."),
+                            /*hint*/ None,
+                        );
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            error = %err,
+                            "failed to persist harness selection"
+                        );
+                        self.chat_widget
+                            .add_error_message(format!("Failed to save default harness: {err}"));
+                    }
+                }
+            }
+            AppEvent::PersistProviderModelSelection {
+                provider_id,
+                provider_name,
+                model,
+                effort,
+                harness,
+            } => {
+                match crate::config_update::write_config_batch(
+                    app_server.request_handle(),
+                    crate::config_update::build_provider_model_selection_edits(
+                        provider_id.as_str(),
+                        model.as_str(),
+                        effort,
+                        harness.as_deref(),
+                    ),
+                )
+                .await
+                {
+                    Ok(_) => {
+                        self.config.model_provider_id = provider_id.clone();
+                        if let Some(provider) = self
+                            .config
+                            .model_providers
+                            .get(provider_id.as_str())
+                            .cloned()
+                        {
+                            self.config.model_provider = provider;
+                        }
+                        self.config.model = Some(model.clone());
+                        self.config.model_reasoning_effort = effort;
+                        self.config.harness = harness.clone();
+                        self.chat_widget.set_model(&model);
+                        self.chat_widget.set_reasoning_effort(effort);
+                        self.chat_widget.set_harness(harness.clone());
+                        self.start_fresh_session_with_summary_hint(
+                            tui, app_server, /*session_start_source*/ None,
+                            /*initial_user_message*/ None,
+                        )
+                        .await;
+
+                        let mut message = format!("Model changed to {provider_name} / {model}");
+                        if let Some(label) = Self::reasoning_label_for(&model, effort) {
+                            message.push(' ');
+                            message.push_str(label);
+                        }
+                        let harness_label = harness.as_deref().unwrap_or("Codex");
+                        message.push_str(&format!(" with {harness_label} harness"));
+                        self.chat_widget.add_info_message(message, /*hint*/ None);
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            error = %err,
+                            "failed to persist provider model selection"
+                        );
+                        self.chat_widget.add_error_message(format!(
+                            "Failed to save {provider_name} model selection: {err}"
+                        ));
                     }
                 }
             }

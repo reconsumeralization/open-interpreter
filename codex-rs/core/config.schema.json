@@ -638,6 +638,14 @@
           },
           "type": "object"
         },
+        "harness": {
+          "description": "Optional harness family to emulate for this profile, such as `claude-code`.",
+          "type": "string"
+        },
+        "harness_guidance": {
+          "description": "Whether to include Open Interpreter guidance for the selected harness.",
+          "type": "boolean"
+        },
         "include_apps_instructions": {
           "type": "boolean"
         },
@@ -4317,6 +4325,20 @@
             "responses"
           ],
           "type": "string"
+        },
+        {
+          "description": "OpenAI-compatible Chat Completions exposed at `/v1/chat/completions`.",
+          "enum": [
+            "chat"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Anthropic Messages exposed at `/v1/messages`.",
+          "enum": [
+            "messages"
+          ],
+          "type": "string"
         }
       ]
     },
@@ -4797,6 +4819,14 @@
       ],
       "default": null,
       "description": "Compatibility-only settings retained so legacy `ghost_snapshot` config still loads."
+    },
+    "harness": {
+      "description": "Optional default harness family to emulate, such as `claude-code`.",
+      "type": "string"
+    },
+    "harness_guidance": {
+      "description": "Whether to include Open Interpreter guidance for the selected harness.",
+      "type": "boolean"
     },
     "hide_agent_reasoning": {
       "default": false,

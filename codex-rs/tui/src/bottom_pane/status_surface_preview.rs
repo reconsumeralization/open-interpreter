@@ -32,6 +32,7 @@ pub(crate) enum StatusSurfacePreviewItem {
     RawOutput,
     Model,
     ModelWithReasoning,
+    Harness,
     TaskProgress,
 }
 
@@ -61,8 +62,9 @@ impl StatusSurfacePreviewItem {
             StatusSurfacePreviewItem::SessionId => "550e8400-e29b-41d4",
             StatusSurfacePreviewItem::FastMode => "Fast on",
             StatusSurfacePreviewItem::RawOutput => "raw output",
-            StatusSurfacePreviewItem::Model => "gpt-5.2-codex",
-            StatusSurfacePreviewItem::ModelWithReasoning => "gpt-5.2-codex medium",
+            StatusSurfacePreviewItem::Model => "openai gpt-5.2-codex",
+            StatusSurfacePreviewItem::ModelWithReasoning => "openai gpt-5.2-codex medium",
+            StatusSurfacePreviewItem::Harness => "native",
             StatusSurfacePreviewItem::TaskProgress => "Tasks 0/0",
         }
     }
@@ -94,6 +96,7 @@ impl StatusSurfacePreviewItem {
             Self::RawOutput,
             Self::Model,
             Self::ModelWithReasoning,
+            Self::Harness,
             Self::TaskProgress,
         ]
         .into_iter()

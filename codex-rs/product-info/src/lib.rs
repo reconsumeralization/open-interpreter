@@ -54,6 +54,13 @@ impl Product {
         }
     }
 
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Product::Codex => "OpenAI Codex",
+            Product::OpenInterpreter => "Open Interpreter",
+        }
+    }
+
     pub fn release_notes_url(self) -> &'static str {
         match self {
             Product::Codex => CODEX_RELEASE_NOTES_URL,

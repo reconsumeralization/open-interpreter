@@ -1548,6 +1548,9 @@ mod tests {
             for x in 0..buf.area().width {
                 row.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
             }
+            while row.ends_with(' ') {
+                row.pop();
+            }
             lines.push(row);
         }
         lines.join("\n")

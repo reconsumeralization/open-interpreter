@@ -9,6 +9,7 @@ use crate::tools::handlers::DynamicToolHandler;
 use crate::tools::handlers::ExecCommandHandler;
 use crate::tools::handlers::ExecCommandHandlerOptions;
 use crate::tools::handlers::GetGoalHandler;
+use crate::tools::handlers::HarnessAliasHandler;
 use crate::tools::handlers::ListAvailablePluginsToInstallHandler;
 use crate::tools::handlers::ListMcpResourceTemplatesHandler;
 use crate::tools::handlers::ListMcpResourcesHandler;
@@ -64,6 +65,7 @@ use codex_protocol::openai_models::ToolMode;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::SubAgentSource;
 use codex_tools::DiscoverableTool;
+use codex_tools::Harness;
 use codex_tools::ResponsesApiNamespace;
 use codex_tools::ResponsesApiNamespaceTool;
 use codex_tools::TOOL_SEARCH_TOOL_NAME;
@@ -521,6 +523,7 @@ fn code_mode_namespace_descriptions(
 
 fn add_tool_sources(context: &CoreToolPlanContext<'_>, planned_tools: &mut PlannedTools) {
     add_shell_tools(context, planned_tools);
+    add_harness_alias_tools(context, planned_tools);
     add_mcp_resource_tools(context, planned_tools);
     add_core_utility_tools(context, planned_tools);
     add_collaboration_tools(context, planned_tools);
@@ -529,6 +532,54 @@ fn add_tool_sources(context: &CoreToolPlanContext<'_>, planned_tools: &mut Plann
     add_extension_tools(context, planned_tools);
     for spec in hosted_model_tool_specs(context) {
         planned_tools.add_hosted_spec(spec);
+    }
+}
+
+fn add_harness_alias_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut PlannedTools) {
+    let harness = Harness::from_config_name(context.turn_context.config.harness.as_deref());
+    if matches!(harness, Harness::Native) {
+        return;
+    }
+
+    if harness.is_claude_code() {
+        planned_tools.add(HarnessAliasHandler::Agent);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::TaskOutput);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::TaskStop);
+    }
+    planned_tools.add(HarnessAliasHandler::Bash);
+    planned_tools.add(HarnessAliasHandler::BashLower);
+    planned_tools.add(HarnessAliasHandler::Read);
+    planned_tools.add(HarnessAliasHandler::ReadLower);
+    planned_tools.add(HarnessAliasHandler::Write);
+    planned_tools.add(HarnessAliasHandler::WriteLower);
+    planned_tools.add(HarnessAliasHandler::Edit);
+    planned_tools.add(HarnessAliasHandler::EditLower);
+    planned_tools.add(HarnessAliasHandler::Glob);
+    planned_tools.add(HarnessAliasHandler::GlobLower);
+    planned_tools.add(HarnessAliasHandler::Grep);
+    planned_tools.add(HarnessAliasHandler::GrepLower);
+    planned_tools.add(HarnessAliasHandler::AskUserQuestion);
+    if matches!(harness, Harness::DeepSeekTui) {
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekApplyPatch);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ChecklistAdd);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ChecklistList);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ChecklistUpdate);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ChecklistWrite);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekDiagnostics);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekEditFile);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekExecShell);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekFileSearch);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekGitDiff);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekGitStatus);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekGrepFiles);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekListDir);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekReadFile);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekToolSearch);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekWriteFile);
+    }
+    if matches!(harness, Harness::OpenCode) {
+        planned_tools.add_dispatch_only(HarnessAliasHandler::OpenCodeTask);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::OpenCodeTodoWrite);
     }
 }
 

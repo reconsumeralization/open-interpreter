@@ -53,6 +53,7 @@ use crate::stream_events_utils::record_completed_response_item_with_finalized_fa
 use crate::tasks::emit_compact_metric;
 use crate::tools::ToolRouter;
 use crate::tools::context::SharedTurnDiffTracker;
+use crate::tools::handlers::take_claude_code_bare_completed_task_notification;
 use crate::tools::parallel::ToolCallRuntime;
 use crate::tools::registry::ToolArgumentDiffConsumer;
 use crate::tools::router::ToolRouterParams;
@@ -319,6 +320,39 @@ pub(crate) async fn run_turn(
                 }
 
                 if !needs_follow_up {
+                    if turn_context
+                        .config
+                        .harness
+                        .as_deref()
+                        .is_some_and(|harness| harness == "deepseek-tui")
+                        && token_status.active_context_tokens >= DEEPSEEK_TUI_CYCLE_TOKEN_LIMIT
+                        && let Err(err) = run_auto_compact(
+                            &sess,
+                            &turn_context,
+                            &mut client_session,
+                            InitialContextInjection::DoNotInject,
+                            CompactionReason::ContextLimit,
+                            CompactionPhase::MidTurn,
+                        )
+                        .await
+                    {
+                        warn!("DeepSeek TUI post-final cycle handoff failed: {err}");
+                    }
+                    if turn_context
+                        .config
+                        .harness
+                        .as_deref()
+                        .is_some_and(|harness| harness == "claude-code-bare")
+                        && let Some(notification) =
+                            take_claude_code_bare_completed_task_notification()
+                    {
+                        sess.record_conversation_items(
+                            &turn_context,
+                            std::slice::from_ref(&notification),
+                        )
+                        .await;
+                        continue;
+                    }
                     last_agent_message = sampling_request_last_agent_message;
                     let stop_outcome = run_turn_stop_hooks(
                         &sess,
@@ -642,6 +676,8 @@ async fn track_turn_resolved_config_analytics(
         });
 }
 
+const DEEPSEEK_TUI_CYCLE_TOKEN_LIMIT: i64 = 31_800;
+
 #[derive(Debug)]
 struct AutoCompactTokenStatus {
     // Full active context usage, independent of the configured auto-compact scope.
@@ -904,6 +940,10 @@ pub(crate) fn build_prompt(
         input,
         tools: router.model_visible_specs(),
         parallel_tool_calls: turn_context.model_info.supports_parallel_tool_calls,
+        cwd: turn_context
+            .environments
+            .primary()
+            .map(|turn_environment| turn_environment.cwd.to_path_buf()),
         base_instructions,
         personality: turn_context.personality,
         output_schema: turn_context.final_output_json_schema.clone(),
@@ -1720,20 +1760,19 @@ async fn try_run_sampling_request(
         turn_context.model_info.slug.as_str(),
         turn_context.provider.info().name.as_str(),
     );
-    let mut stream = client_session
-        .stream(
-            prompt,
-            &turn_context.model_info,
-            &turn_context.session_telemetry,
-            turn_context.reasoning_effort,
-            turn_context.reasoning_summary,
-            turn_context.config.service_tier.clone(),
-            turn_metadata_header,
-            &inference_trace,
-        )
-        .instrument(trace_span!("stream_request"))
-        .or_cancel(&cancellation_token)
-        .await??;
+    let mut stream = Box::pin(client_session.stream(
+        prompt,
+        &turn_context.model_info,
+        &turn_context.session_telemetry,
+        turn_context.reasoning_effort,
+        turn_context.reasoning_summary,
+        turn_context.config.service_tier.clone(),
+        turn_metadata_header,
+        &inference_trace,
+    ))
+    .instrument(trace_span!("stream_request"))
+    .or_cancel(&cancellation_token)
+    .await??;
     let mut in_flight: FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>> =
         FuturesOrdered::new();
     let mut needs_follow_up = false;

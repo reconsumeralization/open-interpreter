@@ -13,6 +13,7 @@ pub enum SlashCommand {
     // DO NOT ALPHA-SORT! Enum order is presentation order in the popup, so
     // more frequently used commands should be listed first.
     Model,
+    Harness,
     Ide,
     Permissions,
     Keymap,
@@ -82,7 +83,14 @@ impl SlashCommand {
         match self {
             SlashCommand::Feedback => "send logs to maintainers",
             SlashCommand::New => "start a new chat during a conversation",
-            SlashCommand::Init => "create an AGENTS.md file with instructions for Codex",
+            SlashCommand::Init => match codex_product_info::Product::current() {
+                codex_product_info::Product::Codex => {
+                    "create an AGENTS.md file with instructions for Codex"
+                }
+                codex_product_info::Product::OpenInterpreter => {
+                    "create an AGENTS.md file with instructions for Open Interpreter"
+                }
+            },
             SlashCommand::Compact => "summarize conversation to prevent hitting the context limit",
             SlashCommand::Review => "review my current changes and find issues",
             SlashCommand::Rename => "rename the current thread",
@@ -90,12 +98,23 @@ impl SlashCommand {
             SlashCommand::Archive => "archive this session and exit",
             SlashCommand::Clear => "clear the terminal and start a new chat",
             SlashCommand::Fork => "fork the current chat",
-            SlashCommand::Quit | SlashCommand::Exit => "exit Codex",
+            SlashCommand::Quit | SlashCommand::Exit => match codex_product_info::Product::current()
+            {
+                codex_product_info::Product::Codex => "exit Codex",
+                codex_product_info::Product::OpenInterpreter => "exit Open Interpreter",
+            },
             SlashCommand::Copy => "copy last response as markdown",
             SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
             SlashCommand::Diff => "show git diff (including untracked files)",
             SlashCommand::Mention => "mention a file",
-            SlashCommand::Skills => "use skills to improve how Codex performs specific tasks",
+            SlashCommand::Skills => match codex_product_info::Product::current() {
+                codex_product_info::Product::Codex => {
+                    "use skills to improve how Codex performs specific tasks"
+                }
+                codex_product_info::Product::OpenInterpreter => {
+                    "use skills to improve how Open Interpreter performs specific tasks"
+                }
+            },
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Status => "show current session configuration and token usage",
             SlashCommand::DebugConfig => "show config layers and requirement sources for debugging",
@@ -107,11 +126,17 @@ impl SlashCommand {
             SlashCommand::Stop => "stop all background terminals",
             SlashCommand::MemoryDrop => "DO NOT USE",
             SlashCommand::MemoryUpdate => "DO NOT USE",
-            SlashCommand::Model => "choose what model and reasoning effort to use",
+            SlashCommand::Model => "choose provider, model, reasoning effort, and harness",
+            SlashCommand::Harness => "choose the tool harness for the current model",
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
             }
-            SlashCommand::Personality => "choose a communication style for Codex",
+            SlashCommand::Personality => match codex_product_info::Product::current() {
+                codex_product_info::Product::Codex => "choose a communication style for Codex",
+                codex_product_info::Product::OpenInterpreter => {
+                    "choose a communication style for Open Interpreter"
+                }
+            },
             SlashCommand::Realtime => "toggle realtime voice mode (experimental)",
             SlashCommand::Settings => "configure realtime microphone/speaker",
             SlashCommand::Plan => "switch to Plan mode",
@@ -120,7 +145,12 @@ impl SlashCommand {
             SlashCommand::Side | SlashCommand::Btw => {
                 "start a side conversation in an ephemeral fork"
             }
-            SlashCommand::Permissions => "choose what Codex is allowed to do",
+            SlashCommand::Permissions => match codex_product_info::Product::current() {
+                codex_product_info::Product::Codex => "choose what Codex is allowed to do",
+                codex_product_info::Product::OpenInterpreter => {
+                    "choose what Open Interpreter is allowed to do"
+                }
+            },
             SlashCommand::Keymap => "remap TUI shortcuts",
             SlashCommand::Vim => "toggle Vim mode for the composer",
             SlashCommand::ElevateSandbox => "set up elevated agent sandbox",
@@ -188,6 +218,7 @@ impl SlashCommand {
             | SlashCommand::Init
             | SlashCommand::Compact
             | SlashCommand::Model
+            | SlashCommand::Harness
             | SlashCommand::Personality
             | SlashCommand::Permissions
             | SlashCommand::Keymap

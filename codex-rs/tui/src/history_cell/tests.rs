@@ -1475,6 +1475,7 @@ fn session_header_includes_reasoning_level_when_present() {
         /*show_fast_status*/ true,
         std::env::temp_dir(),
         "test",
+        codex_product_info::Product::Codex,
     );
 
     let lines = render_lines(&cell.display_lines(/*width*/ 80));
@@ -1495,6 +1496,7 @@ fn session_header_hides_fast_status_when_disabled() {
         /*show_fast_status*/ false,
         std::env::temp_dir(),
         "test",
+        codex_product_info::Product::Codex,
     );
 
     let lines = render_lines(&cell.display_lines(/*width*/ 80));
@@ -1519,11 +1521,66 @@ fn session_header_indicates_yolo_mode() {
         /*show_fast_status*/ false,
         test_path_buf("/tmp/project").abs().to_path_buf(),
         "test",
+        codex_product_info::Product::Codex,
     )
     .with_yolo_mode(/*yolo_mode*/ true);
 
     let rendered = render_lines(&cell.display_lines(/*width*/ 80)).join("\n");
     insta::assert_snapshot!(rendered);
+}
+
+#[test]
+#[cfg_attr(
+    target_os = "windows",
+    ignore = "snapshot path rendering differs on Windows"
+)]
+fn open_interpreter_session_header_uses_product_name_without_border() {
+    let cell = SessionHeaderHistoryCell::new(
+        "gpt-5".to_string(),
+        /*reasoning_effort*/ None,
+        /*show_fast_status*/ false,
+        test_path_buf("/tmp/project").abs().to_path_buf(),
+        "test",
+        codex_product_info::Product::OpenInterpreter,
+    );
+
+    let rendered = render_lines(&cell.display_lines(/*width*/ 80)).join("\n");
+    assert!(!rendered.contains(">_"));
+    assert!(!rendered.contains("model:"));
+    assert!(!rendered.contains("directory:"));
+    insta::assert_snapshot!(rendered);
+}
+
+#[test]
+fn open_interpreter_source_build_session_header_shows_debug_version() {
+    let cell = SessionHeaderHistoryCell::new(
+        "gpt-5".to_string(),
+        /*reasoning_effort*/ None,
+        /*show_fast_status*/ false,
+        test_cwd(),
+        "0.0.0",
+        codex_product_info::Product::OpenInterpreter,
+    );
+
+    let lines = render_lines(&cell.display_lines(/*width*/ 80));
+    let rendered = lines.join("\n");
+    assert!(rendered.contains("Open Interpreter (v0.0.0)"));
+    assert!(!rendered.contains(">_"));
+    assert!(!rendered.contains("model:"));
+    assert!(!rendered.contains("directory:"));
+}
+
+#[test]
+fn open_interpreter_tooltip_copy_replaces_codex_branding() {
+    let tip = super::session::productize_tip(
+        "GPT-5.5 is now available in Codex. OpenAI Codex keeps going.".to_string(),
+        codex_product_info::Product::OpenInterpreter,
+    );
+
+    assert_eq!(
+        tip,
+        "GPT-5.5 is now available in Open Interpreter. Open Interpreter keeps going."
+    );
 }
 
 #[test]
@@ -1961,6 +2018,29 @@ fn user_history_cell_renders_remote_image_urls() {
 }
 
 #[test]
+fn user_history_cell_uses_gentle_separators_without_blank_padding() {
+    let cell = UserHistoryCell {
+        message: "hello".to_string(),
+        text_elements: Vec::new(),
+        local_image_paths: Vec::new(),
+        remote_image_urls: Vec::new(),
+    };
+
+    let rendered = render_lines(&cell.display_lines(/*width*/ 12));
+
+    assert_eq!(rendered.first().map(String::as_str), Some("────────────"));
+    assert_eq!(rendered.last().map(String::as_str), Some("────────────"));
+    assert_eq!(
+        rendered
+            .iter()
+            .rev()
+            .take_while(|line| line.trim().is_empty())
+            .count(),
+        0
+    );
+}
+
+#[test]
 fn user_history_cell_summarizes_inline_data_urls() {
     let cell = UserHistoryCell {
         message: "describe inline image".to_string(),
@@ -2031,7 +2111,7 @@ fn user_history_cell_trims_trailing_blank_message_lines() {
         .rev()
         .take_while(|line| line.trim().is_empty())
         .count();
-    assert_eq!(trailing_blank_count, 1);
+    assert_eq!(trailing_blank_count, 0);
     assert!(rendered.iter().any(|line| line.contains("line one")));
 }
 
@@ -2054,7 +2134,7 @@ fn user_history_cell_trims_trailing_blank_message_lines_with_text_elements() {
         .rev()
         .take_while(|line| line.trim().is_empty())
         .count();
-    assert_eq!(trailing_blank_count, 1);
+    assert_eq!(trailing_blank_count, 0);
     assert!(rendered.iter().any(|line| line.contains("tokenized")));
 }
 

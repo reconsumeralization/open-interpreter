@@ -3659,6 +3659,22 @@ fn thread_settings_update_params_preserve_explicit_null_service_tier() {
 }
 
 #[test]
+fn thread_settings_update_params_round_trip_model_provider() {
+    let params: ThreadSettingsUpdateParams = serde_json::from_value(json!({
+        "threadId": "thread_123",
+        "model": "claude-sonnet-4-6",
+        "modelProvider": "anthropic"
+    }))
+    .expect("params should deserialize");
+
+    assert_eq!(params.model.as_deref(), Some("claude-sonnet-4-6"));
+    assert_eq!(params.model_provider.as_deref(), Some("anthropic"));
+
+    let serialized = serde_json::to_value(&params).expect("params should serialize");
+    assert_eq!(serialized.get("modelProvider"), Some(&json!("anthropic")));
+}
+
+#[test]
 fn thread_settings_update_params_preserve_field_level_experimental_gates() {
     let permissions = ThreadSettingsUpdateParams {
         thread_id: "thread_123".to_string(),

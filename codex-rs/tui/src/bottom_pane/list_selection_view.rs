@@ -143,6 +143,7 @@ pub(crate) struct SelectionItem {
     pub dismiss_on_select: bool,
     pub dismiss_parent_on_child_accept: bool,
     pub search_value: Option<String>,
+    pub keep_visible_during_search: bool,
     pub disabled_reason: Option<String>,
 }
 
@@ -433,9 +434,11 @@ impl ListSelectionView {
                 .active_items()
                 .iter()
                 .positions(|item| {
-                    item.search_value
-                        .as_ref()
-                        .is_some_and(|v| v.to_lowercase().contains(&query_lower))
+                    item.keep_visible_during_search
+                        || item
+                            .search_value
+                            .as_ref()
+                            .is_some_and(|v| v.to_lowercase().contains(&query_lower))
                 })
                 .collect();
         } else {

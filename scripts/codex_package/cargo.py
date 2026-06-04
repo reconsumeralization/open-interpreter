@@ -82,7 +82,7 @@ def build_source_binaries(
     outputs = SourceBuildOutputs(
         entrypoint_bin=resolve_output_path(
             entrypoint_bin,
-            output_dir / variant.entrypoint_name(spec),
+            output_dir / cargo_binary_output_name(variant.cargo_bin, spec),
         ),
         managed_codex_bin=resolve_output_path(
             managed_codex_bin,
@@ -105,6 +105,10 @@ def build_source_binaries(
     )
     validate_source_outputs(outputs)
     return outputs
+
+
+def cargo_binary_output_name(binary: str, spec: TargetSpec) -> str:
+    return f"{binary}{spec.exe_suffix}"
 
 
 def source_binaries_for_target(

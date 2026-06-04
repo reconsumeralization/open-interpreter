@@ -185,6 +185,8 @@ impl MemoryStartupContext {
             config.features.enabled(Feature::EnableRequestCompression),
             config.features.enabled(Feature::RuntimeMetrics),
             /*beta_features_header*/ None,
+            codex_tools::Harness::Native,
+            /*harness_guidance*/ true,
             /*attestation_provider*/ None,
         );
 

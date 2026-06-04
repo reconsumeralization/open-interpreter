@@ -33,11 +33,8 @@ pub(crate) fn accent_style() -> Style {
 }
 
 /// Returns the style for a user-authored message using the provided terminal background.
-pub fn user_message_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
-    match terminal_bg {
-        Some(bg) => Style::default().bg(user_message_bg(bg)),
-        None => Style::default(),
-    }
+pub fn user_message_style_for(_terminal_bg: Option<(u8, u8, u8)>) -> Style {
+    Style::default()
 }
 
 pub fn proposed_plan_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
@@ -107,6 +104,13 @@ mod tests {
 
         assert_eq!(accent_style_for(Some((0, 0, 0))), expected);
         assert_eq!(accent_style_for(/*terminal_bg*/ None), expected);
+    }
+
+    #[test]
+    fn user_message_style_never_sets_background() {
+        assert_eq!(user_message_style_for(Some((0, 0, 0))).bg, None);
+        assert_eq!(user_message_style_for(Some((255, 255, 255))).bg, None);
+        assert_eq!(user_message_style_for(/*terminal_bg*/ None).bg, None);
     }
 
     #[test]

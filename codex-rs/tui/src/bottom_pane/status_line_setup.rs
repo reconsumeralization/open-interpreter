@@ -10,6 +10,7 @@
 //! # Available Status Line Items
 //!
 //! - Model information (name, reasoning level)
+//! - Harness information
 //! - Directory paths (current dir, project root)
 //! - Git information (branch name)
 //! - Permissions profile
@@ -59,6 +60,9 @@ pub(crate) enum StatusLineItem {
 
     /// Model name with reasoning level suffix.
     ModelWithReasoning,
+
+    /// Current harness family.
+    Harness,
 
     /// Current working directory path.
     CurrentDir,
@@ -144,6 +148,7 @@ impl StatusLineItem {
         match self {
             StatusLineItem::ModelName => "Current model name",
             StatusLineItem::ModelWithReasoning => "Current model name with reasoning level",
+            StatusLineItem::Harness => "Current harness family",
             StatusLineItem::CurrentDir => "Current working directory",
             StatusLineItem::ProjectRoot => "Project name (omitted when unavailable)",
             StatusLineItem::GitBranch => "Current Git branch (omitted when unavailable)",
@@ -191,6 +196,7 @@ impl StatusLineItem {
         match self {
             StatusLineItem::ModelName => StatusSurfacePreviewItem::Model,
             StatusLineItem::ModelWithReasoning => StatusSurfacePreviewItem::ModelWithReasoning,
+            StatusLineItem::Harness => StatusSurfacePreviewItem::Harness,
             StatusLineItem::CurrentDir => StatusSurfacePreviewItem::CurrentDir,
             StatusLineItem::ProjectRoot => StatusSurfacePreviewItem::ProjectRoot,
             StatusLineItem::GitBranch => StatusSurfacePreviewItem::GitBranch,
