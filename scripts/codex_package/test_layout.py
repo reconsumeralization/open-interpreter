@@ -51,6 +51,7 @@ class PackageLayoutTest(unittest.TestCase):
                 (package_dir / "bin" / "interpreter").read_text(),
                 "interpreter",
             )
+            self.assertEqual((package_dir / "bin" / "i").read_text(), "interpreter")
             self.assertEqual((package_dir / "bin" / "codex").read_text(), "codex")
             metadata = (package_dir / "codex-package.json").read_text(encoding="utf-8")
             self.assertIn('"entrypoint": "bin/interpreter"', metadata)

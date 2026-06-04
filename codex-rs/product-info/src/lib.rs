@@ -47,7 +47,8 @@ pub enum Product {
 
 impl Product {
     pub fn current() -> Self {
-        if std::env::var_os(OPEN_INTERPRETER_BRAND_ENV_VAR).is_some() {
+        if std::env::var_os(OPEN_INTERPRETER_BRAND_ENV_VAR).is_some() || is_open_interpreter_argv0()
+        {
             Self::OpenInterpreter
         } else {
             Self::Codex
@@ -58,6 +59,13 @@ impl Product {
         match self {
             Product::Codex => "OpenAI Codex",
             Product::OpenInterpreter => "Open Interpreter",
+        }
+    }
+
+    pub fn command_name(self) -> &'static str {
+        match self {
+            Product::Codex => "codex",
+            Product::OpenInterpreter => "interpreter",
         }
     }
 
@@ -109,6 +117,18 @@ impl Product {
             Product::OpenInterpreter => OPEN_INTERPRETER_STANDALONE_WINDOWS_UPDATE_ARGS,
         }
     }
+}
+
+pub fn is_open_interpreter_argv0() -> bool {
+    std::env::args_os()
+        .next()
+        .and_then(|arg0| {
+            std::path::Path::new(&arg0)
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .map(str::to_owned)
+        })
+        .is_some_and(|name| name.starts_with("interpreter"))
 }
 
 #[cfg(test)]

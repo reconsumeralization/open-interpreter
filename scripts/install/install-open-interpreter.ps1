@@ -33,6 +33,11 @@ $env:CODEX_COMMAND_NAME = if ([string]::IsNullOrWhiteSpace($env:CODEX_COMMAND_NA
 } else {
     $env:CODEX_COMMAND_NAME
 }
+$env:CODEX_ALIAS_COMMAND_NAMES = if ([string]::IsNullOrWhiteSpace($env:CODEX_ALIAS_COMMAND_NAMES)) {
+    "i"
+} else {
+    $env:CODEX_ALIAS_COMMAND_NAMES
+}
 $env:CODEX_RELEASE_TAG_PREFIX = if ([string]::IsNullOrWhiteSpace($env:CODEX_RELEASE_TAG_PREFIX)) {
     "rust-v"
 } else {

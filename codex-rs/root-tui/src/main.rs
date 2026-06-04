@@ -20,7 +20,7 @@ const OPEN_INTERPRETER_HOME_ENV_VAR: &str = "OPEN_INTERPRETER_HOME";
 const DEFAULT_OPEN_INTERPRETER_HOME_DIR: &str = ".openinterpreter";
 
 #[derive(Parser, Debug)]
-#[command(version)]
+#[command(name = "interpreter", bin_name = "interpreter", version)]
 struct RootTuiCli {
     #[command(flatten)]
     config_overrides: CliConfigOverrides,

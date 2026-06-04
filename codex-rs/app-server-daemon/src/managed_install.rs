@@ -18,16 +18,22 @@ use tokio::fs;
 use tokio::process::Command;
 
 pub(crate) fn managed_codex_bin(codex_home: &Path) -> PathBuf {
-    managed_codex_bin_for_package_dir(
+    let package_dir = InstallContext::current()
+        .package_layout
+        .as_ref()
+        .map(|layout| layout.package_dir.as_path());
+    managed_codex_bin_for_package_dir_and_current_exe(
         codex_home,
-        InstallContext::current()
-            .package_layout
-            .as_ref()
-            .map(|layout| layout.package_dir.as_path()),
+        package_dir,
+        std::env::current_exe().ok().as_deref(),
     )
 }
 
-fn managed_codex_bin_for_package_dir(codex_home: &Path, package_dir: Option<&Path>) -> PathBuf {
+fn managed_codex_bin_for_package_dir_and_current_exe(
+    codex_home: &Path,
+    package_dir: Option<&Path>,
+    current_exe: Option<&Path>,
+) -> PathBuf {
     if let Some(package_dir) = package_dir
         && let Some(managed_codex) =
             codex_install_context::managed_codex_bin_from_package_dir(package_dir)
@@ -43,6 +49,15 @@ fn managed_codex_bin_for_package_dir(codex_home: &Path, package_dir: Option<&Pat
         codex_install_context::managed_codex_bin_from_package_dir(&package_dir)
     {
         return managed_codex.into_path_buf();
+    }
+
+    if let Some(current_exe) = current_exe
+        && let Some(current_exe_dir) = current_exe.parent()
+    {
+        let sibling_codex = current_exe_dir.join(managed_codex_file_name());
+        if sibling_codex.is_file() {
+            return sibling_codex;
+        }
     }
 
     package_dir.join(managed_codex_file_name())

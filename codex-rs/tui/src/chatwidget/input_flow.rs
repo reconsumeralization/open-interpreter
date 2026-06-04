@@ -37,7 +37,7 @@ impl ChatWidget {
                     // Reset any reasoning header only when we are actually submitting a turn.
                     self.reasoning_buffer.clear();
                     self.full_reasoning_buffer.clear();
-                    self.set_status_header(String::from("Working"));
+                    self.set_status_header(String::from(STATUS_HEADER_INTERPRETING));
                     self.submit_user_message(user_message);
                 } else {
                     self.queue_user_message(user_message);

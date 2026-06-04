@@ -51,6 +51,12 @@ def build_package_dir(
         bin_dir / entrypoint_name,
         is_windows=spec.is_windows,
     )
+    for alias_name in variant.alias_names(spec):
+        copy_executable(
+            inputs.entrypoint_bin,
+            bin_dir / alias_name,
+            is_windows=spec.is_windows,
+        )
     if variant.managed_codex_required:
         if inputs.managed_codex_bin is None:
             raise RuntimeError(
@@ -145,6 +151,10 @@ def validate_package_dir(
         Path("codex-path") / spec.rg_name,
     ]
     executable_files = list(required_files)
+    for alias_name in variant.alias_names(spec):
+        alias_path = Path("bin") / alias_name
+        required_files.append(alias_path)
+        executable_files.append(alias_path)
 
     if variant.managed_codex_required:
         managed_codex_path = Path("bin") / variant.managed_codex_name(spec)

@@ -328,6 +328,7 @@ class InstallShLatestResolutionTests(unittest.TestCase):
                     "CODEX_INSTALL_PRODUCT_NAME": "Open Interpreter",
                     "CODEX_PACKAGE_ASSET_STEM": "open-interpreter-package",
                     "CODEX_COMMAND_NAME": "interpreter",
+                    "CODEX_ALIAS_COMMAND_NAMES": "i",
                     "CODEX_RELEASE_TAG_PREFIX": "rust-v",
                     "CODEX_NON_INTERACTIVE": "1",
                     "CODEX_HOME": str(codex_home),
@@ -348,6 +349,10 @@ class InstallShLatestResolutionTests(unittest.TestCase):
             self.assertFalse((current / "codex").exists())
             self.assertEqual(
                 (install_dir / "interpreter").resolve(),
+                (current / "bin" / "interpreter").resolve(),
+            )
+            self.assertEqual(
+                (install_dir / "i").resolve(),
                 (current / "bin" / "interpreter").resolve(),
             )
 

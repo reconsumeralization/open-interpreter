@@ -8,6 +8,7 @@ GITHUB_REPO="${CODEX_GITHUB_REPO:-openai/codex}"
 PRODUCT_NAME="${CODEX_INSTALL_PRODUCT_NAME:-Codex CLI}"
 PACKAGE_ASSET_STEM="${CODEX_PACKAGE_ASSET_STEM:-codex-package}"
 COMMAND_NAME="${CODEX_COMMAND_NAME:-codex}"
+ALIAS_COMMAND_NAMES="${CODEX_ALIAS_COMMAND_NAMES:-}"
 RELEASE_TAG_PREFIX="${CODEX_RELEASE_TAG_PREFIX:-rust-v}"
 
 BIN_DIR="${CODEX_INSTALL_DIR:-$HOME/.local/bin}"
@@ -522,6 +523,9 @@ cleanup_stale_install_artifacts() {
 
   if [ -d "$BIN_DIR" ]; then
     find "$BIN_DIR" -mindepth 1 -maxdepth 1 -name ".$COMMAND_NAME.*" -exec rm -f {} +
+    for alias_name in $ALIAS_COMMAND_NAMES; do
+      find "$BIN_DIR" -mindepth 1 -maxdepth 1 -name ".$alias_name.*" -exec rm -f {} +
+    done
   fi
 }
 
@@ -824,10 +828,18 @@ update_visible_command() {
   command_relative_path="$(package_entrypoint_relative_path "$release_dir")"
 
   replace_path_with_symlink "$BIN_PATH" "$CURRENT_LINK/$command_relative_path" "$tmp_link"
+
+  for alias_name in $ALIAS_COMMAND_NAMES; do
+    tmp_alias_link="$BIN_DIR/.$alias_name.$$"
+    replace_path_with_symlink "$BIN_DIR/$alias_name" "$CURRENT_LINK/$command_relative_path" "$tmp_alias_link"
+  done
 }
 
 verify_visible_command() {
   "$BIN_PATH" --version >/dev/null
+  for alias_name in $ALIAS_COMMAND_NAMES; do
+    "$BIN_DIR/$alias_name" --version >/dev/null
+  done
 }
 
 parse_args "$@"

@@ -17,6 +17,11 @@ if ([string]::IsNullOrWhiteSpace($Release)) {
 }
 
 $NonInteractive = $env:CODEX_NON_INTERACTIVE -match "^(?i:1|true|yes)$"
+$AliasCommandNames = if ([string]::IsNullOrWhiteSpace($env:CODEX_ALIAS_COMMAND_NAMES)) {
+    @()
+} else {
+    $env:CODEX_ALIAS_COMMAND_NAMES -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+}
 
 function Write-Step {
     param(
@@ -786,6 +791,13 @@ function Test-VisibleCodexCommand {
     & $codexCommand --version *> $null
     if ($LASTEXITCODE -ne 0) {
         throw "Installed $ProductName command failed verification: $codexCommand --version"
+    }
+    foreach ($aliasName in $AliasCommandNames) {
+        $aliasCommand = Join-Path $VisibleBinDir "$aliasName.exe"
+        & $aliasCommand --version *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Installed $ProductName alias failed verification: $aliasCommand --version"
+        }
     }
 }
 

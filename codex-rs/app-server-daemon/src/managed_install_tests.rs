@@ -3,7 +3,7 @@ use tempfile::TempDir;
 
 use super::executable_identity_from_bytes;
 use super::managed_codex_bin;
-use super::managed_codex_bin_for_package_dir;
+use super::managed_codex_bin_for_package_dir_and_current_exe;
 use super::parse_codex_version;
 
 #[test]
@@ -91,6 +91,31 @@ fn managed_codex_bin_falls_back_to_legacy_current_path() {
 }
 
 #[test]
+fn managed_codex_bin_falls_back_to_sibling_binary_for_source_tree_debug() {
+    let codex_home = TempDir::new().expect("codex home");
+    let debug_dir = TempDir::new().expect("debug dir");
+    let current_exe = debug_dir.path().join(if cfg!(windows) {
+        "interpreter-root-tui.exe"
+    } else {
+        "interpreter-root-tui"
+    });
+    let sibling_codex = debug_dir
+        .path()
+        .join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    std::fs::write(&current_exe, "").expect("write current exe");
+    std::fs::write(&sibling_codex, "").expect("write sibling codex");
+
+    assert_eq!(
+        managed_codex_bin_for_package_dir_and_current_exe(
+            codex_home.path(),
+            /*package_dir*/ None,
+            Some(&current_exe),
+        ),
+        sibling_codex
+    );
+}
+
+#[test]
 fn managed_codex_bin_prefers_current_package_layout_over_state_home() {
     let codex_home = TempDir::new().expect("codex home");
     let package_dir = TempDir::new().expect("package dir");
@@ -107,7 +132,11 @@ fn managed_codex_bin_prefers_current_package_layout_over_state_home() {
     )
     .expect("write package metadata");
     assert_eq!(
-        managed_codex_bin_for_package_dir(codex_home.path(), Some(package_dir.path())),
+        managed_codex_bin_for_package_dir_and_current_exe(
+            codex_home.path(),
+            Some(package_dir.path()),
+            /*current_exe*/ None,
+        ),
         managed_codex
             .canonicalize()
             .expect("canonical managed codex")
