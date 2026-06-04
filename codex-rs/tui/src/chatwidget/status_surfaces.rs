@@ -563,6 +563,7 @@ impl ChatWidget {
             StatusLineItem::ModelName => Some(self.model_display_label()),
             StatusLineItem::ModelWithReasoning => Some(self.model_with_reasoning_display_name()),
             StatusLineItem::Harness => Some(self.status_line_harness_label()),
+            StatusLineItem::Reasoning => Some(self.reasoning_display_name().to_string()),
             StatusLineItem::CurrentDir => {
                 Some(format_directory_display(
                     self.status_line_cwd(),
@@ -696,6 +697,7 @@ impl ChatWidget {
             StatusSurfacePreviewItem::Model => StatusLineItem::ModelName,
             StatusSurfacePreviewItem::ModelWithReasoning => StatusLineItem::ModelWithReasoning,
             StatusSurfacePreviewItem::Harness => StatusLineItem::Harness,
+            StatusSurfacePreviewItem::Reasoning => StatusLineItem::Reasoning,
         };
         self.status_line_value_for_item(status_line_item)
     }
@@ -761,8 +763,16 @@ impl ChatWidget {
                 self.model_with_reasoning_display_name_for(self.model_display_name()),
                 /*max_chars*/ 32,
             )),
+            TerminalTitleItem::Reasoning => Some(Self::truncate_terminal_title_part(
+                self.reasoning_display_name().to_string(),
+                /*max_chars*/ 32,
+            )),
             TerminalTitleItem::TaskProgress => self.terminal_title_task_progress(),
         }
+    }
+
+    fn reasoning_display_name(&self) -> &'static str {
+        Self::status_line_reasoning_effort_label(self.effective_reasoning_effort())
     }
 
     fn model_with_reasoning_display_name(&self) -> String {
@@ -806,7 +816,7 @@ impl ChatWidget {
             TerminalTitleStatusKind::Thinking if !self.bottom_pane.is_task_running() => {
                 "Ready".to_string()
             }
-            TerminalTitleStatusKind::Working => "Working".to_string(),
+            TerminalTitleStatusKind::Working => "Interpreting".to_string(),
             TerminalTitleStatusKind::WaitingForBackgroundTerminal => "Waiting".to_string(),
             TerminalTitleStatusKind::Thinking => "Thinking".to_string(),
         }

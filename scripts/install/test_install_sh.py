@@ -105,7 +105,9 @@ class InstallShLatestResolutionTests(unittest.TestCase):
                 check=False,
             )
 
-    def test_latest_without_matching_tag_prefix_fails_at_version_resolution(self) -> None:
+    def test_latest_without_matching_tag_prefix_fails_at_version_resolution(
+        self,
+    ) -> None:
         result = self.run_installer_with_release_list(
             textwrap.dedent(
                 """\
@@ -152,7 +154,9 @@ class InstallShLatestResolutionTests(unittest.TestCase):
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Could not find Open Interpreter release assets for 0.2.0.", result.stderr)
+        self.assertIn(
+            "Could not find Open Interpreter release assets for 0.2.0.", result.stderr
+        )
 
     def test_default_codex_latest_skips_prereleases(self) -> None:
         result = self.run_installer_with_release_list(
@@ -179,7 +183,9 @@ class InstallShLatestResolutionTests(unittest.TestCase):
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Could not find Codex CLI release assets for 0.135.0.", result.stderr)
+        self.assertIn(
+            "Could not find Codex CLI release assets for 0.135.0.", result.stderr
+        )
 
     def test_open_interpreter_package_install_uses_metadata_entrypoint(self) -> None:
         target = current_installer_target()
@@ -203,7 +209,9 @@ class InstallShLatestResolutionTests(unittest.TestCase):
             )
             write_executable(package_root / "codex-path" / "rg", "#!/bin/sh\nexit 0\n")
             if "linux" in target:
-                write_executable(package_root / "codex-resources" / "bwrap", "#!/bin/sh\nexit 0\n")
+                write_executable(
+                    package_root / "codex-resources" / "bwrap", "#!/bin/sh\nexit 0\n"
+                )
 
             (package_root / "codex-package.json").write_text(
                 json.dumps(
@@ -228,7 +236,9 @@ class InstallShLatestResolutionTests(unittest.TestCase):
             package_digest = sha256(archive)
 
             checksum_file = tmp / checksum_asset
-            checksum_file.write_text(f"{package_digest}  {package_asset}\n", encoding="utf-8")
+            checksum_file.write_text(
+                f"{package_digest}  {package_asset}\n", encoding="utf-8"
+            )
             checksum_digest = sha256(checksum_file)
 
             release_json = tmp / "release.json"

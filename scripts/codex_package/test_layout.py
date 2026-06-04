@@ -16,7 +16,9 @@ from codex_package.targets import TARGET_SPECS
 
 
 class PackageLayoutTest(unittest.TestCase):
-    def test_open_interpreter_package_contains_entrypoint_and_managed_codex(self) -> None:
+    def test_open_interpreter_package_contains_entrypoint_and_managed_codex(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             inputs = PackageInputs(

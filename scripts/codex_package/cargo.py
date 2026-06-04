@@ -45,10 +45,10 @@ def build_source_binaries(
         spec,
         variant,
         build_entrypoint=entrypoint_bin is None,
-        build_managed_codex=variant.managed_codex_required and managed_codex_bin is None,
+        build_managed_codex=variant.managed_codex_required
+        and managed_codex_bin is None,
         build_bwrap=spec.is_linux and bwrap_bin is None,
-        build_codex_command_runner=spec.is_windows
-        and codex_command_runner_bin is None,
+        build_codex_command_runner=spec.is_windows and codex_command_runner_bin is None,
         build_codex_windows_sandbox_setup=spec.is_windows
         and codex_windows_sandbox_setup_bin is None,
     )
@@ -154,7 +154,9 @@ def validate_prebuilt_resource_inputs(
         )
 
 
-def resolve_output_path(explicit_path: Path | None, default_path: Path | None) -> Path | None:
+def resolve_output_path(
+    explicit_path: Path | None, default_path: Path | None
+) -> Path | None:
     if explicit_path is not None:
         return explicit_path.resolve()
 

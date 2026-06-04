@@ -298,6 +298,7 @@ async fn handle_bash(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, 
             .features()
             .enabled(codex_features::Feature::ExecPermissionApprovals),
         include_environment_id: false,
+        include_shell_parameter: false,
     });
     let output = handler
         .handle(ToolInvocation {
@@ -1211,8 +1212,9 @@ async fn handle_opencode_task(
     let mut config = build_agent_spawn_config(&base_instructions, turn.as_ref())?;
     config.base_instructions = Some(OPENCODE_SEARCH_AGENT_BASE_INSTRUCTIONS.to_string());
     let role_name = args.subagent_type.as_deref();
+    let parent_thread_id = session.thread_id();
     let spawn_source = thread_spawn_source(
-        session.conversation_id,
+        parent_thread_id,
         &turn.session_source,
         child_depth,
         role_name,
@@ -1224,7 +1226,7 @@ async fn handle_opencode_task(
         initial_operation,
         Some(spawn_source),
         SpawnAgentOptions {
-            parent_thread_id: Some(session.conversation_id),
+            parent_thread_id: Some(parent_thread_id),
             environments: Some(turn.environments.to_selections()),
             ..Default::default()
         },

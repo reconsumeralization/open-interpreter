@@ -33,6 +33,7 @@ pub(crate) enum StatusSurfacePreviewItem {
     Model,
     ModelWithReasoning,
     Harness,
+    Reasoning,
     TaskProgress,
 }
 
@@ -43,7 +44,7 @@ impl StatusSurfacePreviewItem {
             StatusSurfacePreviewItem::ProjectName => "my-project",
             StatusSurfacePreviewItem::ProjectRoot => "my-project",
             StatusSurfacePreviewItem::CurrentDir => "~/my-project/subdir",
-            StatusSurfacePreviewItem::Status => "Working",
+            StatusSurfacePreviewItem::Status => "Interpreting",
             StatusSurfacePreviewItem::ThreadTitle => "thread title",
             StatusSurfacePreviewItem::GitBranch => "feat/awesome-feature",
             StatusSurfacePreviewItem::PullRequestNumber => "PR #123",
@@ -65,6 +66,7 @@ impl StatusSurfacePreviewItem {
             StatusSurfacePreviewItem::Model => "openai gpt-5.2-codex",
             StatusSurfacePreviewItem::ModelWithReasoning => "openai gpt-5.2-codex medium",
             StatusSurfacePreviewItem::Harness => "native",
+            StatusSurfacePreviewItem::Reasoning => "medium",
             StatusSurfacePreviewItem::TaskProgress => "Tasks 0/0",
         }
     }
@@ -97,6 +99,7 @@ impl StatusSurfacePreviewItem {
             Self::Model,
             Self::ModelWithReasoning,
             Self::Harness,
+            Self::Reasoning,
             Self::TaskProgress,
         ]
         .into_iter()

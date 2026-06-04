@@ -2539,6 +2539,7 @@ async fn inactive_thread_permissions_approval_preserves_file_system_permissions(
             thread_id: thread_id.to_string(),
             turn_id: "turn-approval".to_string(),
             item_id: "call-approval".to_string(),
+            environment_id: Some("remote".to_string()),
             started_at_ms: 0,
             cwd: test_absolute_path("/tmp"),
             reason: Some("Need access to .git".to_string()),
@@ -2557,7 +2558,9 @@ async fn inactive_thread_permissions_approval_preserves_file_system_permissions(
     };
 
     let Some(ThreadInteractiveRequest::Approval(ApprovalRequest::Permissions {
-        permissions, ..
+        environment_id,
+        permissions,
+        ..
     })) = app
         .interactive_request_for_thread_request(thread_id, &request)
         .await
@@ -2565,6 +2568,7 @@ async fn inactive_thread_permissions_approval_preserves_file_system_permissions(
         panic!("expected permissions approval request");
     };
 
+    assert_eq!(environment_id.as_deref(), Some("remote"));
     assert_eq!(
         permissions,
         RequestPermissionProfile {
@@ -4638,6 +4642,61 @@ async fn backtrack_remote_image_only_selection_clears_existing_composer_draft() 
 }
 
 #[tokio::test]
+async fn cancelled_turn_edit_restores_prompt_and_rolls_back_latest_turn() {
+    let (mut app, _app_event_rx, mut op_rx) = make_test_app_with_channels().await;
+    app.transcript_cells = vec![Arc::new(UserHistoryCell {
+        message: "original".to_string(),
+        text_elements: Vec::new(),
+        local_image_paths: Vec::new(),
+        remote_image_urls: Vec::new(),
+    }) as Arc<dyn HistoryCell>];
+    let prompt = crate::chatwidget::UserMessage {
+        text: "edit me".to_string(),
+        local_images: Vec::new(),
+        remote_image_urls: vec!["https://example.com/edit.png".to_string()],
+        text_elements: Vec::new(),
+        mention_bindings: Vec::new(),
+    };
+
+    app.apply_cancelled_turn_edit(prompt);
+
+    assert_eq!(app.chat_widget.composer_text_with_pending(), "edit me");
+    assert_snapshot!(
+        "cancelled_turn_edit_restores_composer",
+        app.chat_widget.composer_text_with_pending()
+    );
+    assert_eq!(
+        app.chat_widget.remote_image_urls(),
+        vec!["https://example.com/edit.png".to_string()]
+    );
+    assert_matches!(op_rx.try_recv(), Ok(Op::ThreadRollback { num_turns: 1 }));
+}
+
+#[tokio::test]
+async fn first_cancelled_turn_edit_restores_prompt_without_local_history() {
+    let (mut app, _app_event_rx, mut op_rx) = make_test_app_with_channels().await;
+    let prompt = crate::chatwidget::UserMessage {
+        text: "edit first prompt".to_string(),
+        local_images: Vec::new(),
+        remote_image_urls: vec!["https://example.com/edit.png".to_string()],
+        text_elements: Vec::new(),
+        mention_bindings: Vec::new(),
+    };
+
+    app.apply_cancelled_turn_edit(prompt);
+
+    assert_eq!(
+        app.chat_widget.composer_text_with_pending(),
+        "edit first prompt"
+    );
+    assert_eq!(
+        app.chat_widget.remote_image_urls(),
+        vec!["https://example.com/edit.png".to_string()]
+    );
+    assert_matches!(op_rx.try_recv(), Ok(Op::ThreadRollback { num_turns: 1 }));
+}
+
+#[tokio::test]
 async fn backtrack_resubmit_preserves_data_image_urls_in_user_turn() {
     let (mut app, _app_event_rx, mut op_rx) = make_test_app_with_channels().await;
 
@@ -5043,53 +5102,65 @@ async fn thread_rollback_response_discards_queued_active_thread_events() {
     assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
 }
 
-#[tokio::test]
-async fn new_session_requests_shutdown_for_previous_conversation() {
-    Box::pin(async {
-        let (mut app, mut app_event_rx, mut op_rx) = Box::pin(make_test_app_with_channels()).await;
+#[test]
+fn new_session_requests_shutdown_for_previous_conversation() {
+    std::thread::Builder::new()
+        .name("new-session-shutdown-test".to_string())
+        .stack_size(32 * 1024 * 1024)
+        .spawn(|| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("tokio runtime");
+            runtime.block_on(Box::pin(async {
+                let (mut app, mut app_event_rx, mut op_rx) =
+                    Box::pin(make_test_app_with_channels()).await;
 
-        let thread_id = ThreadId::new();
-        let event = crate::session_state::ThreadSessionState {
-            thread_id,
-            forked_from_id: None,
-            fork_parent_title: None,
-            thread_name: None,
-            model: "gpt-test".to_string(),
-            model_provider_id: "test-provider".to_string(),
-            service_tier: None,
-            approval_policy: AskForApproval::Never,
-            approvals_reviewer: ApprovalsReviewer::User,
-            permission_profile: PermissionProfile::read_only(),
-            active_permission_profile: None,
-            cwd: test_path_buf("/home/user/project").abs(),
-            runtime_workspace_roots: Vec::new(),
-            instruction_source_paths: Vec::new(),
-            reasoning_effort: None,
-            collaboration_mode: None,
-            personality: None,
-            message_history: None,
-            network_proxy: None,
-            rollout_path: Some(PathBuf::new()),
-        };
+                let thread_id = ThreadId::new();
+                let event = crate::session_state::ThreadSessionState {
+                    thread_id,
+                    forked_from_id: None,
+                    fork_parent_title: None,
+                    thread_name: None,
+                    model: "gpt-test".to_string(),
+                    model_provider_id: "test-provider".to_string(),
+                    service_tier: None,
+                    approval_policy: AskForApproval::Never,
+                    approvals_reviewer: ApprovalsReviewer::User,
+                    permission_profile: PermissionProfile::read_only(),
+                    active_permission_profile: None,
+                    cwd: test_path_buf("/home/user/project").abs(),
+                    runtime_workspace_roots: Vec::new(),
+                    instruction_source_paths: Vec::new(),
+                    reasoning_effort: None,
+                    collaboration_mode: None,
+                    personality: None,
+                    message_history: None,
+                    network_proxy: None,
+                    rollout_path: Some(PathBuf::new()),
+                };
 
-        app.chat_widget.handle_thread_session(event);
+                app.chat_widget.handle_thread_session(event);
 
-        while app_event_rx.try_recv().is_ok() {}
-        while op_rx.try_recv().is_ok() {}
+                while app_event_rx.try_recv().is_ok() {}
+                while op_rx.try_recv().is_ok() {}
 
-        let mut app_server = Box::pin(crate::start_embedded_app_server_for_picker(
-            app.chat_widget.config_ref(),
-        ))
-        .await
-        .expect("embedded app server");
-        Box::pin(app.shutdown_current_thread(&mut app_server)).await;
+                let mut app_server = Box::pin(crate::start_embedded_app_server_for_picker(
+                    app.chat_widget.config_ref(),
+                ))
+                .await
+                .expect("embedded app server");
+                Box::pin(app.shutdown_current_thread(&mut app_server)).await;
 
-        assert!(
-            op_rx.try_recv().is_err(),
-            "shutdown should not submit Op::Shutdown"
-        );
-    })
-    .await;
+                assert!(
+                    op_rx.try_recv().is_err(),
+                    "shutdown should not submit Op::Shutdown"
+                );
+            }));
+        })
+        .expect("spawn test thread")
+        .join()
+        .expect("test thread should not panic");
 }
 
 #[tokio::test]

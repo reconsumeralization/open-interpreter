@@ -24,6 +24,7 @@ use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::AdditionalContextEntry;
 use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::Event;
+use codex_protocol::protocol::MultiAgentVersion;
 use codex_protocol::protocol::Op;
 use codex_protocol::protocol::SandboxPolicy;
 use codex_protocol::protocol::SessionConfiguredEvent;
@@ -75,11 +76,8 @@ pub struct ThreadConfigSnapshot {
 
 impl ThreadConfigSnapshot {
     pub fn sandbox_policy(&self) -> SandboxPolicy {
-        let file_system_sandbox_policy = self.permission_profile.file_system_sandbox_policy();
         codex_sandboxing::compatibility_sandbox_policy_for_permission_profile(
             &self.permission_profile,
-            &file_system_sandbox_policy,
-            self.permission_profile.network_sandbox_policy(),
             self.cwd.as_path(),
         )
     }
@@ -277,6 +275,14 @@ impl CodexThread {
         items: Vec<ResponseItem>,
     ) -> Result<(), Vec<ResponseItem>> {
         self.codex.session.inject_if_running(items).await
+    }
+
+    /// Starts a regular turn with model-visible items only if the thread is idle.
+    pub async fn try_start_turn_if_idle(
+        &self,
+        items: Vec<ResponseItem>,
+    ) -> Result<(), Vec<ResponseItem>> {
+        self.codex.session.try_start_turn_if_idle(items).await
     }
 
     pub async fn set_app_server_client_info(
@@ -495,6 +501,10 @@ impl CodexThread {
 
     pub async fn config(&self) -> Arc<crate::config::Config> {
         self.codex.session.get_config().await
+    }
+
+    pub fn multi_agent_version(&self) -> Option<MultiAgentVersion> {
+        self.codex.session.multi_agent_version()
     }
 
     /// Refresh the thread's layer-backed user config state from a caller-supplied

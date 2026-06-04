@@ -17,7 +17,9 @@ LAYOUT_VERSION = 1
 def prepare_package_dir(package_dir: Path, *, force: bool) -> None:
     if package_dir.exists():
         if not package_dir.is_dir():
-            raise RuntimeError(f"Package output exists and is not a directory: {package_dir}")
+            raise RuntimeError(
+                f"Package output exists and is not a directory: {package_dir}"
+            )
         if any(package_dir.iterdir()):
             if not force:
                 raise RuntimeError(
@@ -51,7 +53,9 @@ def build_package_dir(
     )
     if variant.managed_codex_required:
         if inputs.managed_codex_bin is None:
-            raise RuntimeError(f"{variant.name} packages require a managed Codex binary.")
+            raise RuntimeError(
+                f"{variant.name} packages require a managed Codex binary."
+            )
         copy_executable(
             inputs.managed_codex_bin,
             bin_dir / variant.managed_codex_name(spec),

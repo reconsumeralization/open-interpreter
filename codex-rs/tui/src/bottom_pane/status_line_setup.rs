@@ -64,6 +64,9 @@ pub(crate) enum StatusLineItem {
     /// Current harness family.
     Harness,
 
+    /// Current reasoning level.
+    Reasoning,
+
     /// Current working directory path.
     CurrentDir,
 
@@ -149,6 +152,7 @@ impl StatusLineItem {
             StatusLineItem::ModelName => "Current model name",
             StatusLineItem::ModelWithReasoning => "Current model name with reasoning level",
             StatusLineItem::Harness => "Current harness family",
+            StatusLineItem::Reasoning => "Current reasoning level",
             StatusLineItem::CurrentDir => "Current working directory",
             StatusLineItem::ProjectRoot => "Project name (omitted when unavailable)",
             StatusLineItem::GitBranch => "Current Git branch (omitted when unavailable)",
@@ -158,7 +162,9 @@ impl StatusLineItem {
             StatusLineItem::BranchChanges => {
                 "Committed branch changes against the default branch (omitted when unavailable)"
             }
-            StatusLineItem::Status => "Compact session run-state text (Ready, Working, Thinking)",
+            StatusLineItem::Status => {
+                "Compact session run-state text (Ready, Interpreting, Thinking)"
+            }
             StatusLineItem::Permissions => "Active permission profile or sandbox mode",
             StatusLineItem::ApprovalMode => "Active command approval mode",
             StatusLineItem::ContextRemaining => {
@@ -197,6 +203,7 @@ impl StatusLineItem {
             StatusLineItem::ModelName => StatusSurfacePreviewItem::Model,
             StatusLineItem::ModelWithReasoning => StatusSurfacePreviewItem::ModelWithReasoning,
             StatusLineItem::Harness => StatusSurfacePreviewItem::Harness,
+            StatusLineItem::Reasoning => StatusSurfacePreviewItem::Reasoning,
             StatusLineItem::CurrentDir => StatusSurfacePreviewItem::CurrentDir,
             StatusLineItem::ProjectRoot => StatusSurfacePreviewItem::ProjectRoot,
             StatusLineItem::GitBranch => StatusSurfacePreviewItem::GitBranch,
@@ -453,6 +460,15 @@ mod tests {
         assert_eq!(
             "model-name".parse::<StatusLineItem>(),
             Ok(StatusLineItem::ModelName)
+        );
+    }
+
+    #[test]
+    fn reasoning_is_selectable_id() {
+        assert_eq!(StatusLineItem::Reasoning.to_string(), "reasoning");
+        assert_eq!(
+            "reasoning".parse::<StatusLineItem>(),
+            Ok(StatusLineItem::Reasoning)
         );
     }
 

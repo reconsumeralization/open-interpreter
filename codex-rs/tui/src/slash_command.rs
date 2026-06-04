@@ -34,6 +34,7 @@ pub enum SlashCommand {
     Archive,
     Resume,
     Fork,
+    App,
     Init,
     Compact,
     Plan,
@@ -98,6 +99,12 @@ impl SlashCommand {
             SlashCommand::Archive => "archive this session and exit",
             SlashCommand::Clear => "clear the terminal and start a new chat",
             SlashCommand::Fork => "fork the current chat",
+            SlashCommand::App => match codex_product_info::Product::current() {
+                codex_product_info::Product::Codex => "continue this session in Codex Desktop",
+                codex_product_info::Product::OpenInterpreter => {
+                    "continue this session in Open Interpreter Desktop"
+                }
+            },
             SlashCommand::Quit | SlashCommand::Exit => match codex_product_info::Product::current()
             {
                 codex_product_info::Product::Codex => "exit Codex",
@@ -244,6 +251,7 @@ impl SlashCommand {
             | SlashCommand::DebugConfig
             | SlashCommand::Ps
             | SlashCommand::Stop
+            | SlashCommand::App
             | SlashCommand::Goal
             | SlashCommand::Mcp
             | SlashCommand::Apps
@@ -270,6 +278,7 @@ impl SlashCommand {
         match self {
             SlashCommand::SandboxReadRoot => cfg!(target_os = "windows"),
             SlashCommand::Copy => !cfg!(target_os = "android"),
+            SlashCommand::App => cfg!(any(target_os = "macos", target_os = "windows")),
             SlashCommand::Rollout | SlashCommand::TestApproval => cfg!(debug_assertions),
             _ => true,
         }
@@ -316,6 +325,7 @@ mod tests {
         assert!(SlashCommand::Raw.available_during_task());
         assert!(SlashCommand::Raw.available_in_side_conversation());
         assert!(SlashCommand::Raw.supports_inline_args());
+        assert!(SlashCommand::App.available_during_task());
     }
 
     #[test]

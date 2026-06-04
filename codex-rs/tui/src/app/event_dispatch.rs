@@ -324,7 +324,11 @@ impl App {
                 return Ok(AppRunControl::Exit(ExitReason::Fatal(message)));
             }
             AppEvent::CodexOp(op) => {
+                self.chat_widget.prepare_local_op_submission(&op);
                 self.submit_active_thread_op(app_server, op).await?;
+            }
+            AppEvent::RestoreCancelledTurn(prompt) => {
+                self.apply_cancelled_turn_edit(prompt);
             }
             AppEvent::AppendMessageHistoryEntry { thread_id, text } => {
                 self.append_message_history_entry(thread_id, text);
@@ -398,6 +402,9 @@ impl App {
             }
             AppEvent::OpenUrlInBrowser { url } => {
                 self.open_url_in_browser(url);
+            }
+            AppEvent::OpenDesktopThread { thread_id } => {
+                self.open_desktop_thread(thread_id);
             }
             AppEvent::PetSelected { pet_id } => {
                 self.handle_pet_selected(tui, pet_id);
@@ -2041,12 +2048,20 @@ impl App {
                     ));
                 }
                 ApprovalRequest::Permissions {
+                    environment_id,
                     permissions,
                     reason,
                     ..
                 } => {
                     let _ = tui.enter_alt_screen();
                     let mut lines = Vec::new();
+                    if let Some(environment_id) = environment_id {
+                        lines.push(Line::from(vec![
+                            "Environment: ".into(),
+                            environment_id.bold(),
+                        ]));
+                        lines.push(Line::from(""));
+                    }
                     if let Some(reason) = reason {
                         lines.push(Line::from(vec!["Reason: ".into(), reason.italic()]));
                         lines.push(Line::from(""));
