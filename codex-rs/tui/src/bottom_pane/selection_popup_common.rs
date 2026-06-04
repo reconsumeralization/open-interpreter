@@ -15,7 +15,8 @@ use crate::key_hint::KeyBinding;
 use crate::line_truncation::truncate_line_with_ellipsis_if_overflow;
 use crate::render::Insets;
 use crate::render::RectExt as _;
-use crate::style::accent_style;
+use crate::style::selected_option_style;
+use crate::style::unselected_option_style;
 use crate::style::user_message_style;
 
 use super::scroll_state::ScrollState;
@@ -317,14 +318,14 @@ fn apply_row_state_style(lines: &mut [Line<'static>], selected: bool, is_disable
     if selected {
         for line in lines.iter_mut() {
             line.spans.iter_mut().for_each(|span| {
-                span.style = accent_style();
+                span.style = span.style.patch(selected_option_style()).not_dim();
             });
         }
     }
     if is_disabled {
         for line in lines.iter_mut() {
             line.spans.iter_mut().for_each(|span| {
-                span.style = span.style.dim();
+                span.style = span.style.patch(unselected_option_style());
             });
         }
     }
@@ -724,12 +725,12 @@ pub(crate) fn render_rows_single_line_with_col_width_mode(
         let mut full_line = build_full_line(row, desc_col);
         if Some(i) == state.selected_idx && !row.is_disabled {
             full_line.spans.iter_mut().for_each(|span| {
-                span.style = accent_style();
+                span.style = span.style.patch(selected_option_style()).not_dim();
             });
         }
         if row.is_disabled {
             full_line.spans.iter_mut().for_each(|span| {
-                span.style = span.style.dim();
+                span.style = span.style.patch(unselected_option_style());
             });
         }
 
@@ -873,7 +874,7 @@ mod tests {
         );
 
         let style = buf[(0, 0)].style();
-        let expected = accent_style();
+        let expected = selected_option_style();
         assert_eq!(style.fg, expected.fg);
         assert!(style.add_modifier.contains(Modifier::BOLD));
     }

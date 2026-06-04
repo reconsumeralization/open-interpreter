@@ -243,8 +243,16 @@ fn ensure_supported_platform() -> Result<()> {
 #[cfg(not(unix))]
 fn ensure_supported_platform() -> Result<()> {
     Err(anyhow!(
-        "codex app-server daemon lifecycle is only supported on Unix platforms"
+        "{} app-server daemon lifecycle is only supported on Unix platforms",
+        codex_product_info::Product::current().command_name()
     ))
+}
+
+fn unmanaged_app_server_message() -> String {
+    format!(
+        "app server is running but is not managed by {} app-server daemon",
+        codex_product_info::Product::current().command_name()
+    )
 }
 
 struct Daemon {
@@ -334,9 +342,7 @@ impl Daemon {
         if client::probe(&self.socket_path).await.is_ok()
             && self.running_backend(&settings).await?.is_none()
         {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
 
         self.ensure_managed_codex_bin()?;
@@ -388,9 +394,7 @@ impl Daemon {
                 }
             }
         } else if client::probe(&self.socket_path).await.is_ok() {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         } else {
             RestartIfRunningOutcome::NotRunning
         };
@@ -417,9 +421,7 @@ impl Daemon {
         }
 
         if client::probe(&self.socket_path).await.is_ok() {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
 
         Ok(self
@@ -532,9 +534,7 @@ impl Daemon {
         let backend = self.running_backend_instance(&previous_settings).await?;
 
         if backend.is_none() && client::probe(&self.socket_path).await.is_ok() {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
 
         if settings.remote_control_enabled == remote_control_enabled {
@@ -580,9 +580,7 @@ impl Daemon {
         if client::probe(&self.socket_path).await.is_ok()
             && self.running_backend(&settings).await?.is_none()
         {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
         settings.save(&self.settings_file).await?;
 

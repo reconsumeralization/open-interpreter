@@ -2,6 +2,7 @@
 source: tui/src/external_agent_config_migration.rs
 expression: rendered
 ---
+
   > External agent config detected
   We found settings from another agent that you can add to this project.
   Select what to import
@@ -17,7 +18,7 @@ expression: rendered
     [x] Migrate CLAUDE.md to AGENTS.md
 
   Selected 3 of 3 item(s).
-    1. Proceed with selected                                                  
-    2. Skip for now                                                           
-    3. Don't ask again                                                        
+    1. Proceed with selected
+    2. Skip for now
+    3. Don't ask again
   Use ↑/↓ to move, space to toggle, 1/2/3 to choose, a/n for all/none

@@ -1571,15 +1571,27 @@ fn open_interpreter_source_build_session_header_shows_debug_version() {
 }
 
 #[test]
-fn open_interpreter_tooltip_copy_replaces_codex_branding() {
+fn open_interpreter_tooltip_copy_filters_model_promos() {
     let tip = super::session::productize_tip(
         "GPT-5.5 is now available in Codex. OpenAI Codex keeps going.".to_string(),
         codex_product_info::Product::OpenInterpreter,
     );
 
+    assert_eq!(tip, None);
+}
+
+#[test]
+fn open_interpreter_tooltip_copy_replaces_generic_codex_branding() {
+    let tip = super::session::productize_tip(
+        "Use /permissions to control when Codex asks for confirmation.".to_string(),
+        codex_product_info::Product::OpenInterpreter,
+    );
+
     assert_eq!(
         tip,
-        "GPT-5.5 is now available in Open Interpreter. Open Interpreter keeps going."
+        Some(
+            "Use /permissions to control when Open Interpreter asks for confirmation.".to_string()
+        )
     );
 }
 

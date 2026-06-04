@@ -12,6 +12,7 @@ use codex_app_server_protocol::JSONRPCMessage;
 use codex_app_server_protocol::JSONRPCNotification;
 use codex_app_server_protocol::JSONRPCRequest;
 use codex_app_server_protocol::RequestId;
+use codex_product_info::Product;
 use codex_uds::UnixStream;
 use futures::SinkExt;
 use futures::StreamExt;
@@ -83,7 +84,10 @@ where
         params: Some(serde_json::to_value(InitializeParams {
             client_info: ClientInfo {
                 name: CLIENT_NAME.to_string(),
-                title: Some("Codex App Server Daemon".to_string()),
+                title: Some(format!(
+                    "{} App Server Daemon",
+                    Product::current().display_name()
+                )),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
             capabilities: if experimental_api {

@@ -7,6 +7,7 @@ use super::*;
 use codex_model_provider_info::WireApi;
 use codex_model_provider_info::bundled_provider_catalog_entry;
 use codex_model_provider_info::default_harness_for_provider_model;
+use codex_product_info::Product;
 
 impl ChatWidget {
     /// Open a popup to choose a quick auto model. Selecting "All models"
@@ -1015,7 +1016,7 @@ fn harness_choices_for_provider_model(
 
 fn harness_choice(harness: &str, is_recommended: bool) -> HarnessChoice {
     let base_label = match harness {
-        "" => "Codex",
+        "" => native_harness_label(Product::current()),
         "claude-code" => "Claude Code",
         "claude-code-bare" => "Claude Code Bare",
         "kimi-cli" => "Kimi CLI",
@@ -1034,7 +1035,16 @@ fn harness_choice(harness: &str, is_recommended: bool) -> HarnessChoice {
         base_label.to_string()
     };
     let description = match harness {
-        "" => "Use the native Codex tool harness.",
+        "" => {
+            return HarnessChoice {
+                stored: None,
+                label,
+                description: format!(
+                    "Use the native {} tool harness.",
+                    native_harness_label(Product::current())
+                ),
+            };
+        }
         "claude-code" => "Use the Claude Code-style tool harness.",
         "claude-code-bare" => "Use the lean Claude Code-style harness.",
         "kimi-cli" => "Use the Kimi CLI-style tool harness.",
@@ -1052,6 +1062,13 @@ fn harness_choice(harness: &str, is_recommended: bool) -> HarnessChoice {
         stored: (!harness.is_empty()).then(|| harness.to_string()),
         label,
         description,
+    }
+}
+
+fn native_harness_label(product: Product) -> &'static str {
+    match product {
+        Product::Codex => "Codex",
+        Product::OpenInterpreter => "Open Interpreter",
     }
 }
 

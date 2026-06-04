@@ -85,11 +85,11 @@ struct TooltipHistoryCell {
 }
 
 impl TooltipHistoryCell {
-    fn new(tip: String, cwd: &Path) -> Self {
-        Self {
-            tip: productize_tip(tip, codex_product_info::Product::current()),
+    fn new(tip: String, cwd: &Path) -> Option<Self> {
+        Some(Self {
+            tip: productize_tip(tip, codex_product_info::Product::current())?,
             cwd: cwd.to_path_buf(),
-        }
+        })
     }
 }
 
@@ -116,12 +116,12 @@ impl HistoryCell for TooltipHistoryCell {
     }
 }
 
-pub(super) fn productize_tip(tip: String, product: codex_product_info::Product) -> String {
+pub(super) fn productize_tip(tip: String, product: codex_product_info::Product) -> Option<String> {
     match product {
-        codex_product_info::Product::Codex => tip,
-        codex_product_info::Product::OpenInterpreter => tip
-            .replace("OpenAI Codex", product.display_name())
-            .replace("Codex", product.display_name()),
+        codex_product_info::Product::Codex => Some(tip),
+        codex_product_info::Product::OpenInterpreter => {
+            tooltips::productize_open_interpreter_tooltip(&tip)
+        }
     }
 }
 
@@ -214,7 +214,7 @@ pub(crate) fn new_session_info(
         if config.show_tooltips
             && let Some(tooltips) = tooltip_override
                 .or_else(|| tooltips::get_tooltip(auth_plan, show_fast_status))
-                .map(|tip| TooltipHistoryCell::new(tip, &config.cwd))
+                .and_then(|tip| TooltipHistoryCell::new(tip, &config.cwd))
         {
             parts.push(Box::new(tooltips));
         }

@@ -23,10 +23,42 @@ use crate::key_hint::KeyBinding;
 use codex_config::types::KeybindingsSpec;
 use codex_config::types::MAX_FUNCTION_KEY;
 use codex_config::types::TuiKeymap;
+use codex_product_info::Product;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyModifiers;
 use serde::Serialize;
 use std::collections::HashMap;
+
+fn keymap_config_help() -> &'static str {
+    match Product::current() {
+        Product::Codex => {
+            "Set unique keys in `~/.codex/config.toml` and retry. \
+See the Codex keymap documentation for supported actions and examples."
+        }
+        Product::OpenInterpreter => {
+            "Set unique keys in `~/.openinterpreter/config.toml` and retry."
+        }
+    }
+}
+
+fn keymap_config_reserved_help() -> &'static str {
+    match Product::current() {
+        Product::Codex => {
+            "Set a different key in `~/.codex/config.toml` and retry. \
+See the Codex keymap documentation for supported actions and examples."
+        }
+        Product::OpenInterpreter => {
+            "Set a different key in `~/.openinterpreter/config.toml` and retry."
+        }
+    }
+}
+
+fn keymap_parse_help() -> &'static str {
+    match Product::current() {
+        Product::Codex => "See the Codex keymap documentation for supported actions and examples.",
+        Product::OpenInterpreter => "Use supported Open Interpreter keymap actions and examples.",
+    }
+}
 
 /// Runtime keymap used by TUI input handlers.
 ///
@@ -1677,8 +1709,8 @@ impl RuntimeKeymap {
                     }
                     return Err(format!(
                         "Ambiguous approval overlay keymap bindings: `{previous}` and `{action}` use the same key. \
-Set unique keys in `~/.codex/config.toml` and retry. \
-See the Codex keymap documentation for supported actions and examples."
+{}",
+                        keymap_config_help()
                     ));
                 }
             }
@@ -1703,8 +1735,8 @@ fn validate_unique<const N: usize>(
             if let Some(previous) = seen.insert(key, action) {
                 return Err(format!(
                     "Ambiguous `tui.keymap.{context}` bindings: `{previous}` and `{action}` use the same key. \
-Set unique keys in `~/.codex/config.toml` and retry. \
-See the Codex keymap documentation for supported actions and examples."
+{}",
+                    keymap_config_help()
                 ));
             }
         }
@@ -1739,8 +1771,8 @@ fn validate_no_shadow_with_allowed_overlaps<const N: usize, const M: usize, cons
                 }
                 return Err(format!(
                     "Ambiguous `tui.keymap.{context}` bindings: `{previous}` shadows `{action}` with the same key. \
-Set unique keys in `~/.codex/config.toml` and retry. \
-See the Codex keymap documentation for supported actions and examples."
+{}",
+                    keymap_config_help()
                 ));
             }
         }
@@ -1772,8 +1804,8 @@ fn validate_no_reserved<const N: usize, const A: usize>(
                 }
                 return Err(format!(
                     "Ambiguous `tui.keymap.{context}` bindings: `{action}` uses a key reserved by `{reserved_action}`. \
-Set a different key in `~/.codex/config.toml` and retry. \
-See the Codex keymap documentation for supported actions and examples."
+{}",
+                    keymap_config_reserved_help()
                 ));
             }
         }
@@ -1951,8 +1983,9 @@ fn parse_bindings(spec: &KeybindingsSpec, path: &str) -> Result<Vec<KeyBinding>,
         let binding = parse_keybinding(raw.as_str()).ok_or_else(|| {
             format!(
                 "Invalid `{path}` = `{}`. Use values like `ctrl-a`, `shift-enter`, or `page-down`. \
-See the Codex keymap documentation for supported actions and examples.",
-                raw.as_str()
+{}",
+                raw.as_str(),
+                keymap_parse_help()
             )
         })?;
 

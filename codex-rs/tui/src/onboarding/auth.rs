@@ -27,8 +27,7 @@ use ratatui::layout::Layout;
 use ratatui::layout::Rect;
 use ratatui::prelude::Widget;
 use ratatui::style::Color;
-use ratatui::style::Modifier;
-use ratatui::style::Style;
+use ratatui::style::Styled as _;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::widgets::Block;
@@ -52,9 +51,13 @@ use crate::motion::shimmer_text;
 use crate::onboarding::keys;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
 use crate::onboarding::onboarding_screen::StepStateProvider;
+use crate::style::app_accent_style;
+use crate::style::app_accent_underlined_style;
+use crate::style::selected_option_style;
+use crate::style::unselected_option_style;
 use crate::tui::FrameRequester;
 
-/// Marks buffer cells that have cyan+underlined style as an OSC 8 hyperlink.
+/// Marks buffer cells that have underlined style as an OSC 8 hyperlink.
 ///
 /// Terminal emulators recognise the OSC 8 escape sequence and treat the entire
 /// marked region as a single clickable link, regardless of row wrapping.  This
@@ -62,7 +65,7 @@ use crate::tui::FrameRequester;
 /// row boundary, which breaks normal terminal URL detection for long URLs that
 /// wrap across multiple rows.
 pub(crate) fn mark_url_hyperlink(buf: &mut Buffer, area: Rect, url: &str) {
-    crate::terminal_hyperlinks::mark_url_hyperlink(buf, area, url);
+    crate::terminal_hyperlinks::mark_underlined_hyperlink(buf, area, url);
 }
 
 /// Marks any underlined buffer cells as an OSC 8 hyperlink.
@@ -409,20 +412,20 @@ impl AuthModeWidget {
 
             let line1 = if is_selected {
                 Line::from(vec![
-                    format!("{caret} {index}. ", index = idx + 1).cyan().dim(),
-                    text.to_string().cyan(),
+                    format!("{caret} {index}. ", index = idx + 1)
+                        .set_style(selected_option_style())
+                        .dim(),
+                    text.to_string().set_style(selected_option_style()),
                 ])
             } else {
-                format!("  {index}. {text}", index = idx + 1).into()
+                Line::from(format!("  {index}. {text}", index = idx + 1))
+                    .set_style(unselected_option_style())
             };
 
             let line2 = if is_selected {
-                Line::from(format!("     {description}"))
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::DIM)
+                Line::from(format!("     {description}")).set_style(selected_option_style().dim())
             } else {
-                Line::from(format!("     {description}"))
-                    .style(Style::default().add_modifier(Modifier::DIM))
+                Line::from(format!("     {description}")).set_style(unselected_option_style())
             };
 
             vec![line1, line2]
@@ -511,14 +514,17 @@ impl AuthModeWidget {
             lines.push("".into());
             lines.push(Line::from(vec![
                 "  ".into(),
-                state.auth_url.as_str().cyan().underlined(),
+                state
+                    .auth_url
+                    .as_str()
+                    .set_style(app_accent_underlined_style()),
             ]));
             lines.push("".into());
             lines.push(Line::from(vec![
                 "  On a remote or headless machine? Press ".into(),
                 self.cancel_binding().into(),
                 " and choose ".into(),
-                "Sign in with Device Code".cyan(),
+                "Sign in with Device Code".set_style(app_accent_style()),
                 ".".into(),
             ]));
             lines.push("".into());
@@ -544,6 +550,8 @@ impl AuthModeWidget {
     }
 
     fn render_chatgpt_success_message(&self, area: Rect, buf: &mut Buffer) {
+        let product = Product::current();
+        let (docs_url, docs_label) = chatgpt_success_docs_link(product);
         let lines = vec![
             "✓ Signed in with your ChatGPT account"
                 .fg(Color::Green)
@@ -551,18 +559,14 @@ impl AuthModeWidget {
             "".into(),
             "  Before you start:".into(),
             "".into(),
-            "  Decide how much autonomy you want to grant Codex".into(),
+            chatgpt_success_autonomy_copy(product).into(),
             Line::from(vec![
                 "  For more details see the ".into(),
-                crate::terminal_hyperlinks::osc8_hyperlink(
-                    "https://developers.openai.com/codex/security",
-                    "Codex docs",
-                )
-                .underlined(),
+                crate::terminal_hyperlinks::osc8_hyperlink(docs_url, docs_label).underlined(),
             ])
             .dim(),
             "".into(),
-            "  Codex can make mistakes".into(),
+            chatgpt_success_mistakes_copy(product).into(),
             "  Review the code it writes and commands it runs"
                 .dim()
                 .into(),
@@ -579,9 +583,9 @@ impl AuthModeWidget {
             .dim(),
             "".into(),
             Line::from(vec![
-                "  Press ".fg(Color::Cyan),
+                "  Press ".set_style(app_accent_style()),
                 self.confirm_binding().into(),
-                " to continue".fg(Color::Cyan),
+                " to continue".set_style(app_accent_style()),
             ]),
         ];
 
@@ -656,7 +660,7 @@ impl AuthModeWidget {
                     .title("API key")
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
-                    .border_style(Style::default().fg(Color::Cyan)),
+                    .border_style(app_accent_style()),
             )
             .render(input_area, buf);
 
@@ -981,6 +985,24 @@ fn api_key_billing_copy(product: Product) -> String {
     )
 }
 
+fn chatgpt_success_autonomy_copy(product: Product) -> String {
+    format!(
+        "  Decide how much autonomy you want to grant {}",
+        product.display_name()
+    )
+}
+
+fn chatgpt_success_mistakes_copy(product: Product) -> String {
+    format!("  {} can make mistakes", product.display_name())
+}
+
+fn chatgpt_success_docs_link(product: Product) -> (&'static str, &'static str) {
+    match product {
+        Product::Codex => ("https://developers.openai.com/codex/security", "Codex docs"),
+        Product::OpenInterpreter => ("https://docs.openinterpreter.com", "Open Interpreter docs"),
+    }
+}
+
 impl WidgetRef for AuthModeWidget {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let sign_in_state = self.sign_in_state.read().unwrap();
@@ -1266,6 +1288,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn chatgpt_success_copy_follows_product() {
+        assert_eq!(
+            chatgpt_success_autonomy_copy(Product::Codex),
+            "  Decide how much autonomy you want to grant OpenAI Codex"
+        );
+        assert_eq!(
+            chatgpt_success_autonomy_copy(Product::OpenInterpreter),
+            "  Decide how much autonomy you want to grant Open Interpreter"
+        );
+        assert_eq!(
+            chatgpt_success_mistakes_copy(Product::Codex),
+            "  OpenAI Codex can make mistakes"
+        );
+        assert_eq!(
+            chatgpt_success_mistakes_copy(Product::OpenInterpreter),
+            "  Open Interpreter can make mistakes"
+        );
+        assert_eq!(
+            chatgpt_success_docs_link(Product::OpenInterpreter),
+            ("https://docs.openinterpreter.com", "Open Interpreter docs")
+        );
+    }
+
     #[tokio::test]
     async fn device_code_login_completion_advances_to_success_message() {
         let (mut widget, _tmp) = widget_forced_chatgpt().await;
@@ -1300,7 +1346,7 @@ mod tests {
             let cell = &mut buf[(i as u16, 0)];
             cell.set_symbol(&ch.to_string());
             cell.fg = Color::Cyan;
-            cell.modifier = Modifier::UNDERLINED;
+            cell.modifier = ratatui::style::Modifier::UNDERLINED;
         }
         // Leave a plain cell that should NOT be marked.
         buf[(7, 0)].set_symbol("X");
@@ -1324,7 +1370,7 @@ mod tests {
         let cell = &mut buf[(0, 0)];
         cell.set_symbol("a");
         cell.fg = Color::Cyan;
-        cell.modifier = Modifier::UNDERLINED;
+        cell.modifier = ratatui::style::Modifier::UNDERLINED;
 
         // URL contains ESC and BEL that could break the OSC 8 sequence.
         let malicious_url = "https://evil.com/\x1B]8;;\x07injected";

@@ -1,5 +1,5 @@
-name: 🧑‍💻 IDE Extension Bug
-description: Report an issue with the IDE extension
+name: 🧑‍💻 Integration Bug
+description: Report an issue with an Open Interpreter integration
 labels:
   - extension
 body:
@@ -12,7 +12,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: What version of the IDE extension are you using?
+      label: What Open Interpreter integration are you using, and what version?
     validations:
       required: true
   - type: input
@@ -24,8 +24,8 @@ body:
   - type: input
     id: ide
     attributes:
-      label: Which IDE are you using?
-      description: Like `VS Code`, `Cursor`, `Windsurf`, etc.
+      label: Which host application are you using?
+      description: Like `VS Code`, `Cursor`, `Windsurf`, Terminal, or another host.
     validations:
       required: true
   - type: input

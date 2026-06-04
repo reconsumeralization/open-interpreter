@@ -1,8 +1,9 @@
 use crate::render::renderable::Renderable;
 use crate::render::renderable::RowRenderable;
+use crate::style::selected_option_style;
+use crate::style::unselected_option_style;
 use ratatui::style::Style;
 use ratatui::style::Styled as _;
-use ratatui::style::Stylize as _;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Wrap;
 use unicode_width::UnicodeWidthStr;
@@ -19,7 +20,7 @@ pub(crate) fn selection_option_row_with_dim(
     index: usize,
     label: String,
     is_selected: bool,
-    dim: bool,
+    _dim: bool,
 ) -> Box<dyn Renderable> {
     let prefix = if is_selected {
         format!("› {}. ", index + 1)
@@ -27,9 +28,9 @@ pub(crate) fn selection_option_row_with_dim(
         format!("  {}. ", index + 1)
     };
     let style = if is_selected {
-        Style::default().cyan()
-    } else if dim {
-        Style::default().dim()
+        selected_option_style()
+    } else if _dim {
+        unselected_option_style()
     } else {
         Style::default()
     };
@@ -38,9 +39,7 @@ pub(crate) fn selection_option_row_with_dim(
     row.push(prefix_width, prefix.set_style(style));
     row.push(
         u16::MAX,
-        Paragraph::new(label)
-            .style(style)
-            .wrap(Wrap { trim: false }),
+        Paragraph::new(label.set_style(style)).wrap(Wrap { trim: false }),
     );
     row.into()
 }

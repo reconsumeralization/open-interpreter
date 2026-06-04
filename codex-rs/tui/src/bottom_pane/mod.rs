@@ -1830,7 +1830,7 @@ mod tests {
             for x in 0..buf.area().width {
                 row.push(buf[(x, y)].symbol().chars().next().unwrap_or(' '));
             }
-            lines.push(row);
+            lines.push(row.trim_end().to_string());
         }
         lines.join("\n")
     }
@@ -2277,7 +2277,7 @@ mod tests {
             "no active modal view after denial"
         );
 
-        // Render and ensure the top row includes the Working header and a composer line below.
+        // Render and ensure the top row includes the running header and a composer line below.
         // Give the animation thread a moment to tick.
         std::thread::sleep(Duration::from_millis(120));
         let area = Rect::new(0, 0, 40, 6);
@@ -2288,8 +2288,8 @@ mod tests {
             row0.push(buf[(x, 0)].symbol().chars().next().unwrap_or(' '));
         }
         assert!(
-            row0.contains("Working"),
-            "expected Working header after denial on row 0: {row0:?}"
+            row0.contains("Interpreting"),
+            "expected Interpreting header after denial on row 0: {row0:?}"
         );
 
         // Composer placeholder should be visible somewhere below.
@@ -2334,7 +2334,10 @@ mod tests {
         pane.render(area, &mut buf);
 
         let bufs = snapshot_buffer(&buf);
-        assert!(bufs.contains("• Working"), "expected Working header");
+        assert!(
+            bufs.contains("• Interpreting"),
+            "expected Interpreting header"
+        );
     }
 
     #[test]

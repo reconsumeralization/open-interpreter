@@ -413,7 +413,7 @@ mod tests {
             .map(ratatui::buffer::Cell::symbol)
             .collect::<String>();
 
-        assert!(line.starts_with("Working (0s • esc to interrupt)"));
+        assert!(line.starts_with("Interpreting (0s • esc to interrupt)"));
     }
 
     #[test]

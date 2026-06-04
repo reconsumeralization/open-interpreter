@@ -1338,8 +1338,11 @@ impl App {
                                     Line::from(vec!["• ".dim(), "Sandbox ready".into()]),
                                     Line::from(vec![
                                         "  ".into(),
-                                        "Codex can now safely edit files and execute commands in your computer"
-                                            .dark_gray(),
+                                        format!(
+                                            "{} can now safely edit files and execute commands in your computer",
+                                            codex_product_info::Product::current().display_name()
+                                        )
+                                        .dark_gray(),
                                     ]),
                                 ]);
                             } else {
@@ -1371,8 +1374,11 @@ impl App {
                                     Line::from(vec!["• ".dim(), "Sandbox ready".into()]),
                                     Line::from(vec![
                                         "  ".into(),
-                                        "Codex can now safely edit files and execute commands in your computer"
-                                            .dark_gray(),
+                                        format!(
+                                            "{} can now safely edit files and execute commands in your computer",
+                                            codex_product_info::Product::current().display_name()
+                                        )
+                                        .dark_gray(),
                                     ]),
                                 ]);
                             }
@@ -1439,7 +1445,11 @@ impl App {
                             /*initial_user_message*/ None,
                         )
                         .await;
-                        let harness_label = harness.as_deref().unwrap_or("Codex");
+                        let native_harness_label = match codex_product_info::Product::current() {
+                            codex_product_info::Product::Codex => "Codex",
+                            codex_product_info::Product::OpenInterpreter => "Open Interpreter",
+                        };
+                        let harness_label = harness.as_deref().unwrap_or(native_harness_label);
                         self.chat_widget.add_info_message(
                             format!("Harness changed to {harness_label}. Started a new chat."),
                             /*hint*/ None,
@@ -1500,7 +1510,11 @@ impl App {
                             message.push(' ');
                             message.push_str(label);
                         }
-                        let harness_label = harness.as_deref().unwrap_or("Codex");
+                        let native_harness_label = match codex_product_info::Product::current() {
+                            codex_product_info::Product::Codex => "Codex",
+                            codex_product_info::Product::OpenInterpreter => "Open Interpreter",
+                        };
+                        let harness_label = harness.as_deref().unwrap_or(native_harness_label);
                         message.push_str(&format!(" with {harness_label} harness"));
                         self.chat_widget.add_info_message(message, /*hint*/ None);
                     }

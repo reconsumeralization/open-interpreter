@@ -75,6 +75,14 @@ impl WelcomeWidget {
 impl WidgetRef for &WelcomeWidget {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         Clear.render(area, buf);
+        let product = Product::current();
+        if product == Product::OpenInterpreter {
+            Paragraph::new(vec!["".into(), welcome_line(product)])
+                .wrap(Wrap { trim: false })
+                .render(area, buf);
+            return;
+        }
+
         if self.animations_enabled && !self.animations_suppressed.get() {
             self.animation.schedule_next_frame();
         }
@@ -92,7 +100,7 @@ impl WidgetRef for &WelcomeWidget {
             lines.extend(frame.lines().map(Into::into));
             lines.push("".into());
         }
-        lines.push(welcome_line(Product::current()));
+        lines.push(welcome_line(product));
 
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })

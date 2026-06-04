@@ -140,7 +140,7 @@ fn pick_open_interpreter_tooltip<R: Rng + ?Sized>(rng: &mut R) -> Option<String>
     }
 }
 
-fn productize_open_interpreter_tooltip(tip: &str) -> Option<String> {
+pub(crate) fn productize_open_interpreter_tooltip(tip: &str) -> Option<String> {
     if open_interpreter_excludes_tip(tip) {
         return None;
     }

@@ -1,5 +1,5 @@
-name: 🖥️ Codex App Bug
-description: Report an issue with the Codex App
+name: 🖥️ Interactive TUI Bug
+description: Report an issue with the Open Interpreter interactive TUI
 labels:
   - app
 body:
@@ -12,7 +12,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: What version of the Codex App are you using (From “About Codex” dialog)?
+      label: What version of Open Interpreter are you using?
     validations:
       required: true
   - type: input
@@ -39,7 +39,7 @@ body:
     id: steps
     attributes:
       label: What steps can reproduce the bug?
-      description: Explain the bug and provide a code snippet that can reproduce it. Please include session id, token limit usage, context window usage if applicable.
+      description: Explain the bug and provide a code snippet that can reproduce it. Please include thread id, token limit usage, context window usage if applicable.
     validations:
       required: true
   - type: textarea

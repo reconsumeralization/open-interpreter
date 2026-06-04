@@ -208,13 +208,10 @@ impl WidgetRef for &CwdPromptScreen {
         ]));
         column.push("");
         column.push(
-            Line::from(format!(
-                "Session = latest cwd recorded in the {action_past} session"
-            ))
-            .dim()
-            .inset(Insets::tlbr(
-                /*top*/ 0, /*left*/ 2, /*bottom*/ 0, /*right*/ 0,
-            )),
+            Line::from(format!("Session = latest cwd recorded in the {action_past} session").dim())
+                .inset(Insets::tlbr(
+                    /*top*/ 0, /*left*/ 2, /*bottom*/ 0, /*right*/ 0,
+                )),
         );
         column.push(
             Line::from("Current = your current working directory".dim()).inset(Insets::tlbr(
