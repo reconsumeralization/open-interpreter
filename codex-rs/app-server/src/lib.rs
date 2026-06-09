@@ -91,6 +91,7 @@ mod filters;
 mod fs_watch;
 mod fuzzy_file_search;
 pub mod in_process;
+mod interpreter_catalog;
 mod mcp_refresh;
 mod message_processor;
 mod models;

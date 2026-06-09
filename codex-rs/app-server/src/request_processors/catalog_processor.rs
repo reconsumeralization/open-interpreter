@@ -162,6 +162,91 @@ impl CatalogRequestProcessor {
             .map(|response| Some(response.into()))
     }
 
+    pub(crate) async fn interpreter_provider_list(
+        &self,
+        params: InterpreterProviderListParams,
+    ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
+        Ok(Some(
+            crate::interpreter_catalog::provider_list(&self.config, params).into(),
+        ))
+    }
+
+    pub(crate) async fn interpreter_provider_set(
+        &self,
+        params: InterpreterProviderSetParams,
+    ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
+        self.write_interpreter_config_value(
+            scoped_config_key(params.profile.as_deref(), "model_provider"),
+            serde_json::json!(params.provider_id),
+        )
+        .await?;
+        Ok(Some(InterpreterProviderSetResponse {}.into()))
+    }
+
+    pub(crate) async fn interpreter_model_list(
+        &self,
+        params: InterpreterModelListParams,
+    ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
+        let response = self
+            .list_models(
+                self.thread_manager.clone(),
+                ModelListParams {
+                    cursor: None,
+                    limit: None,
+                    include_hidden: params.include_hidden,
+                    model_provider: params.model_provider,
+                },
+            )
+            .await?;
+        Ok(Some(
+            InterpreterModelListResponse {
+                data: response.data,
+            }
+            .into(),
+        ))
+    }
+
+    pub(crate) async fn interpreter_model_set(
+        &self,
+        params: InterpreterModelSetParams,
+    ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
+        let mut edits = vec![config_replace_edit(
+            scoped_config_key(params.profile.as_deref(), "model"),
+            serde_json::json!(params.model),
+        )];
+        if let Some(reasoning_effort) = params.reasoning_effort {
+            edits.push(config_replace_edit(
+                scoped_config_key(params.profile.as_deref(), "model_reasoning_effort"),
+                serde_json::to_value(reasoning_effort).map_err(|err| {
+                    internal_error(format!("failed to serialize reasoning effort: {err}"))
+                })?,
+            ));
+        }
+        self.write_interpreter_config_edits(edits).await?;
+        Ok(Some(InterpreterModelSetResponse {}.into()))
+    }
+
+    pub(crate) async fn interpreter_harness_list(
+        &self,
+        params: InterpreterHarnessListParams,
+    ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
+        Ok(Some(
+            crate::interpreter_catalog::harness_list(&self.config, params).into(),
+        ))
+    }
+
+    pub(crate) async fn interpreter_harness_set(
+        &self,
+        params: InterpreterHarnessSetParams,
+    ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
+        let key = scoped_config_key(params.profile.as_deref(), "harness");
+        let value = params
+            .harness
+            .map_or(serde_json::Value::Null, serde_json::Value::String);
+        self.write_interpreter_config_value(key, value).await?;
+        Ok(Some(InterpreterHarnessSetResponse {}.into()))
+    }
+
     pub(crate) async fn experimental_feature_list(
         &self,
         params: ExperimentalFeatureListParams,
@@ -304,6 +389,31 @@ impl CatalogRequestProcessor {
             data: items,
             next_cursor,
         })
+    }
+
+    async fn write_interpreter_config_value(
+        &self,
+        key_path: String,
+        value: serde_json::Value,
+    ) -> Result<(), JSONRPCErrorError> {
+        self.write_interpreter_config_edits(vec![config_replace_edit(key_path, value)])
+            .await
+    }
+
+    async fn write_interpreter_config_edits(
+        &self,
+        edits: Vec<codex_app_server_protocol::ConfigEdit>,
+    ) -> Result<(), JSONRPCErrorError> {
+        self.config_manager
+            .batch_write(ConfigBatchWriteParams {
+                edits,
+                file_path: None,
+                expected_version: None,
+                reload_user_config: true,
+            })
+            .await
+            .map_err(|err| internal_error(format!("failed to update interpreter config: {err}")))?;
+        Ok(())
     }
 
     async fn list_collaboration_modes(
@@ -723,5 +833,23 @@ impl CatalogRequestProcessor {
                 }
             })
             .map_err(|err| internal_error(format!("failed to update skill settings: {err}")))
+    }
+}
+
+fn scoped_config_key(profile: Option<&str>, key: &str) -> String {
+    match profile {
+        Some(profile) => format!("profiles.{profile}.{key}"),
+        None => key.to_string(),
+    }
+}
+
+fn config_replace_edit(
+    key_path: String,
+    value: serde_json::Value,
+) -> codex_app_server_protocol::ConfigEdit {
+    codex_app_server_protocol::ConfigEdit {
+        key_path,
+        value,
+        merge_strategy: MergeStrategy::Replace,
     }
 }

@@ -1508,6 +1508,150 @@
             },
             "method": {
               "enum": [
+                "interpreter/provider/list"
+              ],
+              "title": "Interpreter/provider/listRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/v2/InterpreterProviderListParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Interpreter/provider/listRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "enum": [
+                "interpreter/provider/set"
+              ],
+              "title": "Interpreter/provider/setRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/v2/InterpreterProviderSetParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Interpreter/provider/setRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "enum": [
+                "interpreter/model/list"
+              ],
+              "title": "Interpreter/model/listRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/v2/InterpreterModelListParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Interpreter/model/listRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "enum": [
+                "interpreter/model/set"
+              ],
+              "title": "Interpreter/model/setRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/v2/InterpreterModelSetParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Interpreter/model/setRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "enum": [
+                "interpreter/harness/list"
+              ],
+              "title": "Interpreter/harness/listRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/v2/InterpreterHarnessListParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Interpreter/harness/listRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "enum": [
+                "interpreter/harness/set"
+              ],
+              "title": "Interpreter/harness/setRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/v2/InterpreterHarnessSetParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Interpreter/harness/setRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/v2/RequestId"
+            },
+            "method": {
+              "enum": [
                 "experimentalFeature/list"
               ],
               "title": "ExperimentalFeature/listRequestMethod",
@@ -10515,6 +10659,265 @@
             "type": "string"
           }
         ]
+      },
+      "InterpreterHarness": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isRecommended": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "isRecommended",
+          "label"
+        ],
+        "type": "object"
+      },
+      "InterpreterHarnessListParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerId"
+        ],
+        "title": "InterpreterHarnessListParams",
+        "type": "object"
+      },
+      "InterpreterHarnessListResponse": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/definitions/v2/InterpreterHarness"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "InterpreterHarnessListResponse",
+        "type": "object"
+      },
+      "InterpreterHarnessSetParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "harness": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "title": "InterpreterHarnessSetParams",
+        "type": "object"
+      },
+      "InterpreterHarnessSetResponse": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "InterpreterHarnessSetResponse",
+        "type": "object"
+      },
+      "InterpreterModelListParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "includeHidden": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "modelProvider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "title": "InterpreterModelListParams",
+        "type": "object"
+      },
+      "InterpreterModelListResponse": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/definitions/v2/Model"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "InterpreterModelListResponse",
+        "type": "object"
+      },
+      "InterpreterModelSetParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasoningEffort": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/ReasoningEffort"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "InterpreterModelSetParams",
+        "type": "object"
+      },
+      "InterpreterModelSetResponse": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "InterpreterModelSetResponse",
+        "type": "object"
+      },
+      "InterpreterProvider": {
+        "properties": {
+          "baseUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "envKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "wireApi": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/v2/WireApiDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "configured",
+          "description",
+          "id",
+          "isCurrent",
+          "isDefault",
+          "name"
+        ],
+        "type": "object"
+      },
+      "InterpreterProviderListParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "includeUnconfigured": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "title": "InterpreterProviderListParams",
+        "type": "object"
+      },
+      "InterpreterProviderListResponse": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/definitions/v2/InterpreterProvider"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "InterpreterProviderListResponse",
+        "type": "object"
+      },
+      "InterpreterProviderSetParams": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerId"
+        ],
+        "title": "InterpreterProviderSetParams",
+        "type": "object"
+      },
+      "InterpreterProviderSetResponse": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "InterpreterProviderSetResponse",
+        "type": "object"
       },
       "ItemCompletedNotification": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -19598,6 +20001,14 @@
         ],
         "title": "WindowsWorldWritableWarningNotification",
         "type": "object"
+      },
+      "WireApiDto": {
+        "enum": [
+          "responses",
+          "chat",
+          "messages"
+        ],
+        "type": "string"
       },
       "WriteStatus": {
         "enum": [

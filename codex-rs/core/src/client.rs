@@ -31,6 +31,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
+use codex_api::AnthropicMessageRequest;
 use codex_api::AnthropicMessagesClient as ApiAnthropicMessagesClient;
 use codex_api::ApiError;
 use codex_api::AuthProvider;
@@ -1788,7 +1789,7 @@ impl ModelClientSession {
                 &self.client.state.harness,
                 self.client.state.harness_guidance,
             );
-            let request = build_claude_code_request(
+            let mut request = build_claude_code_request(
                 &guided_prompt,
                 model_info,
                 effort.clone(),
@@ -1799,14 +1800,15 @@ impl ModelClientSession {
             .map_err(|err| {
                 CodexErr::InvalidRequest(format!("invalid claude-code request: {err}"))
             })?;
+            normalize_messages_harness_request_for_provider(&api_provider, &mut request);
             let client = ApiAnthropicMessagesClient::new(
                 ReqwestTransport::new(build_reqwest_client()),
-                api_provider,
+                api_provider.clone(),
                 Arc::new(auth_provider),
             )
             .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
             if startup_preflight && !request.tools.is_empty() {
-                let title_request = build_claude_code_title_request(
+                let mut title_request = build_claude_code_title_request(
                     prompt,
                     model_info,
                     &thread_id,
@@ -1815,6 +1817,9 @@ impl ModelClientSession {
                 .map_err(|err| {
                     CodexErr::InvalidRequest(format!("invalid claude-code title request: {err}"))
                 })?;
+                if let Some(title_request) = title_request.as_mut() {
+                    normalize_messages_harness_request_for_provider(&api_provider, title_request);
+                }
                 if let Some(title_request) = title_request {
                     let mut title_headers = claude_code_headers(if claude_code_profile.is_bare() {
                         CLAUDE_CODE_BARE_TITLE_BETA_HEADER
@@ -2589,6 +2594,25 @@ impl AuthRequestTelemetryContext {
             retry_after_unauthorized: retry.retry_after_unauthorized,
             recovery_mode: retry.recovery_mode,
             recovery_phase: retry.recovery_phase,
+        }
+    }
+}
+
+fn normalize_messages_harness_request_for_provider(
+    api_provider: &ApiProvider,
+    request: &mut AnthropicMessageRequest,
+) {
+    if !api_provider
+        .base_url
+        .to_ascii_lowercase()
+        .contains("api.deepseek.com")
+    {
+        return;
+    }
+
+    for message in &mut request.messages {
+        if message.role == "developer" {
+            message.role = "user".to_string();
         }
     }
 }

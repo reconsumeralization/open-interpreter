@@ -644,25 +644,31 @@ prompt_yes_no() {
 }
 
 print_launch_instructions() {
+  if [ "$COMMAND_NAME" = "interpreter" ]; then
+    start_command="i or interpreter"
+  else
+    start_command="$COMMAND_NAME"
+  fi
+
   case "$path_action" in
     added)
-      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" && $COMMAND_NAME"
-      step "Future terminals: open a new terminal and run: $COMMAND_NAME"
+      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" then run: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       step "PATH was added to $path_profile"
       ;;
     updated)
-      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" && $COMMAND_NAME"
-      step "Future terminals: open a new terminal and run: $COMMAND_NAME"
+      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" then run: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       step "PATH was updated in $path_profile"
       ;;
     configured)
-      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" && $COMMAND_NAME"
-      step "Future terminals: open a new terminal and run: $COMMAND_NAME"
+      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" then run: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       step "PATH is already configured in $path_profile"
       ;;
     *)
-      step "Current terminal: $COMMAND_NAME"
-      step "Future terminals: open a new terminal and run: $COMMAND_NAME"
+      step "Current terminal: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       ;;
   esac
 }

@@ -41,3 +41,51 @@ fn top_cli_parses_resume_prompt_after_config_flag() {
     );
     assert!(inner.strict_config);
 }
+
+#[test]
+fn resolve_interpreter_home_prefers_interpreter_home() {
+    let resolved = resolve_interpreter_home_from_env(
+        /*codex_home*/ None,
+        Some(OsStr::new("/tmp/interpreter-home")),
+        Some(OsStr::new("/tmp/open-interpreter-home")),
+        Some(PathBuf::from("/tmp/home")),
+    )
+    .expect("home should resolve");
+    assert_eq!(resolved, PathBuf::from("/tmp/interpreter-home"));
+}
+
+#[test]
+fn resolve_interpreter_home_preserves_explicit_codex_home() {
+    let resolved = resolve_interpreter_home_from_env(
+        Some(OsStr::new("/tmp/codex-home")),
+        Some(OsStr::new("/tmp/interpreter-home")),
+        Some(OsStr::new("/tmp/open-interpreter-home")),
+        Some(PathBuf::from("/tmp/home")),
+    )
+    .expect("home should resolve");
+    assert_eq!(resolved, PathBuf::from("/tmp/codex-home"));
+}
+
+#[test]
+fn resolve_interpreter_home_falls_back_to_open_interpreter_home() {
+    let resolved = resolve_interpreter_home_from_env(
+        /*codex_home*/ None,
+        /*interpreter_home*/ None,
+        Some(OsStr::new("/tmp/open-interpreter-home")),
+        Some(PathBuf::from("/tmp/home")),
+    )
+    .expect("home should resolve");
+    assert_eq!(resolved, PathBuf::from("/tmp/open-interpreter-home"));
+}
+
+#[test]
+fn resolve_interpreter_home_defaults_to_dot_openinterpreter() {
+    let resolved = resolve_interpreter_home_from_env(
+        /*codex_home*/ None,
+        /*interpreter_home*/ None,
+        /*open_interpreter_home*/ None,
+        Some(PathBuf::from("/tmp/home")),
+    )
+    .expect("home should resolve");
+    assert_eq!(resolved, PathBuf::from("/tmp/home/.openinterpreter"));
+}

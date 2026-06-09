@@ -29,10 +29,7 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
     let version_file = version_filepath(config);
     let info = read_version_info(&version_file).ok();
 
-    if match &info {
-        None => true,
-        Some(info) => info.last_checked_at < Utc::now() - Duration::hours(20),
-    } {
+    if should_check_for_update(info.as_ref(), Utc::now()) {
         // Refresh the cached latest version in the background so TUI startup
         // isn’t blocked by a network call. The UI reads the previously cached
         // value (if any) for this run; the next run shows the banner if needed.
@@ -50,6 +47,19 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
             None
         }
     })
+}
+
+// When we think we are current, check again on every startup. Otherwise a
+// release published just after the last check can stay hidden. A known pending
+// upgrade remains throttled so repeated launches do not keep hitting the network.
+fn should_check_for_update(info: Option<&VersionInfo>, now: DateTime<Utc>) -> bool {
+    match info {
+        None => true,
+        Some(info) => {
+            let pending = is_newer(&info.latest_version, CODEX_CLI_VERSION).unwrap_or(false);
+            !pending || info.last_checked_at < now - Duration::hours(1)
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -178,4 +188,31 @@ pub async fn dismiss_version(config: &Config, version: &str) -> anyhow::Result<(
     }
     tokio::fs::write(version_file, json_line).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rechecks_each_startup_when_current_but_throttles_pending_upgrade() {
+        let now = Utc::now();
+        let fresh = now - Duration::minutes(1);
+        let info = |latest: &str, checked| VersionInfo {
+            latest_version: latest.to_string(),
+            last_checked_at: checked,
+            dismissed_version: None,
+        };
+
+        assert!(should_check_for_update(None, now));
+        assert!(should_check_for_update(
+            Some(&info(CODEX_CLI_VERSION, fresh)),
+            now
+        ));
+        assert!(!should_check_for_update(Some(&info("999.0.0", fresh)), now));
+        assert!(should_check_for_update(
+            Some(&info("999.0.0", now - Duration::hours(2))),
+            now
+        ));
+    }
 }

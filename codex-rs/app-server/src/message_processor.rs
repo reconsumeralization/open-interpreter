@@ -1217,6 +1217,30 @@ impl MessageProcessor {
             ClientRequest::ModelList { params, .. } => {
                 self.catalog_processor.model_list(params).await
             }
+            ClientRequest::InterpreterProviderList { params, .. } => {
+                self.catalog_processor
+                    .interpreter_provider_list(params)
+                    .await
+            }
+            ClientRequest::InterpreterProviderSet { params, .. } => {
+                self.catalog_processor
+                    .interpreter_provider_set(params)
+                    .await
+            }
+            ClientRequest::InterpreterModelList { params, .. } => {
+                self.catalog_processor.interpreter_model_list(params).await
+            }
+            ClientRequest::InterpreterModelSet { params, .. } => {
+                self.catalog_processor.interpreter_model_set(params).await
+            }
+            ClientRequest::InterpreterHarnessList { params, .. } => {
+                self.catalog_processor
+                    .interpreter_harness_list(params)
+                    .await
+            }
+            ClientRequest::InterpreterHarnessSet { params, .. } => {
+                self.catalog_processor.interpreter_harness_set(params).await
+            }
             ClientRequest::ExperimentalFeatureList { params, .. } => {
                 self.catalog_processor
                     .experimental_feature_list(params)

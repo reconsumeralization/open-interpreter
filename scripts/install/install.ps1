@@ -1020,8 +1020,9 @@ if ($prioritizeVisibleBin) {
     }
 }
 
-Write-Step "Current PowerShell session: $CommandName"
-Write-Step "Future PowerShell windows: open a new PowerShell window and run: $CommandName"
+$startCommand = if ($CommandName -eq "interpreter") { "i or interpreter" } else { $CommandName }
+Write-Step "Current PowerShell session: $startCommand"
+Write-Step "Future PowerShell windows: open a new PowerShell window and run: $startCommand"
 Write-Host "$ProductName $resolvedVersion installed successfully."
 
 $codexCommand = Join-Path $visibleBinDir "$CommandName.exe"
