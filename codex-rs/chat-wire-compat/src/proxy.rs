@@ -313,7 +313,8 @@ async fn collect_output_items(
             | ResponseEvent::ToolCallInputDelta { .. }
             | ResponseEvent::RateLimits(_)
             | ResponseEvent::ModelVerifications(_)
-            | ResponseEvent::ModelsEtag(_) => {}
+            | ResponseEvent::ModelsEtag(_)
+            | ResponseEvent::TurnModerationMetadata(_) => {}
         }
     }
     Ok(items)
@@ -500,7 +501,8 @@ fn serialize_response_event(event: &ResponseEvent) -> std::io::Result<Option<byt
         | ResponseEvent::ToolCallInputDelta { .. }
         | ResponseEvent::RateLimits(_)
         | ResponseEvent::ModelVerifications(_)
-        | ResponseEvent::ModelsEtag(_) => None,
+        | ResponseEvent::ModelsEtag(_)
+        | ResponseEvent::TurnModerationMetadata(_) => None,
     };
     let Some(payload) = payload else {
         return Ok(None);
@@ -626,6 +628,7 @@ impl ReasoningOwned {
         codex_api::Reasoning {
             effort: self.effort,
             summary: self.summary,
+            context: None,
         }
     }
 }

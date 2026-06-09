@@ -218,6 +218,7 @@ fn build_messages(prompt: &Prompt, kind: &Terminus2RequestKind) -> Vec<Value> {
             | ResponseItem::Reasoning { .. }
             | ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }

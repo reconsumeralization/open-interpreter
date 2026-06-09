@@ -207,6 +207,7 @@ fn build_messages(
             }
             ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }

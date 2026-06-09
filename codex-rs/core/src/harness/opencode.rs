@@ -297,6 +297,7 @@ fn build_messages(
             ResponseItem::Reasoning { .. }
             | ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }

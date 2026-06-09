@@ -304,29 +304,30 @@ fn claude_code_output_config(
     let supported_efforts = model_info
         .supported_reasoning_levels
         .iter()
-        .map(|preset| preset.effort)
+        .map(|preset| preset.effort.clone())
         .collect::<HashSet<_>>();
     if supported_efforts.is_empty() {
         return None;
     }
 
-    let requested_effort = effort.or(model_info.default_reasoning_level);
+    let requested_effort = effort.or_else(|| model_info.default_reasoning_level.clone());
     let output_effort = requested_effort.and_then(|effort| {
         (effort != ReasoningEffortConfig::None && supported_efforts.contains(&effort))
             .then_some(effort)
     });
     output_effort.map(|effort| AnthropicOutputConfig {
-        effort: Some(anthropic_output_effort(effort).to_string()),
+        effort: Some(anthropic_output_effort(effort)),
         format: None,
     })
 }
 
-fn anthropic_output_effort(effort: ReasoningEffortConfig) -> &'static str {
+fn anthropic_output_effort(effort: ReasoningEffortConfig) -> String {
     match effort {
-        ReasoningEffortConfig::Minimal | ReasoningEffortConfig::Low => "low",
-        ReasoningEffortConfig::Medium => "medium",
-        ReasoningEffortConfig::High | ReasoningEffortConfig::XHigh => "high",
-        ReasoningEffortConfig::None => "none",
+        ReasoningEffortConfig::Minimal | ReasoningEffortConfig::Low => "low".to_string(),
+        ReasoningEffortConfig::Medium => "medium".to_string(),
+        ReasoningEffortConfig::High | ReasoningEffortConfig::XHigh => "high".to_string(),
+        ReasoningEffortConfig::None => "none".to_string(),
+        ReasoningEffortConfig::Custom(value) => value,
     }
 }
 
@@ -580,6 +581,7 @@ fn build_messages(
             }
             ResponseItem::CustomToolCall { .. }
             | ResponseItem::CustomToolCallOutput { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::LocalShellCall { .. }
             | ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }

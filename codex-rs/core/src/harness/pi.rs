@@ -216,6 +216,7 @@ pub(crate) fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde
             }
             ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }

@@ -294,6 +294,7 @@ pub(crate) fn convert_request(
             }
             ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger
             | ResponseItem::ContextCompaction { .. }

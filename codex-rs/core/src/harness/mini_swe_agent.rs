@@ -89,6 +89,7 @@ pub(crate) fn inject_no_tool_call_format_error(stream: ResponseStream) -> Respon
                 | Ok(ResponseEvent::ReasoningSummaryPartAdded { .. })
                 | Ok(ResponseEvent::RateLimits(_))
                 | Ok(ResponseEvent::ModelsEtag(_))
+                | Ok(ResponseEvent::TurnModerationMetadata(_))
                 | Ok(ResponseEvent::OutputItemDone(_))
                 | Err(_) => {}
             }
@@ -344,6 +345,7 @@ fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde_json::Erro
             }
             ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }

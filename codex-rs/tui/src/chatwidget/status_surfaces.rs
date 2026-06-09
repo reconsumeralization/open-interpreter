@@ -764,15 +764,16 @@ impl ChatWidget {
                 /*max_chars*/ 32,
             )),
             TerminalTitleItem::Reasoning => Some(Self::truncate_terminal_title_part(
-                self.reasoning_display_name().to_string(),
+                self.reasoning_display_name(),
                 /*max_chars*/ 32,
             )),
             TerminalTitleItem::TaskProgress => self.terminal_title_task_progress(),
         }
     }
 
-    fn reasoning_display_name(&self) -> &'static str {
-        Self::status_line_reasoning_effort_label(self.effective_reasoning_effort())
+    fn reasoning_display_name(&self) -> String {
+        let effort = self.effective_reasoning_effort();
+        Self::status_line_reasoning_effort_label(effort.as_ref())
     }
 
     fn model_with_reasoning_display_name(&self) -> String {
@@ -780,7 +781,8 @@ impl ChatWidget {
     }
 
     fn model_with_reasoning_display_name_for(&self, model_label: &str) -> String {
-        let label = Self::status_line_reasoning_effort_label(self.effective_reasoning_effort());
+        let effort = self.effective_reasoning_effort();
+        let label = Self::status_line_reasoning_effort_label(effort.as_ref());
         let service_tier_label = self
             .current_service_tier()
             .and_then(|service_tier| {

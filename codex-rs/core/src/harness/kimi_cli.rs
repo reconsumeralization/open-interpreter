@@ -105,6 +105,10 @@ fn apply_reasoning_effort(request: &mut Value, reasoning_effort: Option<Reasonin
             request_object.insert("reasoning_effort".to_string(), json!("high"));
             request_object.insert("thinking".to_string(), json!({ "type": "enabled" }));
         }
+        ReasoningEffort::Custom(value) => {
+            request_object.insert("reasoning_effort".to_string(), json!(value));
+            request_object.insert("thinking".to_string(), json!({ "type": "enabled" }));
+        }
     }
 }
 
@@ -428,6 +432,7 @@ pub(super) fn build_messages_with_options(
             }
             ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
+            | ResponseItem::AgentMessage { .. }
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }

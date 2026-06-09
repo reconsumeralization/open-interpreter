@@ -5,6 +5,7 @@
 
 use super::resize_reflow::trailing_run_start;
 use super::*;
+use crate::config_update::format_config_error;
 #[cfg(target_os = "windows")]
 use codex_config::types::WindowsSandboxModeToml;
 
@@ -750,7 +751,7 @@ impl App {
                 self.chat_widget.on_connectors_loaded(result, is_final);
             }
             AppEvent::UpdateReasoningEffort(effort) => {
-                self.on_update_reasoning_effort(effort);
+                self.on_update_reasoning_effort(effort.clone());
                 self.sync_active_thread_reasoning_setting(app_server, effort)
                     .await;
             }
@@ -1402,29 +1403,34 @@ impl App {
             AppEvent::PersistModelSelection { model, effort } => {
                 match crate::config_update::write_config_batch(
                     app_server.request_handle(),
-                    crate::config_update::build_model_selection_edits(model.as_str(), effort),
+                    crate::config_update::build_model_selection_edits(
+                        model.as_str(),
+                        effort.as_ref(),
+                    ),
                 )
                 .await
                 {
                     Ok(_) => {
                         let effort_label = effort
-                            .map(|selected_effort| selected_effort.to_string())
+                            .as_ref()
+                            .map(std::string::ToString::to_string)
                             .unwrap_or_else(|| "default".to_string());
                         tracing::info!("Selected model: {model}, Selected effort: {effort_label}");
                         let mut message = format!("Model changed to {model}");
-                        if let Some(label) = Self::reasoning_label_for(&model, effort) {
+                        if let Some(label) = Self::reasoning_label_for(&model, effort.as_ref()) {
                             message.push(' ');
-                            message.push_str(label);
+                            message.push_str(&label);
                         }
                         self.chat_widget.add_info_message(message, /*hint*/ None);
                     }
                     Err(err) => {
+                        let error = format_config_error(&err);
                         tracing::error!(
-                            error = %err,
+                            error = %error,
                             "failed to persist model selection"
                         );
                         self.chat_widget
-                            .add_error_message(format!("Failed to save default model: {err}"));
+                            .add_error_message(format!("Failed to save default model: {error}"));
                     }
                 }
             }
@@ -1477,7 +1483,7 @@ impl App {
                     crate::config_update::build_provider_model_selection_edits(
                         provider_id.as_str(),
                         model.as_str(),
-                        effort,
+                        effort.clone(),
                         harness.as_deref(),
                     ),
                 )
@@ -1494,10 +1500,10 @@ impl App {
                             self.config.model_provider = provider;
                         }
                         self.config.model = Some(model.clone());
-                        self.config.model_reasoning_effort = effort;
+                        self.config.model_reasoning_effort = effort.clone();
                         self.config.harness = harness.clone();
                         self.chat_widget.set_model(&model);
-                        self.chat_widget.set_reasoning_effort(effort);
+                        self.chat_widget.set_reasoning_effort(effort.clone());
                         self.chat_widget.set_harness(harness.clone());
                         self.start_fresh_session_with_summary_hint(
                             tui, app_server, /*session_start_source*/ None,
@@ -1506,9 +1512,9 @@ impl App {
                         .await;
 
                         let mut message = format!("Model changed to {provider_name} / {model}");
-                        if let Some(label) = Self::reasoning_label_for(&model, effort) {
+                        if let Some(label) = Self::reasoning_label_for(&model, effort.as_ref()) {
                             message.push(' ');
-                            message.push_str(label);
+                            message.push_str(&label);
                         }
                         let native_harness_label = match codex_product_info::Product::current() {
                             codex_product_info::Product::Codex => "Codex",
@@ -1810,7 +1816,7 @@ impl App {
                 self.chat_widget.set_rate_limit_switch_prompt_hidden(hidden);
             }
             AppEvent::UpdatePlanModeReasoningEffort(effort) => {
-                self.config.plan_mode_reasoning_effort = effort;
+                self.config.plan_mode_reasoning_effort = effort.clone();
                 self.chat_widget.set_plan_mode_reasoning_effort(effort);
                 self.sync_active_thread_plan_mode_reasoning_setting(app_server)
                     .await;
@@ -2144,9 +2150,10 @@ impl App {
                         self.chat_widget.setup_status_line(items, use_theme_colors);
                     }
                     Err(err) => {
-                        tracing::error!(error = %err, "failed to persist status line settings; keeping previous selection");
+                        let error = format_config_error(&err);
+                        tracing::error!(error = %error, "failed to persist status line settings; keeping previous selection");
                         self.chat_widget.add_error_message(format!(
-                            "Failed to save status line settings: {err}"
+                            "Failed to save status line settings: {error}"
                         ));
                     }
                 }
