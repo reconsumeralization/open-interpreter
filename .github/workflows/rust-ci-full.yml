@@ -1,11 +1,6 @@
 name: rust-ci-full
 on:
-  push:
-    branches:
-      - main
-      - "**full-ci**"
   workflow_dispatch:
-
 # CI builds in debug (dev) for faster signal.
 env:
   # Cargo's libgit2 transport has been flaky on macOS when fetching git
