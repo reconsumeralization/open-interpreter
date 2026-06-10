@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "acp-server",
     "aws-auth",
     "analytics",
     "agent-graph-store",
@@ -123,7 +124,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.0.0"
+version = "0.0.11"
 # Track the edition for all workspace crates in one place. Individual
 # crates can still override this value, but keeping it here means new
 # crates created with `cargo new -w ...` automatically inherit the 2024
@@ -134,6 +135,7 @@ license = "Apache-2.0"
 [workspace.dependencies]
 # Internal
 app_test_support = { path = "app-server/tests/common" }
+codex-acp-server = { path = "acp-server" }
 codex-analytics = { path = "analytics" }
 codex-agent-graph-store = { path = "agent-graph-store" }
 codex-agent-identity = { path = "agent-identity" }
@@ -254,6 +256,7 @@ mcp_test_support = { path = "mcp-server/tests/common" }
 
 # External
 age = "0.11.1"
+agent-client-protocol = { version = "=0.12.1", features = ["unstable"] }
 allocative = "0.3.3"
 ansi-to-tui = "7.0.0"
 anyhow = "1"
