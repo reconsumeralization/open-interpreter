@@ -228,7 +228,7 @@ async fn run_remote_compact_task_inner_impl(
             .primary()
             .map(|turn_environment| turn_environment.cwd.to_path_buf()),
     };
-    let window_id = sess.services.model_client.current_window_id();
+    let window_id = sess.current_window_id().await;
     let turn_metadata_header = turn_context
         .turn_metadata_state
         .current_header_value_for_compaction(&window_id, compaction_metadata);
@@ -249,6 +249,7 @@ async fn run_remote_compact_task_inner_impl(
             },
             &turn_context.session_telemetry,
             &compaction_trace,
+            &window_id,
             turn_metadata_header.as_deref(),
         )
         .await?;
@@ -267,6 +268,7 @@ async fn run_remote_compact_task_inner_impl(
     let compacted_item = CompactedItem {
         message: String::new(),
         replacement_history: Some(new_history.clone()),
+        window_id: None,
     };
     // Install is the semantic boundary where the compact endpoint's output becomes live
     // thread history. Keep it distinct from the later inference request so the reducer can

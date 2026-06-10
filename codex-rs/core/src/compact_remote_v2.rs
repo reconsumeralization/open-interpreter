@@ -244,7 +244,7 @@ async fn run_remote_compact_task_inner_impl(
             .map(|turn_environment| turn_environment.cwd.to_path_buf()),
     };
 
-    let window_id = sess.services.model_client.current_window_id();
+    let window_id = sess.current_window_id().await;
     let turn_metadata_header = turn_context
         .turn_metadata_state
         .current_header_value_for_compaction(&window_id, compaction_metadata);
@@ -268,6 +268,7 @@ async fn run_remote_compact_task_inner_impl(
         turn_context,
         client_session,
         &prompt,
+        &window_id,
         turn_metadata_header.as_deref(),
     )
     .await;
@@ -303,6 +304,7 @@ async fn run_remote_compact_task_inner_impl(
     let compacted_item = CompactedItem {
         message: String::new(),
         replacement_history: Some(new_history.clone()),
+        window_id: None,
     };
     compaction_trace.record_installed(&CompactionCheckpointTracePayload {
         input_history: &trace_input_history,
@@ -327,6 +329,7 @@ async fn run_remote_compaction_request_v2(
     turn_context: &TurnContext,
     client_session: &mut ModelClientSession,
     prompt: &Prompt,
+    window_id: &str,
     turn_metadata_header: Option<&str>,
 ) -> CodexResult<RemoteCompactionV2Output> {
     let max_retries = turn_context
@@ -338,6 +341,7 @@ async fn run_remote_compaction_request_v2(
     loop {
         let result = match client_session
             .stream(
+                window_id,
                 prompt,
                 &turn_context.model_info,
                 &turn_context.session_telemetry,

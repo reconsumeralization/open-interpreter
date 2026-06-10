@@ -2023,6 +2023,7 @@ dependencies = [
  "codex-model-provider",
  "codex-plugin",
  "codex-protocol",
+ "codex-state",
  "codex-utils-absolute-path",
  "os_info",
  "pretty_assertions",
@@ -2113,6 +2114,7 @@ dependencies = [
  "codex-image-generation-extension",
  "codex-login",
  "codex-mcp",
+ "codex-mcp-extension",
  "codex-memories-extension",
  "codex-memories-write",
  "codex-model-provider",
@@ -3080,7 +3082,7 @@ dependencies = [
 name = "codex-extension-api"
 version = "0.0.11"
 dependencies = [
- "async-trait",
+ "codex-config",
  "codex-context-fragments",
  "codex-protocol",
  "codex-tools",
@@ -3206,8 +3208,8 @@ name = "codex-goal-extension"
 version = "0.0.11"
 dependencies = [
  "anyhow",
- "async-trait",
  "chrono",
+ "codex-analytics",
  "codex-core",
  "codex-extension-api",
  "codex-otel",
@@ -3227,7 +3229,6 @@ dependencies = [
 name = "codex-guardian"
 version = "0.0.11"
 dependencies = [
- "async-trait",
  "codex-core",
  "codex-extension-api",
  "codex-protocol",
@@ -3260,7 +3261,6 @@ dependencies = [
 name = "codex-image-generation-extension"
 version = "0.0.11"
 dependencies = [
- "async-trait",
  "codex-api",
  "codex-core",
  "codex-extension-api",
@@ -3412,6 +3412,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "codex-mcp-extension"
+version = "0.0.0"
+dependencies = [
+ "codex-config",
+ "codex-core",
+ "codex-core-plugins",
+ "codex-extension-api",
+ "codex-features",
+ "codex-login",
+ "codex-mcp",
+ "pretty_assertions",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "codex-mcp-server"
 version = "0.0.11"
 dependencies = [
@@ -3447,7 +3463,6 @@ dependencies = [
 name = "codex-memories-extension"
 version = "0.0.11"
 dependencies = [
- "async-trait",
  "codex-core",
  "codex-extension-api",
  "codex-features",
@@ -3487,6 +3502,8 @@ dependencies = [
  "codex-features",
  "codex-git-utils",
  "codex-login",
+ "codex-model-provider",
+ "codex-model-provider-info",
  "codex-models-manager",
  "codex-otel",
  "codex-protocol",
@@ -4067,7 +4084,6 @@ dependencies = [
 name = "codex-tools"
 version = "0.0.11"
 dependencies = [
- "async-trait",
  "codex-app-server-protocol",
  "codex-code-mode",
  "codex-features",
@@ -4449,7 +4465,6 @@ dependencies = [
 name = "codex-web-search-extension"
 version = "0.0.11"
 dependencies = [
- "async-trait",
  "codex-api",
  "codex-core",
  "codex-extension-api",

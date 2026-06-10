@@ -213,14 +213,6 @@ impl ChatWidget {
                     .send(AppEvent::OpenDesktopThread { thread_id });
             }
             SlashCommand::Init => {
-                let init_target = self.config.cwd.join(DEFAULT_AGENTS_MD_FILENAME);
-                if init_target.exists() {
-                    let message = format!(
-                        "{DEFAULT_AGENTS_MD_FILENAME} already exists here. Skipping /init to avoid overwriting it."
-                    );
-                    self.add_info_message(message, /*hint*/ None);
-                    return;
-                }
                 const INIT_PROMPT: &str = include_str!("../../prompt_for_init_command.md");
                 self.submit_user_message(INIT_PROMPT.to_string().into());
             }
@@ -408,6 +400,10 @@ impl ChatWidget {
             }
             SlashCommand::Skills => {
                 self.open_skills_menu();
+            }
+            SlashCommand::Import => {
+                self.app_event_tx
+                    .send(AppEvent::OpenExternalAgentConfigMigration);
             }
             SlashCommand::Hooks => {
                 self.add_hooks_output();
@@ -665,7 +661,7 @@ impl ChatWidget {
                 }
                 self.session_telemetry
                     .counter("codex.thread.rename", /*inc*/ 1, &[]);
-                let Some(name) = crate::legacy_core::util::normalize_thread_name(&args) else {
+                let Some(name) = normalize_thread_name(&args) else {
                     self.add_error_message("Thread name cannot be empty.".to_string());
                     return;
                 };
@@ -1022,6 +1018,7 @@ impl ChatWidget {
             | SlashCommand::Logout
             | SlashCommand::Mention
             | SlashCommand::Skills
+            | SlashCommand::Import
             | SlashCommand::Hooks
             | SlashCommand::Title
             | SlashCommand::Statusline

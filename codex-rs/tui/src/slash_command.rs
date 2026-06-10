@@ -27,6 +27,7 @@ pub enum SlashCommand {
     AutoReview,
     Memories,
     Skills,
+    Import,
     Hooks,
     Review,
     Rename,
@@ -122,6 +123,9 @@ impl SlashCommand {
                     "use skills to improve how Open Interpreter performs specific tasks"
                 }
             },
+            SlashCommand::Import => {
+                "import setup, this project, and recent chats from another coding agent"
+            }
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Status => "show current session configuration and token usage",
             SlashCommand::DebugConfig => "show config layers and requirement sources for debugging",
@@ -234,6 +238,7 @@ impl SlashCommand {
             | SlashCommand::SandboxReadRoot
             | SlashCommand::Experimental
             | SlashCommand::Memories
+            | SlashCommand::Import
             | SlashCommand::Review
             | SlashCommand::Plan
             | SlashCommand::Clear

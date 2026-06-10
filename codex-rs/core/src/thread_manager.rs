@@ -272,7 +272,10 @@ impl ThreadManager {
             codex_home.to_path_buf(),
             restriction_product,
         ));
-        let mcp_manager = Arc::new(McpManager::new(Arc::clone(&plugins_manager)));
+        let mcp_manager = Arc::new(McpManager::new_with_extensions(
+            Arc::clone(&plugins_manager),
+            Arc::clone(&extensions),
+        ));
         let skills_manager = Arc::new(SkillsManager::new_with_restriction_product(
             codex_home,
             config.bundled_skills_enabled(),
@@ -512,14 +515,12 @@ impl ThreadManager {
         &self,
         thread_id: ThreadId,
     ) -> CodexResult<Vec<ThreadId>> {
-        let thread = self.state.get_thread(thread_id).await?;
-
         let mut subtree_thread_ids = Vec::new();
         let mut seen_thread_ids = HashSet::new();
         subtree_thread_ids.push(thread_id);
         seen_thread_ids.insert(thread_id);
 
-        if let Some(state_db_ctx) = thread.state_db() {
+        if let Some(state_db_ctx) = self.state.state_db() {
             for status in [
                 DirectionalThreadSpawnEdgeStatus::Open,
                 DirectionalThreadSpawnEdgeStatus::Closed,
@@ -538,11 +539,8 @@ impl ThreadManager {
             }
         }
 
-        for descendant_id in thread
-            .codex
-            .session
-            .services
-            .agent_control
+        for descendant_id in self
+            .agent_control()
             .list_live_agent_subtree_thread_ids(thread_id)
             .await?
         {

@@ -941,6 +941,7 @@ impl TurnRequestProcessor {
             request_id,
             thread.as_ref(),
             Op::RealtimeConversationStart(ConversationStartParams {
+                model: params.model,
                 output_modality: params.output_modality,
                 prompt: params.prompt,
                 realtime_session_id: params.realtime_session_id,
@@ -952,6 +953,7 @@ impl TurnRequestProcessor {
                         ConversationStartTransport::Webrtc { sdp }
                     }
                 }),
+                version: params.version,
                 voice: params.voice,
             }),
         )
