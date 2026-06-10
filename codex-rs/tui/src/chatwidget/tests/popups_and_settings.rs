@@ -2438,19 +2438,18 @@ async fn model_reasoning_selection_popup_applies_custom_effort() {
     chat.handle_key_event(KeyEvent::from(KeyCode::Down));
     chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
 
+    // Open Interpreter's /model flow continues into harness selection after a
+    // reasoning level is chosen; the selection is applied when that final
+    // step completes rather than here.
     let selected_effort_events = std::iter::from_fn(|| rx.try_recv().ok())
         .filter_map(|event| match event {
-            AppEvent::UpdateReasoningEffort(effort) => Some((None, effort)),
-            AppEvent::PersistModelSelection { model, effort } => Some((Some(model), effort)),
+            AppEvent::OpenHarnessPopup { model, effort } => Some((model, effort)),
             _ => None,
         })
         .collect::<Vec<_>>();
     assert_eq!(
         selected_effort_events,
-        vec![
-            (None, Some(custom_effort.clone())),
-            (Some("gpt-5.4".to_string()), Some(custom_effort)),
-        ]
+        vec![("gpt-5.4".to_string(), Some(custom_effort))]
     );
 }
 

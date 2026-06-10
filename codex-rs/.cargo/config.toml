@@ -9,3 +9,9 @@ rustflags = ["-C", "link-arg=/STACK:8388608", "-C", "link-arg=/arm64hazardfree"]
 
 [target.'cfg(all(windows, target_env = "gnu"))']
 rustflags = ["-C", "link-arg=-Wl,--stack,8388608"]
+
+# Windows builds raise the linker stack above for deep TUI widget recursion.
+# Debug-build TUI app tests recurse just as deeply on other platforms; raise
+# the spawned-thread stack so test threads do not overflow the 2 MiB default.
+[env]
+RUST_MIN_STACK = "33554432"
