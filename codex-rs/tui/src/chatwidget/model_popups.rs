@@ -4,6 +4,7 @@
 //! into another, especially while Plan mode is active.
 
 use super::*;
+use codex_login::KIMI_CODE_PROVIDER_ID;
 use codex_model_provider_info::WireApi;
 use codex_model_provider_info::bundled_provider_catalog_entry;
 use codex_model_provider_info::default_harness_for_provider_model;
@@ -74,10 +75,17 @@ impl ChatWidget {
                     description: Some(description),
                     is_current: provider_id == self.config.model_provider_id,
                     actions: vec![Box::new(move |tx| {
-                        tx.send(AppEvent::LoadProviderModels {
-                            provider_id: provider_id.clone(),
-                            provider_name: provider_name.clone(),
-                        });
+                        if provider_id == KIMI_CODE_PROVIDER_ID {
+                            tx.send(AppEvent::StartKimiCodeLogin {
+                                provider_id: provider_id.clone(),
+                                provider_name: provider_name.clone(),
+                            });
+                        } else {
+                            tx.send(AppEvent::LoadProviderModels {
+                                provider_id: provider_id.clone(),
+                                provider_name: provider_name.clone(),
+                            });
+                        }
                     })],
                     dismiss_on_select: true,
                     search_value,
@@ -744,7 +752,7 @@ impl ChatWidget {
             .iter()
             .map(|option| {
                 let effort = option.effort.clone();
-                let mut label = Self::reasoning_effort_label(&effort).to_string();
+                let mut label = Self::reasoning_effort_label(&effort);
                 if effort == default_effort {
                     label.push_str(" (default)");
                 }
@@ -864,17 +872,9 @@ fn single_supported_reasoning_effort(
         return Some(None);
     }
 
-    if preset.supported_reasoning_efforts.len() == 1 {
-        Some(Some(
-            preset
-                .supported_reasoning_efforts
-                .first()
-                .expect("checked exactly one supported reasoning effort")
-                .effort
-                .clone(),
-        ))
-    } else {
-        None
+    match preset.supported_reasoning_efforts.as_slice() {
+        [only] => Some(Some(only.effort.clone())),
+        _ => None,
     }
 }
 
@@ -882,7 +882,9 @@ fn provider_description(
     provider_id: &str,
     provider: &codex_model_provider_info::ModelProviderInfo,
 ) -> String {
-    let description = if provider.requires_openai_auth {
+    let description = if provider_id == KIMI_CODE_PROVIDER_ID {
+        "Sign in with Kimi Code".to_string()
+    } else if provider.requires_openai_auth {
         "Sign in with ChatGPT".to_string()
     } else if let Some(env_key) = provider.env_key.as_deref() {
         format!("Use {env_key} or paste a key")

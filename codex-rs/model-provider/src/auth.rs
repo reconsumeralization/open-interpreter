@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use codex_agent_identity::AgentIdentityKey;
@@ -7,7 +8,12 @@ use codex_api::AuthProvider;
 use codex_api::SharedAuthProvider;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
+use codex_login::KIMI_CODE_PROVIDER_ID;
+use codex_login::kimi_code;
+use codex_login::kimi_code::KimiCodeAuthError;
 use codex_model_provider_info::ModelProviderInfo;
+use codex_model_provider_info::bundled_provider_catalog_entry_for_base_url;
+use codex_protocol::error::CodexErr;
 use http::HeaderMap;
 use http::HeaderValue;
 
@@ -75,17 +81,58 @@ pub(crate) fn auth_manager_for_provider(
     }
 }
 
-pub(crate) fn resolve_provider_auth(
+pub(crate) async fn resolve_provider_auth(
     auth: Option<&CodexAuth>,
     provider: &ModelProviderInfo,
+    codex_home: Option<&Path>,
 ) -> codex_protocol::error::Result<SharedAuthProvider> {
-    if let Some(auth) = bearer_auth_for_provider(provider)? {
-        return Ok(Arc::new(auth));
+    match bearer_auth_for_provider(provider) {
+        Ok(Some(auth)) => return Ok(Arc::new(auth)),
+        Ok(None) => {}
+        Err(err) => {
+            // The Kimi Code provider can authenticate with stored OAuth
+            // credentials when no API key is available in the environment.
+            return match kimi_code_bearer_token(provider, codex_home).await? {
+                Some(token) => Ok(Arc::new(BearerAuthProvider::new(token))),
+                None => Err(err),
+            };
+        }
     }
 
     Ok(match auth {
         Some(auth) => auth_provider_from_auth(auth),
         None => unauthenticated_auth_provider(),
+    })
+}
+
+/// Resolves the stored Kimi Code OAuth access token for the `kimi-for-coding`
+/// provider, refreshing it first when it is stale.
+///
+/// Returns `Ok(None)` when the provider is not Kimi Code, no Codex home is
+/// available, or no credentials have been stored by the device login flow.
+async fn kimi_code_bearer_token(
+    provider: &ModelProviderInfo,
+    codex_home: Option<&Path>,
+) -> codex_protocol::error::Result<Option<String>> {
+    if !is_kimi_code_provider(provider) {
+        return Ok(None);
+    }
+    let Some(codex_home) = codex_home else {
+        return Ok(None);
+    };
+    match kimi_code::resolve_access_token(codex_home).await {
+        Ok(token) => Ok(Some(token)),
+        Err(KimiCodeAuthError::MissingCredentials) => Ok(None),
+        Err(err) => Err(CodexErr::Fatal(format!(
+            "Kimi Code authentication failed: {err}"
+        ))),
+    }
+}
+
+fn is_kimi_code_provider(provider: &ModelProviderInfo) -> bool {
+    provider.base_url.as_deref().is_some_and(|base_url| {
+        bundled_provider_catalog_entry_for_base_url(base_url)
+            .is_some_and(|entry| entry.id == KIMI_CODE_PROVIDER_ID)
     })
 }
 
@@ -139,12 +186,32 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn unauthenticated_auth_provider_adds_no_headers() {
+    #[tokio::test]
+    async fn unauthenticated_auth_provider_adds_no_headers() {
         let provider =
             create_oss_provider_with_base_url("http://localhost:11434/v1", WireApi::Responses);
-        let auth = resolve_provider_auth(/*auth*/ None, &provider).expect("auth should resolve");
+        let auth = resolve_provider_auth(/*auth*/ None, &provider, /*codex_home*/ None)
+            .await
+            .expect("auth should resolve");
 
         assert!(auth.to_auth_headers().is_empty());
+    }
+
+    #[test]
+    fn kimi_for_coding_provider_is_detected_by_base_url() {
+        let provider = ModelProviderInfo {
+            name: "Kimi For Coding".to_string(),
+            base_url: Some("https://api.kimi.com/coding/v1".to_string()),
+            env_key: Some("KIMI_API_KEY".to_string()),
+            wire_api: WireApi::Chat,
+            requires_openai_auth: false,
+            ..Default::default()
+        };
+
+        assert!(is_kimi_code_provider(&provider));
+        assert!(!is_kimi_code_provider(&create_oss_provider_with_base_url(
+            "http://localhost:11434/v1",
+            WireApi::Responses,
+        )));
     }
 }

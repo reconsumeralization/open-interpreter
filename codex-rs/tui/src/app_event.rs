@@ -74,6 +74,15 @@ pub(crate) struct HistoryLookupResponse {
     pub(crate) entry: Option<String>,
 }
 
+/// How the Kimi Code OAuth device login flow finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KimiCodeLoginOutcome {
+    /// Stored credentials (or an API key in the environment) already work.
+    AlreadyAuthenticated,
+    /// The browser device flow completed and credentials were stored.
+    SignedIn,
+}
+
 impl RealtimeAudioDeviceKind {
     pub(crate) fn title(self) -> &'static str {
         match self {
@@ -645,6 +654,26 @@ pub(crate) enum AppEvent {
     LoadProviderModels {
         provider_id: String,
         provider_name: String,
+    },
+
+    /// Ensure Kimi Code OAuth credentials exist (running the device login flow
+    /// when needed) before loading its models in `/model`.
+    StartKimiCodeLogin {
+        provider_id: String,
+        provider_name: String,
+    },
+
+    /// Show the Kimi Code device-login verification details to the user.
+    KimiCodeLoginVerification {
+        verification_url: String,
+        user_code: String,
+    },
+
+    /// Result of the Kimi Code OAuth device login flow.
+    KimiCodeLoginComplete {
+        provider_id: String,
+        provider_name: String,
+        result: Result<KimiCodeLoginOutcome, String>,
     },
 
     /// Result of loading the provider-specific model catalog for `/model`.

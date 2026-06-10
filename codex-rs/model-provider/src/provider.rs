@@ -131,7 +131,13 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
     /// Returns the auth provider used to attach request credentials.
     async fn api_auth(&self) -> codex_protocol::error::Result<SharedAuthProvider> {
         let auth = self.auth().await;
-        resolve_provider_auth(auth.as_ref(), self.info())
+        let auth_manager = self.auth_manager();
+        resolve_provider_auth(
+            auth.as_ref(),
+            self.info(),
+            auth_manager.as_deref().map(AuthManager::codex_home),
+        )
+        .await
     }
 
     /// Creates the model manager implementation appropriate for this provider.

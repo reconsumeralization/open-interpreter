@@ -563,7 +563,7 @@ impl ChatWidget {
             StatusLineItem::ModelName => Some(self.model_display_label()),
             StatusLineItem::ModelWithReasoning => Some(self.model_with_reasoning_display_name()),
             StatusLineItem::Harness => Some(self.status_line_harness_label()),
-            StatusLineItem::Reasoning => Some(self.reasoning_display_name().to_string()),
+            StatusLineItem::Reasoning => Some(self.reasoning_display_name()),
             StatusLineItem::CurrentDir => {
                 Some(format_directory_display(
                     self.status_line_cwd(),

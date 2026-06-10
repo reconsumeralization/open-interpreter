@@ -5,9 +5,12 @@
 
 use super::resize_reflow::trailing_run_start;
 use super::*;
+use crate::app_event::KimiCodeLoginOutcome;
 use crate::config_update::format_config_error;
 #[cfg(target_os = "windows")]
 use codex_config::types::WindowsSandboxModeToml;
+use codex_login::kimi_code;
+use codex_login::kimi_code::KimiCodeAuthError;
 
 const SHUTDOWN_FIRST_EXIT_TIMEOUT: Duration = Duration::from_secs(/*secs*/ 2);
 
@@ -838,6 +841,113 @@ impl App {
                         provider_name,
                         None,
                     );
+                }
+            },
+            AppEvent::StartKimiCodeLogin {
+                provider_id,
+                provider_name,
+            } => {
+                let env_api_key_present = self
+                    .config
+                    .model_providers
+                    .get(provider_id.as_str())
+                    .and_then(|provider| provider.env_key.as_deref())
+                    .and_then(|env_key| std::env::var(env_key).ok())
+                    .is_some_and(|value| !value.trim().is_empty());
+                let codex_home = self.config.codex_home.clone();
+                let tx = self.app_event_tx.clone();
+                tokio::spawn(async move {
+                    if env_api_key_present {
+                        tx.send(AppEvent::KimiCodeLoginComplete {
+                            provider_id,
+                            provider_name,
+                            result: Ok(KimiCodeLoginOutcome::AlreadyAuthenticated),
+                        });
+                        return;
+                    }
+                    match kimi_code::resolve_access_token(&codex_home).await {
+                        Ok(_) => {
+                            tx.send(AppEvent::KimiCodeLoginComplete {
+                                provider_id,
+                                provider_name,
+                                result: Ok(KimiCodeLoginOutcome::AlreadyAuthenticated),
+                            });
+                            return;
+                        }
+                        Err(
+                            KimiCodeAuthError::MissingCredentials
+                            | KimiCodeAuthError::ReauthenticationRequired,
+                        ) => {}
+                        Err(err) => {
+                            tx.send(AppEvent::KimiCodeLoginComplete {
+                                provider_id,
+                                provider_name,
+                                result: Err(err.to_string()),
+                            });
+                            return;
+                        }
+                    }
+                    let authorization =
+                        match kimi_code::request_device_authorization(&codex_home).await {
+                            Ok(authorization) => authorization,
+                            Err(err) => {
+                                tx.send(AppEvent::KimiCodeLoginComplete {
+                                    provider_id,
+                                    provider_name,
+                                    result: Err(err.to_string()),
+                                });
+                                return;
+                            }
+                        };
+                    let _ =
+                        kimi_code::open_verification_url(&authorization.verification_uri_complete);
+                    tx.send(AppEvent::KimiCodeLoginVerification {
+                        verification_url: authorization.verification_uri_complete.clone(),
+                        user_code: authorization.user_code.clone(),
+                    });
+                    let result =
+                        kimi_code::complete_device_authorization(&codex_home, &authorization)
+                            .await
+                            .map(|()| KimiCodeLoginOutcome::SignedIn)
+                            .map_err(|err| err.to_string());
+                    tx.send(AppEvent::KimiCodeLoginComplete {
+                        provider_id,
+                        provider_name,
+                        result,
+                    });
+                });
+            }
+            AppEvent::KimiCodeLoginVerification {
+                verification_url,
+                user_code,
+            } => {
+                self.chat_widget.add_info_message(
+                    format!(
+                        "Finish signing in to Kimi Code in your browser: open {verification_url} and confirm code {user_code}."
+                    ),
+                    /*hint*/ None,
+                );
+            }
+            AppEvent::KimiCodeLoginComplete {
+                provider_id,
+                provider_name,
+                result,
+            } => match result {
+                Ok(outcome) => {
+                    if outcome == KimiCodeLoginOutcome::SignedIn {
+                        self.chat_widget.add_info_message(
+                            format!("Signed in to {provider_name}."),
+                            /*hint*/ None,
+                        );
+                    }
+                    self.app_event_tx.send(AppEvent::LoadProviderModels {
+                        provider_id,
+                        provider_name,
+                    });
+                }
+                Err(err) => {
+                    self.chat_widget
+                        .add_error_message(format!("{provider_name} sign-in failed: {err}"));
                 }
             },
             AppEvent::OpenCustomProviderModelPrompt {

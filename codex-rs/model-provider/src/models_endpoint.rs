@@ -87,7 +87,12 @@ impl ModelsEndpointClient for OpenAiModelsEndpoint {
         let auth = self.auth().await;
         let auth_mode = auth.as_ref().map(CodexAuth::auth_mode);
         let api_provider = self.provider_info.to_api_provider(auth_mode)?;
-        let api_auth = resolve_provider_auth(auth.as_ref(), &self.provider_info)?;
+        let api_auth = resolve_provider_auth(
+            auth.as_ref(),
+            &self.provider_info,
+            self.auth_manager.as_deref().map(AuthManager::codex_home),
+        )
+        .await?;
         let transport = ReqwestTransport::new(build_reqwest_client());
         let auth_telemetry = auth_header_telemetry(api_auth.as_ref());
         let request_telemetry: Arc<dyn RequestTelemetry> = Arc::new(ModelsRequestTelemetry {
