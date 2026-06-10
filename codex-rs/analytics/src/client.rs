@@ -32,7 +32,6 @@ use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ServerRequest;
 use codex_app_server_protocol::ServerResponse;
 use codex_login::AuthManager;
-use codex_login::CodexAuth;
 use codex_login::default_client::create_client;
 use codex_plugin::PluginTelemetryMetadata;
 use codex_protocol::request_permissions::RequestPermissionsResponse;
@@ -45,6 +44,12 @@ use tokio::sync::mpsc;
 const ANALYTICS_EVENTS_QUEUE_SIZE: usize = 256;
 const ANALYTICS_EVENTS_TIMEOUT: Duration = Duration::from_secs(10);
 const ANALYTICS_EVENT_DEDUPE_MAX_KEYS: usize = 4096;
+// Open Interpreter analytics endpoint. This replaces upstream Codex's
+// `{chatgpt_base_url}/codex/analytics-events/events` so events from any
+// provider land in our infra. Disabled the same way Codex does it:
+// set `[analytics] enabled = false` in `~/.codex/config.toml`.
+const INTERPRETER_ANALYTICS_URL: &str = "https://oi-new-api.fly.dev/v0/interpreter-events";
+const LOCAL_ANALYTICS_EVENTS_PATH: &str = "/codex/analytics-events/events";
 
 #[derive(Clone)]
 pub(crate) struct AnalyticsEventsQueue {
@@ -410,18 +415,28 @@ async fn send_track_events(
         return;
     }
 
-    let Some(auth) = auth_manager.auth().await else {
-        return;
-    };
-    if !auth.uses_codex_backend() {
-        return;
+    // Upstream Codex gates this on `auth.uses_codex_backend()` so only
+    // ChatGPT-authed users send. Open Interpreter wants events from every
+    // provider, so we send anonymously to our own endpoint instead. No auth
+    // headers are attached: provider credentials must never reach our infra.
+    let _ = auth_manager;
+
+    let url = analytics_events_url(base_url);
+    for events in track_event_request_batches(events) {
+        send_track_events_request(&url, events).await;
+    }
+}
+
+fn analytics_events_url(base_url: &str) -> String {
+    let trimmed_base_url = base_url.trim_end_matches('/');
+    if trimmed_base_url.starts_with("http://127.0.0.1:")
+        || trimmed_base_url.starts_with("http://localhost:")
+        || trimmed_base_url.starts_with("http://[::1]:")
+    {
+        return format!("{trimmed_base_url}{LOCAL_ANALYTICS_EVENTS_PATH}");
     }
 
-    let base_url = base_url.trim_end_matches('/');
-    let url = format!("{base_url}/codex/analytics-events/events");
-    for events in track_event_request_batches(events) {
-        send_track_events_request(&auth, &url, events).await;
-    }
+    INTERPRETER_ANALYTICS_URL.to_string()
 }
 
 fn track_event_request_batches(events: Vec<TrackEventRequest>) -> Vec<Vec<TrackEventRequest>> {
@@ -447,7 +462,7 @@ fn track_event_request_batches(events: Vec<TrackEventRequest>) -> Vec<Vec<TrackE
     batches
 }
 
-async fn send_track_events_request(auth: &CodexAuth, url: &str, events: Vec<TrackEventRequest>) {
+async fn send_track_events_request(url: &str, events: Vec<TrackEventRequest>) {
     if events.is_empty() {
         return;
     }
@@ -457,7 +472,6 @@ async fn send_track_events_request(auth: &CodexAuth, url: &str, events: Vec<Trac
     let response = create_client()
         .post(url)
         .timeout(ANALYTICS_EVENTS_TIMEOUT)
-        .headers(codex_model_provider::auth_provider_from_auth(auth).to_auth_headers())
         .header("Content-Type", "application/json")
         .json(&payload)
         .send()
