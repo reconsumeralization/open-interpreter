@@ -38,6 +38,8 @@ use crate::tools::handlers::ExecCommandHandler;
 use crate::tools::handlers::ExecCommandHandlerOptions;
 use crate::tools::handlers::RequestUserInputHandler;
 use crate::tools::handlers::WriteStdinHandler;
+use crate::tools::handlers::harness_fs;
+use crate::tools::handlers::harness_fs::WalkEntryKind;
 use crate::tools::handlers::multi_agents_common::build_agent_spawn_config;
 use crate::tools::handlers::multi_agents_common::parse_collab_input;
 use crate::tools::handlers::multi_agents_common::thread_spawn_source;
@@ -271,7 +273,7 @@ struct BashArgs {
 async fn handle_bash(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let arguments = function_arguments(&invocation.payload)?;
     let args: BashArgs = parse_arguments(arguments)?;
-    let command = normalize_model_path_text(&args.command);
+    let command = harness_fs::normalize_model_path_text(&args.command);
     let mut translated = json!({
         "cmd": command,
         "yield_time_ms": if args.run_in_background { 1_000 } else { args.timeout.unwrap_or(10_000).min(30_000) },
@@ -291,23 +293,7 @@ async fn handle_bash(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, 
         .run_in_background
         .then(|| claude_task_output_path(&invocation));
     let is_claude_code = is_claude_code(&invocation);
-    let handler = ExecCommandHandler::new(ExecCommandHandlerOptions {
-        allow_login_shell: invocation.turn.config.permissions.allow_login_shell,
-        exec_permission_approvals_enabled: invocation
-            .session
-            .features()
-            .enabled(codex_features::Feature::ExecPermissionApprovals),
-        include_environment_id: false,
-        include_shell_parameter: false,
-    });
-    let output = handler
-        .handle(ToolInvocation {
-            tool_name: ToolName::plain("exec_command"),
-            payload,
-            ..invocation.clone()
-        })
-        .await?;
-    let result = output.code_mode_result(&payload_for_result);
+    let result = execute_harness_command(&invocation, payload, &payload_for_result).await?;
     if args.run_in_background
         && let Some(process_id) = result.get("session_id").and_then(serde_json::Value::as_i64)
     {
@@ -366,15 +352,25 @@ async fn handle_plain_bash(
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let arguments = function_arguments(&invocation.payload)?;
     let args: BashArgs = parse_arguments(arguments)?;
-    let command = normalize_model_path_text(&args.command);
-    let output = std::process::Command::new("bash")
-        .arg("-lc")
-        .arg(&command)
-        .current_dir(primary_cwd(&invocation))
-        .output()
-        .map_err(|err| FunctionCallError::RespondToModel(format!("bash failed: {err}")))?;
-    let mut text = String::from_utf8_lossy(&output.stdout).to_string();
-    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    let command = harness_fs::normalize_model_path_text(&args.command);
+    let payload = ToolPayload::Function {
+        arguments: json!({
+            "cmd": command,
+            "yield_time_ms": args.timeout.unwrap_or(10_000).min(30_000),
+        })
+        .to_string(),
+    };
+    let payload_for_result = payload.clone();
+    let result = execute_harness_command(&invocation, payload, &payload_for_result).await?;
+    let mut text = result
+        .get("output")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    let exit_code = result
+        .get("exit_code")
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or(1);
     if text.is_empty()
         && (is_pi(&invocation) || is_little_coder(&invocation) || is_opencode(&invocation))
     {
@@ -382,8 +378,32 @@ async fn handle_plain_bash(
     }
     Ok(boxed_tool_output(FunctionToolOutput::from_text(
         format!("{HARNESS_NO_TRUNCATE_PREFIX}{text}"),
-        Some(output.status.success()),
+        Some(exit_code == 0),
     )))
+}
+
+async fn execute_harness_command(
+    invocation: &ToolInvocation,
+    payload: ToolPayload,
+    payload_for_result: &ToolPayload,
+) -> Result<serde_json::Value, FunctionCallError> {
+    let handler = ExecCommandHandler::new(ExecCommandHandlerOptions {
+        allow_login_shell: invocation.turn.config.permissions.allow_login_shell,
+        exec_permission_approvals_enabled: invocation
+            .session
+            .features()
+            .enabled(codex_features::Feature::ExecPermissionApprovals),
+        include_environment_id: false,
+        include_shell_parameter: false,
+    });
+    let output = handler
+        .handle(ToolInvocation {
+            tool_name: ToolName::plain("exec_command"),
+            payload,
+            ..invocation.clone()
+        })
+        .await?;
+    Ok(output.code_mode_result(payload_for_result))
 }
 
 fn is_claude_code(invocation: &ToolInvocation) -> bool {
@@ -466,7 +486,7 @@ fn store_claude_task(
 }
 
 fn claude_task_output_path(invocation: &ToolInvocation) -> String {
-    let cwd_key = primary_cwd(invocation)
+    let cwd_key = harness_fs::primary_cwd(invocation)
         .display()
         .to_string()
         .replace('/', "-");
@@ -647,7 +667,7 @@ struct ReadArgs {
 async fn handle_read(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let arguments = function_arguments(&invocation.payload)?;
     let args: ReadArgs = parse_arguments(arguments)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_read_path(&invocation, &args.path, "Read")?;
     if let Some(task_id) = claude_task_id_from_output_path(&path) {
         let output = poll_claude_task_output(&invocation, task_id).await?;
         let (body, _, _, _) = numbered_read_lines(&output, 1, DEFAULT_READ_LIMIT);
@@ -801,7 +821,7 @@ async fn handle_write(
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let arguments = function_arguments(&invocation.payload)?;
     let args: WriteArgs = parse_arguments(arguments)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_write_path(&invocation, &args.path, "Write")?;
     let bytes_written = args.content.len();
     match args.mode.as_deref() {
         Some("append") => {
@@ -866,7 +886,8 @@ struct EditReplacement {
 async fn handle_edit(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let arguments = function_arguments(&invocation.payload)?;
     let args: EditArgs = parse_arguments(arguments)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_read_path(&invocation, &args.path, "Edit")?;
+    harness_fs::ensure_write_allowed(&invocation, &path, "Edit")?;
     if is_claude_code_bare(&invocation) && !claude_has_read_file(&path) {
         return Ok(boxed_tool_output(FunctionToolOutput::from_text(
             "File has not been read yet. Read it first before writing to it.".to_string(),
@@ -967,12 +988,16 @@ async fn handle_glob(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, 
     let arguments = function_arguments(&invocation.payload)?;
     let args: GlobArgs = parse_arguments(arguments)?;
     let root = match args.path.as_deref() {
-        Some(path) => resolve_model_path(&invocation, path)?,
-        None => primary_cwd(&invocation),
+        Some(path) => harness_fs::checked_read_path(&invocation, path, "Glob")?,
+        None => {
+            let root = harness_fs::primary_cwd(&invocation);
+            harness_fs::ensure_read_allowed(&invocation, &root, "Glob")?;
+            root
+        }
     };
     let include_dirs = args.include_dirs.unwrap_or(true);
     let mut matches = Vec::new();
-    collect_glob_matches(&root, &root, &args.pattern, include_dirs, &mut matches)
+    collect_glob_matches(&root, &args.pattern, include_dirs, &mut matches)
         .map_err(|err| FunctionCallError::RespondToModel(format!("Glob failed: {err}")))?;
     matches.sort();
     matches.truncate(250);
@@ -1005,8 +1030,12 @@ async fn handle_grep(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, 
     let arguments = function_arguments(&invocation.payload)?;
     let args: GrepArgs = parse_arguments(arguments)?;
     let root = match args.path.as_deref() {
-        Some(path) => resolve_model_path(&invocation, path)?,
-        None => primary_cwd(&invocation),
+        Some(path) => harness_fs::checked_read_path(&invocation, path, "Grep")?,
+        None => {
+            let root = harness_fs::primary_cwd(&invocation);
+            harness_fs::ensure_read_allowed(&invocation, &root, "Grep")?;
+            root
+        }
     };
     let regex = Regex::new(&args.pattern)
         .map_err(|err| FunctionCallError::RespondToModel(format!("Grep failed: {err}")))?;
@@ -1300,7 +1329,7 @@ async fn handle_deepseek_list_dir(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let args: ReadArgs = parse_arguments(function_arguments(&invocation.payload)?)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_read_path(&invocation, &args.path, "list_dir")?;
     let mut entries = std::fs::read_dir(&path)
         .map_err(|err| FunctionCallError::RespondToModel(format!("list_dir failed: {err}")))?
         .map(|entry| {
@@ -1338,7 +1367,7 @@ async fn handle_deepseek_read_file(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let args: ReadArgs = parse_arguments(function_arguments(&invocation.payload)?)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_read_path(&invocation, &args.path, "read_file")?;
     let text = std::fs::read_to_string(&path)
         .map_err(|err| FunctionCallError::RespondToModel(format!("read_file failed: {err}")))?;
     if let Ok(mut counts) = DEEPSEEK_READ_FILE_COUNTS.lock() {
@@ -1366,7 +1395,8 @@ async fn handle_deepseek_grep_files(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let args: DeepSeekGrepArgs = parse_arguments(function_arguments(&invocation.payload)?)?;
-    let root = primary_cwd(&invocation);
+    let root = harness_fs::primary_cwd(&invocation);
+    harness_fs::ensure_read_allowed(&invocation, &root, "grep_files")?;
     let regex = Regex::new(&args.pattern)
         .map_err(|err| FunctionCallError::RespondToModel(format!("grep_files failed: {err}")))?;
     let mut matches = Vec::new();
@@ -1388,7 +1418,8 @@ async fn handle_deepseek_file_search(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let args: DeepSeekFileSearchArgs = parse_arguments(function_arguments(&invocation.payload)?)?;
-    let root = primary_cwd(&invocation);
+    let root = harness_fs::primary_cwd(&invocation);
+    harness_fs::ensure_read_allowed(&invocation, &root, "file_search")?;
     let mut matches = Vec::new();
     collect_file_search_matches(&root, &root, &args.query, &mut matches)
         .map_err(|err| FunctionCallError::RespondToModel(format!("file_search failed: {err}")))?;
@@ -1404,7 +1435,7 @@ async fn handle_deepseek_write_file(
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let arguments = function_arguments(&invocation.payload)?;
     let args: WriteArgs = parse_arguments(arguments)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_write_path(&invocation, &args.path, "write_file")?;
     let previous = std::fs::read_to_string(&path).ok();
     std::fs::write(&path, &args.content)
         .map_err(|err| FunctionCallError::RespondToModel(format!("write_file failed: {err}")))?;
@@ -1440,7 +1471,8 @@ async fn handle_deepseek_edit_file(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let args: DeepSeekEditFileArgs = parse_arguments(function_arguments(&invocation.payload)?)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_read_path(&invocation, &args.path, "edit_file")?;
+    harness_fs::ensure_write_allowed(&invocation, &path, "edit_file")?;
     let text = std::fs::read_to_string(&path)
         .map_err(|err| FunctionCallError::RespondToModel(format!("edit_file failed: {err}")))?;
     let matches = text.matches(&args.search).count();
@@ -1470,7 +1502,8 @@ async fn handle_deepseek_apply_patch(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let args: DeepSeekApplyPatchArgs = parse_arguments(function_arguments(&invocation.payload)?)?;
-    let path = resolve_model_path(&invocation, &args.path)?;
+    let path = harness_fs::checked_read_path(&invocation, &args.path, "apply_patch")?;
+    harness_fs::ensure_write_allowed(&invocation, &path, "apply_patch")?;
     let text = std::fs::read_to_string(&path)
         .map_err(|err| FunctionCallError::RespondToModel(format!("apply_patch failed: {err}")))?;
     if args.fuzz.is_none() {
@@ -1535,7 +1568,7 @@ async fn handle_deepseek_exec_shell(
 async fn handle_deepseek_diagnostics(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
-    let cwd = primary_cwd(&invocation);
+    let cwd = harness_fs::primary_cwd(&invocation);
     let trusted_path = cwd
         .parent()
         .unwrap_or(cwd.as_path())
@@ -1566,17 +1599,24 @@ async fn handle_git_command(
     invocation: ToolInvocation,
     args: &[&str],
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
-    let output = std::process::Command::new("git")
-        .args(args)
-        .current_dir(primary_cwd(&invocation))
-        .output()
-        .map_err(|err| FunctionCallError::RespondToModel(format!("git failed: {err}")))?;
-    let text = String::from_utf8_lossy(&output.stdout)
+    let payload = ToolPayload::Function {
+        arguments: json!({
+            "cmd": format!("git {}", args.join(" ")),
+            "yield_time_ms": 10_000,
+        })
+        .to_string(),
+    };
+    let payload_for_result = payload.clone();
+    let result = execute_harness_command(&invocation, payload, &payload_for_result).await?;
+    let text = result
+        .get("output")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
         .trim_end()
         .to_string();
     Ok(boxed_tool_output(FunctionToolOutput::from_text(
         text,
-        Some(output.status.success()),
+        Some(result.get("exit_code").and_then(serde_json::Value::as_i64) == Some(0)),
     )))
 }
 
@@ -1620,7 +1660,7 @@ fn format_opencode_grep_matches(root: &Path, matches: &[String], pattern: &str) 
         .map(|item| {
             let path = root.join(item);
             let mut lines = Vec::new();
-            if let Ok(text) = std::fs::read_to_string(&path) {
+            if let Some(text) = harness_fs::read_search_file(&path) {
                 for (index, line) in text.lines().enumerate() {
                     if regex.is_match(line) {
                         lines.push(format!("  Line {}: {line}", index + 1));
@@ -1887,37 +1927,8 @@ fn function_arguments(payload: &ToolPayload) -> Result<&str, FunctionCallError> 
     }
 }
 
-fn primary_cwd(invocation: &ToolInvocation) -> PathBuf {
-    invocation
-        .turn
-        .environments
-        .primary()
-        .map(|environment| environment.cwd.as_path().to_path_buf())
-        .unwrap_or_else(|| {
-            #[allow(deprecated)]
-            invocation.turn.cwd.as_path().to_path_buf()
-        })
-}
-
-fn resolve_model_path(
-    invocation: &ToolInvocation,
-    path: &str,
-) -> Result<PathBuf, FunctionCallError> {
-    let path = normalize_model_path_text(path);
-    let path = PathBuf::from(path);
-    if path.is_absolute() {
-        Ok(path)
-    } else {
-        Ok(primary_cwd(invocation).join(path))
-    }
-}
-
-fn normalize_model_path_text(text: &str) -> String {
-    text.replace("/private/private/tmp/", "/private/tmp/")
-}
-
 fn display_model_path(invocation: &ToolInvocation, path: &Path) -> String {
-    let cwd = primary_cwd(invocation);
+    let cwd = harness_fs::primary_cwd(invocation);
     path.strip_prefix(&cwd)
         .unwrap_or(path)
         .to_string_lossy()
@@ -1940,21 +1951,18 @@ fn image_mime_type(path: &Path) -> Option<&'static str> {
 
 fn collect_glob_matches(
     root: &Path,
-    dir: &Path,
     pattern: &str,
     include_dirs: bool,
     matches: &mut Vec<String>,
 ) -> std::io::Result<()> {
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    for entry in harness_fs::bounded_walk(root)? {
+        let path = entry.path;
         let relative = path.strip_prefix(root).unwrap_or(path.as_path());
         let relative_text = relative.to_string_lossy();
-        if (include_dirs || path.is_file()) && simple_glob_matches(pattern, &relative_text) {
+        if (include_dirs || entry.kind == WalkEntryKind::File)
+            && simple_glob_matches(pattern, &relative_text)
+        {
             matches.push(relative_text.to_string());
-        }
-        if path.is_dir() && !is_ignored_dir(&path) {
-            collect_glob_matches(root, &path, pattern, include_dirs, matches)?;
         }
     }
     Ok(())
@@ -1967,11 +1975,15 @@ fn collect_grep_matches(
     glob: Option<&str>,
     matches: &mut Vec<String>,
 ) -> std::io::Result<()> {
-    if path.is_file() {
-        let relative = path.strip_prefix(root).unwrap_or(path);
+    for entry in harness_fs::bounded_walk(path)? {
+        if entry.kind != WalkEntryKind::File {
+            continue;
+        }
+        let path = entry.path;
+        let relative = path.strip_prefix(root).unwrap_or(path.as_path());
         let relative_text = relative.to_string_lossy();
         if glob.is_none_or(|pattern| simple_glob_matches(pattern, &relative_text))
-            && let Ok(text) = std::fs::read_to_string(path)
+            && let Some(text) = harness_fs::read_search_file(&path)
         {
             for line in text.lines() {
                 if regex.is_match(line) {
@@ -1980,13 +1992,6 @@ fn collect_grep_matches(
                 }
             }
         }
-        return Ok(());
-    }
-    if !path.is_dir() || is_ignored_dir(path) {
-        return Ok(());
-    }
-    for entry in std::fs::read_dir(path)? {
-        collect_grep_matches(root, &entry?.path(), regex, glob, matches)?;
     }
     Ok(())
 }
@@ -1997,10 +2002,14 @@ fn collect_grep_line_matches(
     regex: &Regex,
     matches: &mut Vec<serde_json::Value>,
 ) -> std::io::Result<()> {
-    if path.is_file() {
-        let relative = path.strip_prefix(root).unwrap_or(path);
+    for entry in harness_fs::bounded_walk(path)? {
+        if entry.kind != WalkEntryKind::File {
+            continue;
+        }
+        let path = entry.path;
+        let relative = path.strip_prefix(root).unwrap_or(path.as_path());
         let relative_text = relative.to_string_lossy();
-        if let Ok(text) = std::fs::read_to_string(path) {
+        if let Some(text) = harness_fs::read_search_file(&path) {
             for (index, line) in text.lines().enumerate() {
                 if regex.is_match(line) {
                     matches.push(json!({
@@ -2013,13 +2022,6 @@ fn collect_grep_line_matches(
                 }
             }
         }
-        return Ok(());
-    }
-    if !path.is_dir() || is_ignored_dir(path) {
-        return Ok(());
-    }
-    for entry in std::fs::read_dir(path)? {
-        collect_grep_line_matches(root, &entry?.path(), regex, matches)?;
     }
     Ok(())
 }
@@ -2030,48 +2032,30 @@ fn collect_file_search_matches(
     query: &str,
     matches: &mut Vec<String>,
 ) -> std::io::Result<()> {
-    if path.is_file() {
-        let relative = path.strip_prefix(root).unwrap_or(path);
+    for entry in harness_fs::bounded_walk(path)? {
+        if entry.kind != WalkEntryKind::File {
+            continue;
+        }
+        let path = entry.path;
+        let relative = path.strip_prefix(root).unwrap_or(path.as_path());
         let relative_text = relative.to_string_lossy();
         if relative_text.contains(query) {
             matches.push(relative_text.to_string());
         }
-        return Ok(());
-    }
-    if !path.is_dir() || is_ignored_dir(path) {
-        return Ok(());
-    }
-    for entry in std::fs::read_dir(path)? {
-        collect_file_search_matches(root, &entry?.path(), query, matches)?;
     }
     matches.sort();
     Ok(())
 }
 
 fn count_searchable_files(root: &Path) -> usize {
-    fn walk(path: &Path, count: &mut usize) {
-        if path.is_file() {
-            *count += 1;
-            return;
-        }
-        if !path.is_dir() || is_ignored_dir(path) {
-            return;
-        }
-        if let Ok(entries) = std::fs::read_dir(path) {
-            for entry in entries.flatten() {
-                walk(&entry.path(), count);
-            }
-        }
-    }
-    let mut count = 0;
-    walk(root, &mut count);
-    count
-}
-
-fn is_ignored_dir(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| matches!(name, ".git" | "node_modules" | "target" | ".venv"))
+    harness_fs::bounded_walk(root)
+        .map(|entries| {
+            entries
+                .into_iter()
+                .filter(|entry| entry.kind == WalkEntryKind::File)
+                .count()
+        })
+        .unwrap_or(0)
 }
 
 fn simple_glob_matches(pattern: &str, relative_path: &str) -> bool {
@@ -2299,3 +2283,180 @@ The agent starts with no context from this conversation, so the prompt briefs it
 </commentary>
 </example>
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use codex_protocol::models::PermissionProfile;
+    use codex_protocol::protocol::FileSystemAccessMode;
+    use codex_protocol::protocol::FileSystemPath;
+    use codex_protocol::protocol::FileSystemSandboxEntry;
+    use codex_protocol::protocol::FileSystemSandboxPolicy;
+    use codex_protocol::protocol::NetworkSandboxPolicy;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use std::sync::Arc;
+    use tempfile::TempDir;
+    use tokio::sync::Mutex;
+    use tokio_util::sync::CancellationToken;
+
+    use crate::session::tests::make_session_and_context;
+    use crate::tools::context::ToolCallSource;
+    use crate::tools::registry::ToolExecutor;
+    use crate::turn_diff_tracker::TurnDiffTracker;
+
+    async fn invocation(
+        workspace: &TempDir,
+        tool_name: &str,
+        args: serde_json::Value,
+    ) -> ToolInvocation {
+        let (session, mut turn) = make_session_and_context().await;
+        let workspace_root = codex_utils_absolute_path::AbsolutePathBuf::from_absolute_path(
+            std::fs::canonicalize(workspace.path()).expect("workspace path should canonicalize"),
+        )
+        .expect("workspace path should be absolute");
+        #[allow(deprecated)]
+        {
+            turn.cwd = workspace_root.clone();
+        }
+        turn.environments.turn_environments[0].cwd = workspace_root.clone();
+        let file_system_sandbox_policy =
+            FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry {
+                path: FileSystemPath::Path {
+                    path: workspace_root,
+                },
+                access: FileSystemAccessMode::Write,
+            }]);
+        turn.permission_profile = PermissionProfile::from_runtime_permissions(
+            &file_system_sandbox_policy,
+            NetworkSandboxPolicy::Restricted,
+        );
+        ToolInvocation {
+            session: session.into(),
+            turn: turn.into(),
+            cancellation_token: CancellationToken::new(),
+            tracker: Arc::new(Mutex::new(TurnDiffTracker::new())),
+            call_id: "call-harness-alias".to_string(),
+            tool_name: codex_tools::ToolName::plain(tool_name),
+            source: ToolCallSource::Direct,
+            payload: ToolPayload::Function {
+                arguments: args.to_string(),
+            },
+        }
+    }
+
+    async fn handle_text(
+        workspace: &TempDir,
+        handler: HarnessAliasHandler,
+        tool_name: &str,
+        args: serde_json::Value,
+    ) -> Result<String, FunctionCallError> {
+        let invocation = invocation(workspace, tool_name, args).await;
+        let output = handler.handle(invocation).await?;
+        Ok(output.log_preview())
+    }
+
+    #[tokio::test]
+    async fn read_alias_denies_paths_outside_workspace_policy() {
+        let workspace = tempfile::tempdir().expect("workspace temp dir");
+        let outside = tempfile::tempdir().expect("outside temp dir");
+        let outside_file = outside.path().join("secret.txt");
+        std::fs::write(&outside_file, "secret").expect("write outside file");
+
+        let err = handle_text(
+            &workspace,
+            HarnessAliasHandler::Read,
+            "Read",
+            json!({ "path": outside_file }),
+        )
+        .await
+        .expect_err("read outside workspace should fail");
+
+        assert!(
+            matches!(&err, FunctionCallError::RespondToModel(message) if message.contains("sandbox policy denied read access")),
+            "unexpected error: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn write_alias_denies_paths_outside_workspace_policy() {
+        let workspace = tempfile::tempdir().expect("workspace temp dir");
+        let outside = tempfile::tempdir().expect("outside temp dir");
+        let outside_file = outside.path().join("created.txt");
+
+        let err = handle_text(
+            &workspace,
+            HarnessAliasHandler::Write,
+            "Write",
+            json!({ "path": outside_file, "content": "secret" }),
+        )
+        .await
+        .expect_err("write outside workspace should fail");
+
+        assert!(
+            matches!(&err, FunctionCallError::RespondToModel(message) if message.contains("sandbox policy denied write access")),
+            "unexpected error: {err:?}"
+        );
+        assert!(!outside_file.exists());
+    }
+
+    #[tokio::test]
+    async fn write_alias_denies_symlink_escape() {
+        let workspace = tempfile::tempdir().expect("workspace temp dir");
+        let outside = tempfile::tempdir().expect("outside temp dir");
+        let outside_file = outside.path().join("target.txt");
+        std::fs::write(&outside_file, "original").expect("write outside file");
+        let symlink = workspace.path().join("link.txt");
+        create_symlink(&outside_file, &symlink);
+
+        let err = handle_text(
+            &workspace,
+            HarnessAliasHandler::Write,
+            "Write",
+            json!({ "path": "link.txt", "content": "changed" }),
+        )
+        .await
+        .expect_err("write through outside symlink should fail");
+
+        assert!(
+            matches!(&err, FunctionCallError::RespondToModel(message) if message.contains("sandbox policy denied write access")),
+            "unexpected error: {err:?}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&outside_file).expect("read outside file"),
+            "original"
+        );
+    }
+
+    #[tokio::test]
+    async fn grep_alias_skips_symlink_cycles() {
+        let workspace = tempfile::tempdir().expect("workspace temp dir");
+        std::fs::write(workspace.path().join("real.txt"), "NEEDLE\n").expect("write real file");
+        create_symlink(workspace.path(), &workspace.path().join("loop"));
+
+        let output = handle_text(
+            &workspace,
+            HarnessAliasHandler::Grep,
+            "Grep",
+            json!({ "pattern": "NEEDLE" }),
+        )
+        .await
+        .expect("grep succeeds");
+
+        assert_eq!(output, "real.txt");
+    }
+
+    #[cfg(unix)]
+    fn create_symlink(original: &Path, link: &Path) {
+        std::os::unix::fs::symlink(original, link).expect("create symlink");
+    }
+
+    #[cfg(windows)]
+    fn create_symlink(original: &Path, link: &Path) {
+        if original.is_dir() {
+            std::os::windows::fs::symlink_dir(original, link).expect("create dir symlink");
+        } else {
+            std::os::windows::fs::symlink_file(original, link).expect("create file symlink");
+        }
+    }
+}

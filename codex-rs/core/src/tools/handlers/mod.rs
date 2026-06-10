@@ -5,6 +5,7 @@ pub(crate) mod apply_patch_spec;
 mod dynamic;
 pub(crate) mod extension_tools;
 mod harness_aliases;
+mod harness_fs;
 mod list_available_plugins_to_install;
 pub(crate) mod list_available_plugins_to_install_spec;
 mod mcp;
