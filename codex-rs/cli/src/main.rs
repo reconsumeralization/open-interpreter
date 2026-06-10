@@ -95,9 +95,10 @@ use codex_terminal_detection::TerminalName;
     subcommand_negates_reqs = true,
     // The executable is sometimes invoked via a platform‑specific name like
     // `codex-x86_64-unknown-linux-musl`, but the help output should always use
-    // the generic `codex` command name that users run.
-    bin_name = "codex",
-    override_usage = "codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND> [ARGS]"
+    // the generic command name users run: `codex`, or `interpreter` when this
+    // binary ships as Open Interpreter.
+    bin_name = product_command_name(),
+    override_usage = product_usage()
 )]
 struct MultitoolCli {
     #[clap(flatten)]
@@ -916,6 +917,15 @@ fn stage_str(stage: Stage) -> &'static str {
         Stage::Deprecated => "deprecated",
         Stage::Removed => "removed",
     }
+}
+
+fn product_command_name() -> &'static str {
+    codex_product_info::Product::current().command_name()
+}
+
+fn product_usage() -> String {
+    let command = product_command_name();
+    format!("{command} [OPTIONS] [PROMPT]\n       {command} [OPTIONS] <COMMAND> [ARGS]")
 }
 
 fn main() -> anyhow::Result<()> {
@@ -2144,6 +2154,28 @@ fn read_remote_auth_token_from_env_var(env_var_name: &str) -> anyhow::Result<Str
     read_remote_auth_token_from_env_var_with(env_var_name, |name| std::env::var(name))
 }
 
+const DEFAULT_MODE_REQUEST_USER_INPUT_OVERRIDE: &str =
+    "features.default_mode_request_user_input=true";
+
+/// Open Interpreter enables `request_user_input` in the default mode. Applied
+/// here, before config load, so an explicit user override still wins.
+fn apply_open_interpreter_feature_defaults(config_overrides: &mut CliConfigOverrides) {
+    if codex_product_info::Product::current() != codex_product_info::Product::OpenInterpreter {
+        return;
+    }
+    if config_overrides.raw_overrides.iter().all(|override_entry| {
+        let key = override_entry
+            .split_once('=')
+            .map_or(override_entry.as_str(), |(path, _)| path)
+            .trim();
+        key != "features.default_mode_request_user_input"
+    }) {
+        config_overrides
+            .raw_overrides
+            .push(DEFAULT_MODE_REQUEST_USER_INPUT_OVERRIDE.to_string());
+    }
+}
+
 async fn run_interactive_tui(
     mut interactive: TuiCli,
     remote: Option<String>,
@@ -2154,6 +2186,8 @@ async fn run_interactive_tui(
         // Normalize CRLF/CR to LF so CLI-provided text can't leak `\r` into TUI state.
         interactive.prompt = Some(prompt.replace("\r\n", "\n").replace('\r', "\n"));
     }
+
+    apply_open_interpreter_feature_defaults(&mut interactive.config_overrides);
 
     let terminal_info = codex_terminal_detection::terminal_info();
     if terminal_info.name == TerminalName::Dumb {

@@ -116,7 +116,6 @@ replace_symlink "$current_link/bin/interpreter" "$install_dir/i"
 echo
 echo "Built and staged:"
 echo "  $package_dir/bin/interpreter"
-echo "  $package_dir/bin/codex"
 echo
 echo "Installed shims:"
 echo "  $install_dir/interpreter -> $current_link/bin/interpreter"

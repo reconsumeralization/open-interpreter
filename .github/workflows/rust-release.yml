@@ -92,7 +92,7 @@ jobs:
             target: aarch64-apple-darwin
             bundle: open-interpreter
             artifact_name: aarch64-apple-darwin-open-interpreter
-            binaries: "codex interpreter-root-tui"
+            binaries: "codex"
             build_dmg: "false"
           - runner: macos-15-xlarge
             target: x86_64-apple-darwin
@@ -110,7 +110,7 @@ jobs:
             target: x86_64-apple-darwin
             bundle: open-interpreter
             artifact_name: x86_64-apple-darwin-open-interpreter
-            binaries: "codex interpreter-root-tui"
+            binaries: "codex"
             build_dmg: "false"
           # Release artifacts intentionally ship MUSL-linked Linux binaries.
           - runner: ${{ github.event.repository.name }}-linux-x64-xl
@@ -129,7 +129,7 @@ jobs:
             target: x86_64-unknown-linux-musl
             bundle: open-interpreter
             artifact_name: x86_64-unknown-linux-musl-open-interpreter
-            binaries: "codex interpreter-root-tui bwrap"
+            binaries: "codex bwrap"
             build_dmg: "false"
           - runner: ${{ github.event.repository.name }}-linux-arm64
             target: aarch64-unknown-linux-musl
@@ -147,7 +147,7 @@ jobs:
             target: aarch64-unknown-linux-musl
             bundle: open-interpreter
             artifact_name: aarch64-unknown-linux-musl-open-interpreter
-            binaries: "codex interpreter-root-tui bwrap"
+            binaries: "codex bwrap"
             build_dmg: "false"
 
     steps:
@@ -1084,7 +1084,7 @@ jobs:
           - target: aarch64-apple-darwin
             bundle: open-interpreter
             artifact_name: aarch64-apple-darwin-open-interpreter
-            binaries: "codex interpreter-root-tui"
+            binaries: "codex"
             build_dmg: "false"
           - target: x86_64-apple-darwin
             bundle: primary
@@ -1099,7 +1099,7 @@ jobs:
           - target: x86_64-apple-darwin
             bundle: open-interpreter
             artifact_name: x86_64-apple-darwin-open-interpreter
-            binaries: "codex interpreter-root-tui"
+            binaries: "codex"
             build_dmg: "false"
 
     steps:

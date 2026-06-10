@@ -95,9 +95,9 @@ fn managed_codex_bin_falls_back_to_sibling_binary_for_source_tree_debug() {
     let codex_home = TempDir::new().expect("codex home");
     let debug_dir = TempDir::new().expect("debug dir");
     let current_exe = debug_dir.path().join(if cfg!(windows) {
-        "interpreter-root-tui.exe"
+        "interpreter.exe"
     } else {
-        "interpreter-root-tui"
+        "interpreter"
     });
     let sibling_codex = debug_dir
         .path()

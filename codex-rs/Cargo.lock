@@ -2402,6 +2402,7 @@ dependencies = [
  "codex-model-provider",
  "codex-models-manager",
  "codex-plugin",
+ "codex-product-info",
  "codex-protocol",
  "codex-responses-api-proxy",
  "codex-rmcp-client",
@@ -3787,23 +3788,6 @@ dependencies = [
  "tempfile",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "codex-root-tui"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "clap",
- "codex-app-server-daemon",
- "codex-arg0",
- "codex-config",
- "codex-product-info",
- "codex-tui",
- "codex-utils-absolute-path",
- "codex-utils-cli",
- "pretty_assertions",
- "tempfile",
 ]
 
 [[package]]

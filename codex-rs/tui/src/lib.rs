@@ -1925,13 +1925,20 @@ impl Drop for TerminalRestoreGuard {
 /// - Otherwise, respect the `tui.alternate_screen` config setting:
 ///   - `always`: Use alternate screen
 ///   - `never`: Inline mode only, preserves scrollback
-///   - `auto` (default): Use alternate screen
+///   - `auto` (default): Use alternate screen for Codex; Open Interpreter
+///     deliberately starts inline to preserve terminal scrollback
 fn determine_alt_screen_mode(no_alt_screen: bool, tui_alternate_screen: AltScreenMode) -> bool {
     if no_alt_screen {
         return false;
     }
 
-    tui_alternate_screen != AltScreenMode::Never
+    match tui_alternate_screen {
+        AltScreenMode::Always => true,
+        AltScreenMode::Never => false,
+        AltScreenMode::Auto => {
+            codex_product_info::Product::current() != codex_product_info::Product::OpenInterpreter
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

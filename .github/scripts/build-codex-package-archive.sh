@@ -98,7 +98,7 @@ case "$bundle" in
     ;;
   open-interpreter)
     variant="open-interpreter"
-    entrypoint="interpreter-root-tui"
+    entrypoint="codex"
     archive_stem="open-interpreter-package"
     ;;
   *)

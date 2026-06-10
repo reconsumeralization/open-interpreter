@@ -16,14 +16,14 @@ from codex_package.targets import TARGET_SPECS
 
 
 class PackageLayoutTest(unittest.TestCase):
-    def test_open_interpreter_package_contains_entrypoint_and_managed_codex(
+    def test_open_interpreter_package_contains_single_multitool_entrypoint(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             inputs = PackageInputs(
                 entrypoint_bin=touch_executable(root / "interpreter"),
-                managed_codex_bin=touch_executable(root / "codex"),
+                managed_codex_bin=None,
                 rg_bin=touch_executable(root / "rg"),
                 zsh_bin=None,
                 bwrap_bin=touch_executable(root / "bwrap"),
@@ -52,10 +52,10 @@ class PackageLayoutTest(unittest.TestCase):
                 "interpreter",
             )
             self.assertEqual((package_dir / "bin" / "i").read_text(), "interpreter")
-            self.assertEqual((package_dir / "bin" / "codex").read_text(), "codex")
+            self.assertFalse((package_dir / "bin" / "codex").exists())
             metadata = (package_dir / "codex-package.json").read_text(encoding="utf-8")
             self.assertIn('"entrypoint": "bin/interpreter"', metadata)
-            self.assertIn('"managedCodex": "bin/codex"', metadata)
+            self.assertNotIn('"managedCodex"', metadata)
 
 
 def touch_executable(path: Path) -> Path:

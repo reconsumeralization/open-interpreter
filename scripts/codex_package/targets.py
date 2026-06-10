@@ -69,10 +69,9 @@ PACKAGE_VARIANTS: dict[str, PackageVariant] = {
     ),
     "open-interpreter": PackageVariant(
         name="open-interpreter",
-        cargo_bin="interpreter-root-tui",
+        cargo_bin="codex",
         executable_stem="interpreter",
         alias_stems=("i",),
-        managed_codex_required=True,
     ),
 }
 

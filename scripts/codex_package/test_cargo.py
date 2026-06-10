@@ -99,13 +99,14 @@ class SourceBinariesForTargetTest(unittest.TestCase):
         self.assertEqual(outputs.codex_command_runner_bin, command_runner)
         self.assertEqual(outputs.codex_windows_sandbox_setup_bin, sandbox_setup)
 
-    def test_open_interpreter_package_builds_managed_codex_when_missing(self) -> None:
+    def test_open_interpreter_package_uses_codex_multitool_entrypoint(self) -> None:
+        self.assertFalse(PACKAGE_VARIANTS["open-interpreter"].managed_codex_required)
         self.assertEqual(
             source_binaries_for_target(
                 TARGET_SPECS["aarch64-apple-darwin"],
                 PACKAGE_VARIANTS["open-interpreter"],
-                build_entrypoint=False,
-                build_managed_codex=True,
+                build_entrypoint=True,
+                build_managed_codex=False,
                 build_bwrap=False,
                 build_codex_command_runner=False,
                 build_codex_windows_sandbox_setup=False,
@@ -143,12 +144,9 @@ class SourceBinariesForTargetTest(unittest.TestCase):
 
         self.assertEqual(
             outputs.entrypoint_bin,
-            target_dir / "aarch64-apple-darwin" / "release" / "interpreter-root-tui",
-        )
-        self.assertEqual(
-            outputs.managed_codex_bin,
             target_dir / "aarch64-apple-darwin" / "release" / "codex",
         )
+        self.assertIsNone(outputs.managed_codex_bin)
 
 
 def touch_file(path: Path) -> Path:
@@ -181,7 +179,7 @@ def write_fake_cargo(path: Path) -> Path:
                 "done",
                 'out="${CARGO_TARGET_DIR}/${target}/${profile}"',
                 'mkdir -p "$out"',
-                'touch "$out/interpreter-root-tui" "$out/codex"',
+                'touch "$out/codex"',
                 "",
             ]
         ),
