@@ -141,6 +141,9 @@ enum Subcommand {
     /// Start Codex as an MCP server (stdio).
     McpServer(McpServerCommand),
 
+    /// [experimental] Run as an Agent Client Protocol (ACP) agent over stdio.
+    Acp,
+
     /// [experimental] Run the app server or related tooling.
     AppServer(AppServerCommand),
 
@@ -1019,6 +1022,14 @@ async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
                 strict_config || root_strict_config,
             )
             .await?;
+        }
+        Some(Subcommand::Acp) => {
+            reject_remote_mode_for_subcommand(
+                root_remote.as_deref(),
+                root_remote_auth_token_env.as_deref(),
+                "acp",
+            )?;
+            codex_acp_server::run_main(arg0_paths.clone()).await?;
         }
         Some(Subcommand::Mcp(mut mcp_cli)) => {
             reject_remote_mode_for_subcommand(
@@ -2043,6 +2054,7 @@ fn unsupported_subcommand_name_for_strict_config(
             Some(app_server_subcommand_name(app_server.subcommand.as_ref()))
         }
         Some(Subcommand::RemoteControl(remote_control)) => Some(remote_control.subcommand_name()),
+        Some(Subcommand::Acp) => Some("acp"),
         Some(Subcommand::Mcp(_)) => Some("mcp"),
         Some(Subcommand::Plugin(_)) => Some("plugin"),
         #[cfg(any(target_os = "macos", target_os = "windows"))]

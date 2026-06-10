@@ -2450,11 +2450,13 @@ dependencies = [
 name = "codex-cli"
 version = "0.0.11"
 dependencies = [
+ "agent-client-protocol",
  "anyhow",
  "assert_cmd",
  "assert_matches",
  "clap",
  "clap_complete",
+ "codex-acp-server",
  "codex-api",
  "codex-app-server",
  "codex-app-server-daemon",
@@ -2519,6 +2521,7 @@ dependencies = [
  "url",
  "which 8.0.0",
  "windows-sys 0.52.0",
+ "wiremock",
 ]
 
 [[package]]
