@@ -1,4 +1,3 @@
-use crate::proxy::CHAT_WIRE_UPSTREAM_URL_HEADER;
 use crate::request::ToolKinds;
 use crate::request::convert_request;
 use crate::stream::spawn_chat_stream;
@@ -26,6 +25,11 @@ use http::Method;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::instrument;
+
+/// Internal extra-header key carrying a per-request chat-completions upstream
+/// URL override. This never leaves the process as a real header; the compat
+/// client reads it to pick the upstream before building the provider request.
+pub const CHAT_WIRE_UPSTREAM_URL_HEADER: &str = "x-codex-chat-wire-upstream-url";
 
 pub struct ChatCompletionsCompatClient<T: HttpTransport> {
     transport: T,

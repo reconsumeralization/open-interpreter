@@ -2323,10 +2323,7 @@ dependencies = [
 name = "codex-chat-wire-compat"
 version = "0.0.0"
 dependencies = [
- "anyhow",
- "async-stream",
  "async-trait",
- "axum",
  "bytes",
  "codex-api",
  "codex-client",
@@ -2335,15 +2332,12 @@ dependencies = [
  "futures",
  "http 1.4.0",
  "pretty_assertions",
- "reqwest 0.12.28",
  "schemars 0.8.22",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
- "url",
  "wiremock",
- "zstd 0.13.3",
 ]
 
 [[package]]
