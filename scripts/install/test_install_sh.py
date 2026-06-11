@@ -60,7 +60,7 @@ class InstallShLatestResolutionTests(unittest.TestCase):
             fake_curl.write_text(
                 textwrap.dedent(
                     f"""\
-                    #!/bin/sh
+                    #!/usr/bin/env bash
                     url="${{@:$#}}"
                     case "$url" in
                       */releases?per_page=100)
