@@ -125,6 +125,10 @@ jobs:
       # Release runners have no sccache; an empty value overrides any
       # configured rustc wrapper, matching cargo-ci.
       RUSTC_WRAPPER: ""
+      # Cargo's libgit2 transport hangs fetching git dependencies with nested
+      # submodules (it wedged a release build for 5+ hours on a macOS runner).
+      # Use the system git CLI like the other cargo workflows.
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}

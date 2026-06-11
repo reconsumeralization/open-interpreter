@@ -24,6 +24,7 @@ jobs:
       # in the GitHub Actions cache, so unchanged crates restore instead of
       # recompiling. RUSTC_WRAPPER overrides the repo's .cargo/config wrapper.
       RUSTC_WRAPPER: sccache
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
       SCCACHE_GHA_ENABLED: "true"
       SCCACHE_CACHE_SIZE: 10G
     steps:
