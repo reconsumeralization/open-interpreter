@@ -6,7 +6,7 @@ usage() {
 Usage: scripts/build-interpreter-release.sh [--target <rust-target>] [--install-dir <dir>] [--home <dir>]
 
 Builds a local Open Interpreter standalone package using the same package
-layout as the public installer, stages it under OPEN_INTERPRETER_HOME, and
+layout as the public installer, stages it under INTERPRETER_HOME, and
 installs interpreter/i shims into the visible bin directory.
 EOF
 }
@@ -15,7 +15,7 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 codex_rs_dir="$repo_root/codex-rs"
 target=""
 install_dir="${OPEN_INTERPRETER_INSTALL_DIR:-${CODEX_INSTALL_DIR:-$HOME/.local/bin}}"
-interpreter_home="${OPEN_INTERPRETER_HOME:-${CODEX_HOME:-$HOME/.openinterpreter}}"
+interpreter_home="${INTERPRETER_HOME:-$HOME/.openinterpreter}"
 build_jobs="${CARGO_BUILD_JOBS:-1}"
 
 while [[ $# -gt 0 ]]; do

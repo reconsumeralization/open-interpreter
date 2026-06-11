@@ -1048,9 +1048,9 @@ esac
         .collect::<String>();
     format!(
         r##"set -e
-session="${{OPEN_INTERPRETER_TERMINUS_2_TMUX_SESSION:-oi-terminus-2-$(printf %s "${{OPEN_INTERPRETER_HOME:-${{CODEX_HOME:-$PWD}}}}" | cksum | awk '{{print $1}}')}}"
+session="${{INTERPRETER_TERMINUS_2_TMUX_SESSION:-oi-terminus-2-$(printf %s "${{INTERPRETER_HOME:-${{CODEX_HOME:-$PWD}}}}" | cksum | awk '{{print $1}}')}}"
 target="$session:0.0"
-state_dir="${{OPEN_INTERPRETER_HOME:-${{CODEX_HOME:-$PWD}}}}/.terminus-2"
+state_dir="${{INTERPRETER_HOME:-${{CODEX_HOME:-$PWD}}}}/.terminus-2"
 mkdir -p "$state_dir"
 previous_buffer_path="$state_dir/$session.previous-buffer"
 current_buffer_path="$state_dir/$session.current-buffer"

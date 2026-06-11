@@ -5,14 +5,13 @@ use std::path::PathBuf;
 
 const CODEX_HOME_ENV_VAR: &str = "CODEX_HOME";
 const INTERPRETER_HOME_ENV_VAR: &str = "INTERPRETER_HOME";
-const OPEN_INTERPRETER_HOME_ENV_VAR: &str = "OPEN_INTERPRETER_HOME";
 
 /// Returns the path to the Codex/Open Interpreter configuration directory.
 ///
 /// For `codex`, this can be specified by `CODEX_HOME` and defaults to
-/// `~/.codex`. For `interpreter`, `INTERPRETER_HOME` and
-/// `OPEN_INTERPRETER_HOME` are preferred before `CODEX_HOME`, and the default is
-/// `~/.openinterpreter`.
+/// `~/.codex`. For `interpreter`, the only honored override is
+/// `INTERPRETER_HOME` and the default is `~/.openinterpreter`; `CODEX_HOME`
+/// is deliberately ignored so the two products stay isolated.
 ///
 /// - If an env override is set, the value must exist and be a directory. The
 ///   value will be canonicalized and this function will Err otherwise.
@@ -21,28 +20,18 @@ const OPEN_INTERPRETER_HOME_ENV_VAR: &str = "OPEN_INTERPRETER_HOME";
 pub fn find_codex_home() -> std::io::Result<AbsolutePathBuf> {
     let codex_home_env = env_override(CODEX_HOME_ENV_VAR);
     let interpreter_home_env = env_override(INTERPRETER_HOME_ENV_VAR);
-    let open_interpreter_home_env = env_override(OPEN_INTERPRETER_HOME_ENV_VAR);
-    find_codex_home_from_env(
-        interpreter_home_env.as_deref(),
-        open_interpreter_home_env.as_deref(),
-        codex_home_env.as_deref(),
-    )
+    find_codex_home_from_env(interpreter_home_env.as_deref(), codex_home_env.as_deref())
 }
 
 fn find_codex_home_from_env(
     interpreter_home_env: Option<&str>,
-    open_interpreter_home_env: Option<&str>,
     codex_home_env: Option<&str>,
 ) -> std::io::Result<AbsolutePathBuf> {
     // Open Interpreter deliberately does not honor CODEX_HOME: sharing the
     // Codex home leaks Codex config, update caches, and credentials into the
     // Interpreter identity. Migration goes through the explicit /import flow.
     let env_home = if is_open_interpreter_argv0() {
-        interpreter_home_env
-            .map(|value| (INTERPRETER_HOME_ENV_VAR, value))
-            .or_else(|| {
-                open_interpreter_home_env.map(|value| (OPEN_INTERPRETER_HOME_ENV_VAR, value))
-            })
+        interpreter_home_env.map(|value| (INTERPRETER_HOME_ENV_VAR, value))
     } else {
         codex_home_env.map(|value| (CODEX_HOME_ENV_VAR, value))
     };
@@ -133,7 +122,6 @@ mod tests {
 
         let err = find_codex_home_from_env(
             /*interpreter_home_env*/ None,
-            /*open_interpreter_home_env*/ None,
             Some(missing_str),
         )
         .expect_err("missing CODEX_HOME");
@@ -155,7 +143,6 @@ mod tests {
 
         let err = find_codex_home_from_env(
             /*interpreter_home_env*/ None,
-            /*open_interpreter_home_env*/ None,
             Some(file_str),
         )
         .expect_err("file CODEX_HOME");
@@ -176,7 +163,6 @@ mod tests {
 
         let resolved = find_codex_home_from_env(
             /*interpreter_home_env*/ None,
-            /*open_interpreter_home_env*/ None,
             Some(temp_str),
         )
         .expect("valid CODEX_HOME");
@@ -191,7 +177,7 @@ mod tests {
     #[test]
     fn find_codex_home_without_env_uses_default_home_dir() {
         let resolved = find_codex_home_from_env(
-            /*interpreter_home_env*/ None, /*open_interpreter_home_env*/ None,
+            /*interpreter_home_env*/ None,
             /*codex_home_env*/ None,
         )
         .expect("default CODEX_HOME");

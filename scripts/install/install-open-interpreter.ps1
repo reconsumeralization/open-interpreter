@@ -43,14 +43,14 @@ $env:CODEX_RELEASE_TAG_PREFIX = if ([string]::IsNullOrWhiteSpace($env:CODEX_RELE
 } else {
     $env:CODEX_RELEASE_TAG_PREFIX
 }
-$env:CODEX_HOME = if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_HOME)) {
+$env:CODEX_HOME = if ([string]::IsNullOrWhiteSpace($env:INTERPRETER_HOME)) {
     if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
         Join-Path $env:USERPROFILE ".openinterpreter"
     } else {
         $env:CODEX_HOME
     }
 } else {
-    $env:OPEN_INTERPRETER_HOME
+    $env:INTERPRETER_HOME
 }
 $env:CODEX_INSTALL_DIR = if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_INSTALL_DIR)) {
     if ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_DIR)) {
