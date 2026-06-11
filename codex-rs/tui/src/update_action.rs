@@ -25,10 +25,22 @@ pub enum UpdateAction {
 impl UpdateAction {
     #[cfg(any(not(debug_assertions), test))]
     pub(crate) fn from_install_context(context: &InstallContext) -> Option<Self> {
+        Self::from_install_context_for_product(codex_product_info::Product::current(), context)
+    }
+
+    #[cfg(any(not(debug_assertions), test))]
+    fn from_install_context_for_product(
+        product: codex_product_info::Product,
+        context: &InstallContext,
+    ) -> Option<Self> {
+        let is_codex = product == codex_product_info::Product::Codex;
         match &context.method {
-            InstallMethod::Npm => Some(UpdateAction::NpmGlobalLatest),
-            InstallMethod::Bun => Some(UpdateAction::BunGlobalLatest),
-            InstallMethod::Brew => Some(UpdateAction::BrewUpgrade),
+            // npm, bun, and Homebrew distribute Codex; Open Interpreter ships
+            // only the standalone package and must never offer to "update" by
+            // installing OpenAI's Codex.
+            InstallMethod::Npm => is_codex.then_some(UpdateAction::NpmGlobalLatest),
+            InstallMethod::Bun => is_codex.then_some(UpdateAction::BunGlobalLatest),
+            InstallMethod::Brew => is_codex.then_some(UpdateAction::BrewUpgrade),
             InstallMethod::Standalone { platform, .. } => Some(match platform {
                 StandalonePlatform::Unix => UpdateAction::StandaloneUnix,
                 StandalonePlatform::Windows => UpdateAction::StandaloneWindows,
@@ -81,6 +93,39 @@ mod tests {
     use super::*;
     use codex_utils_absolute_path::AbsolutePathBuf;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn open_interpreter_never_updates_through_codex_channels() {
+        for method in [InstallMethod::Npm, InstallMethod::Bun, InstallMethod::Brew] {
+            assert_eq!(
+                UpdateAction::from_install_context_for_product(
+                    codex_product_info::Product::OpenInterpreter,
+                    &InstallContext {
+                        method,
+                        package_layout: None,
+                    }
+                ),
+                None
+            );
+        }
+        let release_dir =
+            AbsolutePathBuf::from_absolute_path(std::env::temp_dir().join("oi-release"))
+                .expect("temp dir path should be absolute");
+        assert_eq!(
+            UpdateAction::from_install_context_for_product(
+                codex_product_info::Product::OpenInterpreter,
+                &InstallContext {
+                    method: InstallMethod::Standalone {
+                        release_dir,
+                        resources_dir: None,
+                        platform: StandalonePlatform::Unix,
+                    },
+                    package_layout: None,
+                }
+            ),
+            Some(UpdateAction::StandaloneUnix)
+        );
+    }
 
     #[test]
     fn maps_install_context_to_update_action() {

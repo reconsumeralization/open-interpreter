@@ -118,8 +118,14 @@ impl InstallContext {
     pub fn current() -> &'static Self {
         INSTALL_CONTEXT.get_or_init(|| {
             let current_exe = std::env::current_exe().ok();
-            let managed_by_npm = std::env::var_os("CODEX_MANAGED_BY_NPM").is_some();
-            let managed_by_bun = std::env::var_os("CODEX_MANAGED_BY_BUN").is_some();
+            // The npm/bun wrapper env markers describe a Codex install; an
+            // Open Interpreter binary inheriting them from the environment
+            // (for example through a long-lived tmux server) must not adopt
+            // a Codex install identity.
+            let is_codex =
+                codex_product_info::Product::current() == codex_product_info::Product::Codex;
+            let managed_by_npm = is_codex && std::env::var_os("CODEX_MANAGED_BY_NPM").is_some();
+            let managed_by_bun = is_codex && std::env::var_os("CODEX_MANAGED_BY_BUN").is_some();
             Self::from_exe(
                 cfg!(target_os = "macos"),
                 current_exe.as_deref(),

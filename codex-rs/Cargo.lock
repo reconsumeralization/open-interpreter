@@ -3283,6 +3283,7 @@ dependencies = [
 name = "codex-install-context"
 version = "0.0.11"
 dependencies = [
+ "codex-product-info",
  "codex-utils-absolute-path",
  "codex-utils-home-dir",
  "pretty_assertions",
