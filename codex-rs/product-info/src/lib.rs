@@ -128,7 +128,7 @@ pub fn is_open_interpreter_argv0() -> bool {
                 .and_then(|name| name.to_str())
                 .map(str::to_owned)
         })
-        .is_some_and(|name| name.starts_with("interpreter"))
+        .is_some_and(|name| name.starts_with("interpreter") || name == "i")
 }
 
 #[cfg(test)]
