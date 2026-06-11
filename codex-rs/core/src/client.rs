@@ -2172,6 +2172,7 @@ impl ModelClientSession {
             }
             StreamTransportRoute::ChatCompletionsCompat => {
                 self.stream_responses_api(
+                    window_id,
                     prompt,
                     model_info,
                     session_telemetry,

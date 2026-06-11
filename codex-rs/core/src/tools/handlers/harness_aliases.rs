@@ -108,7 +108,6 @@ pub enum HarnessAliasHandler {
     OpenCodeTodoWrite,
 }
 
-#[async_trait::async_trait]
 impl ToolExecutor<ToolInvocation> for HarnessAliasHandler {
     fn tool_name(&self) -> ToolName {
         ToolName::plain(match self {
@@ -157,7 +156,13 @@ impl ToolExecutor<ToolInvocation> for HarnessAliasHandler {
         !matches!(self, Self::Edit | Self::Write | Self::AskUserQuestion)
     }
 
-    async fn handle(
+    fn handle(&self, invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'_> {
+        Box::pin(self.handle_call(invocation))
+    }
+}
+
+impl HarnessAliasHandler {
+    async fn handle_call(
         &self,
         invocation: ToolInvocation,
     ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
