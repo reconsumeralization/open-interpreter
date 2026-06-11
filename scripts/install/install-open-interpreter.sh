@@ -6,7 +6,7 @@ script_name="$(basename -- "$0")"
 script_dir=""
 case "$script_name" in
   install.sh | install-open-interpreter.sh)
-    script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+    script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
     ;;
 esac
 
