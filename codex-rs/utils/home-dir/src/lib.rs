@@ -1,6 +1,5 @@
 use codex_utils_absolute_path::AbsolutePathBuf;
 use dirs::home_dir;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 
 const CODEX_HOME_ENV_VAR: &str = "CODEX_HOME";
@@ -30,7 +29,7 @@ fn find_codex_home_from_env(
     // Open Interpreter deliberately does not honor CODEX_HOME: sharing the
     // Codex home leaks Codex config, update caches, and credentials into the
     // Interpreter identity. Migration goes through the explicit /import flow.
-    let env_home = if is_open_interpreter_argv0() {
+    let env_home = if is_open_interpreter() {
         interpreter_home_env.map(|value| (INTERPRETER_HOME_ENV_VAR, value))
     } else {
         codex_home_env.map(|value| (CODEX_HOME_ENV_VAR, value))
@@ -83,23 +82,15 @@ fn env_override(name: &str) -> Option<String> {
 }
 
 fn default_home_dir_name() -> &'static str {
-    if is_open_interpreter_argv0() {
+    if is_open_interpreter() {
         ".openinterpreter"
     } else {
         ".codex"
     }
 }
 
-fn is_open_interpreter_argv0() -> bool {
-    std::env::args_os()
-        .next()
-        .and_then(|arg0| {
-            std::path::Path::new(&arg0)
-                .file_stem()
-                .and_then(OsStr::to_str)
-                .map(str::to_owned)
-        })
-        .is_some_and(|name| name.starts_with("interpreter"))
+fn is_open_interpreter() -> bool {
+    codex_product_info::Product::current() == codex_product_info::Product::OpenInterpreter
 }
 
 #[cfg(test)]
@@ -120,11 +111,8 @@ mod tests {
             .to_str()
             .expect("missing codex home path should be valid utf-8");
 
-        let err = find_codex_home_from_env(
-            /*interpreter_home_env*/ None,
-            Some(missing_str),
-        )
-        .expect_err("missing CODEX_HOME");
+        let err = find_codex_home_from_env(/*interpreter_home_env*/ None, Some(missing_str))
+            .expect_err("missing CODEX_HOME");
         assert_eq!(err.kind(), ErrorKind::NotFound);
         assert!(
             err.to_string().contains("CODEX_HOME"),
@@ -141,11 +129,8 @@ mod tests {
             .to_str()
             .expect("file codex home path should be valid utf-8");
 
-        let err = find_codex_home_from_env(
-            /*interpreter_home_env*/ None,
-            Some(file_str),
-        )
-        .expect_err("file CODEX_HOME");
+        let err = find_codex_home_from_env(/*interpreter_home_env*/ None, Some(file_str))
+            .expect_err("file CODEX_HOME");
         assert_eq!(err.kind(), ErrorKind::InvalidInput);
         assert!(
             err.to_string().contains("not a directory"),
@@ -161,11 +146,8 @@ mod tests {
             .to_str()
             .expect("temp codex home path should be valid utf-8");
 
-        let resolved = find_codex_home_from_env(
-            /*interpreter_home_env*/ None,
-            Some(temp_str),
-        )
-        .expect("valid CODEX_HOME");
+        let resolved = find_codex_home_from_env(/*interpreter_home_env*/ None, Some(temp_str))
+            .expect("valid CODEX_HOME");
         let expected = temp_home
             .path()
             .canonicalize()
@@ -177,8 +159,7 @@ mod tests {
     #[test]
     fn find_codex_home_without_env_uses_default_home_dir() {
         let resolved = find_codex_home_from_env(
-            /*interpreter_home_env*/ None,
-            /*codex_home_env*/ None,
+            /*interpreter_home_env*/ None, /*codex_home_env*/ None,
         )
         .expect("default CODEX_HOME");
         let mut expected = home_dir().expect("home dir");
