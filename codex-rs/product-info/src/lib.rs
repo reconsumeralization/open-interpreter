@@ -145,6 +145,10 @@ fn is_open_interpreter_install() -> bool {
     *IS_OPEN_INTERPRETER_INSTALL.get_or_init(|| {
         std::env::current_exe()
             .ok()
+            // current_exe can return the path the binary was invoked through
+            // (for example a symlink elsewhere); resolve to the real location
+            // so the package metadata next to the binary decides.
+            .map(|exe| exe.canonicalize().unwrap_or(exe))
             .is_some_and(|exe| executable_is_in_open_interpreter_package(&exe))
     })
 }
