@@ -9,8 +9,21 @@ use std::path::Path;
 use std::process::Command;
 
 fn run(bin: &Path, args: &[&str], envs: &[(&str, &str)], removed: &[&str]) -> (String, String) {
+    run_in(bin, args, envs, removed, None)
+}
+
+fn run_in(
+    bin: &Path,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    removed: &[&str],
+    cwd: Option<&Path>,
+) -> (String, String) {
     let mut command = Command::new(bin);
     command.args(args);
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
     for (key, value) in envs {
         command.env(key, value);
     }
@@ -82,6 +95,65 @@ fn codex_name_keeps_codex_identity_in_dev_builds() -> anyhow::Result<()> {
     assert!(
         stdout.starts_with("codex "),
         "dev codex binary should keep codex identity, got: {stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn i_alias_never_loads_codex_project_config() -> anyhow::Result<()> {
+    let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
+    let alias_dir = tempfile::tempdir()?;
+    let alias = alias_dir.path().join("i");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&codex_bin, &alias)?;
+    #[cfg(not(unix))]
+    std::fs::copy(&codex_bin, &alias)?;
+
+    let project = tempfile::tempdir()?;
+    let project_path = canonical_str(project.path());
+    let interpreter_home = tempfile::tempdir()?;
+    std::fs::write(
+        interpreter_home.path().join("config.toml"),
+        format!("[projects.\"{project_path}\"]\ntrust_level = \"trusted\"\n"),
+    )?;
+
+    // A repository's Codex configuration must never load as Interpreter
+    // project config.
+    std::fs::create_dir_all(project.path().join(".codex"))?;
+    std::fs::write(
+        project.path().join(".codex/config.toml"),
+        "model = \"codex-leak-canary\"\n",
+    )?;
+    let home_str = canonical_str(interpreter_home.path());
+    let envs = [("INTERPRETER_HOME", home_str.as_str())];
+    let (stdout, stderr) = run_in(
+        &alias,
+        &["doctor", "--json"],
+        &envs,
+        &[],
+        Some(project.path()),
+    );
+    assert!(
+        !stdout.contains("codex-leak-canary") && !stderr.contains("codex-leak-canary"),
+        "Interpreter must not load .codex project config; stdout: {stdout}"
+    );
+
+    // Interpreter's own project config folder does load.
+    std::fs::create_dir_all(project.path().join(".openinterpreter"))?;
+    std::fs::write(
+        project.path().join(".openinterpreter/config.toml"),
+        "model = \"interpreter-canary\"\n",
+    )?;
+    let (stdout, stderr) = run_in(
+        &alias,
+        &["doctor", "--json"],
+        &envs,
+        &[],
+        Some(project.path()),
+    );
+    assert!(
+        stdout.contains("interpreter-canary"),
+        "Interpreter should load .openinterpreter project config; stdout: {stdout}; stderr: {stderr}"
     );
     Ok(())
 }
