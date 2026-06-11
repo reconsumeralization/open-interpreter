@@ -138,9 +138,9 @@ pub(crate) fn build_chat_harness_request(
         }
         ChatHarnessRoute::Minimal => {
             let (request_body, tool_kinds) =
-                build_minimal_request(&guided_prompt, model_info, effort).map_err(
-                    |err| CodexErr::InvalidRequest(format!("invalid minimal request: {err}")),
-                )?;
+                build_minimal_request(&guided_prompt, model_info, effort).map_err(|err| {
+                    CodexErr::InvalidRequest(format!("invalid minimal request: {err}"))
+                })?;
             (request_body, tool_kinds, None, ChatHarnessPostprocess::None)
         }
         ChatHarnessRoute::OpenCode => {
@@ -163,14 +163,11 @@ pub(crate) fn build_chat_harness_request(
             (request_body, tool_kinds, None, ChatHarnessPostprocess::None)
         }
         ChatHarnessRoute::QwenCode => {
-            let (request_body, tool_kinds) = build_qwen_code_request(
-                &guided_prompt,
-                model_info,
-                effort,
-                thread_id,
-                yolo_mode,
-            )
-            .map_err(|err| CodexErr::InvalidRequest(format!("invalid qwen-code request: {err}")))?;
+            let (request_body, tool_kinds) =
+                build_qwen_code_request(&guided_prompt, model_info, effort, thread_id, yolo_mode)
+                    .map_err(|err| {
+                    CodexErr::InvalidRequest(format!("invalid qwen-code request: {err}"))
+                })?;
             (request_body, tool_kinds, None, ChatHarnessPostprocess::None)
         }
         ChatHarnessRoute::SweAgent => {
