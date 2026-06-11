@@ -49,17 +49,27 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
     })
 }
 
-// When we think we are current, check again on every startup. Otherwise a
-// release published just after the last check can stay hidden. A known pending
-// upgrade remains throttled so repeated launches do not keep hitting the network.
+// Open Interpreter: when we think we are current, check again on every
+// startup. Otherwise a release published just after the last check can stay
+// hidden. A known pending upgrade remains throttled so repeated launches do
+// not keep hitting the network. Codex keeps the upstream 20-hour throttle.
 fn should_check_for_update(info: Option<&VersionInfo>, now: DateTime<Utc>) -> bool {
-    match info {
-        None => true,
-        Some(info) => {
-            let pending = is_newer(&info.latest_version, CODEX_CLI_VERSION).unwrap_or(false);
-            !pending || info.last_checked_at < now - Duration::hours(1)
-        }
+    should_check_for_update_for_product(codex_product_info::Product::current(), info, now)
+}
+
+fn should_check_for_update_for_product(
+    product: codex_product_info::Product,
+    info: Option<&VersionInfo>,
+    now: DateTime<Utc>,
+) -> bool {
+    let Some(info) = info else {
+        return true;
+    };
+    if product != codex_product_info::Product::OpenInterpreter {
+        return info.last_checked_at < now - Duration::hours(20);
     }
+    let pending = is_newer(&info.latest_version, CODEX_CLI_VERSION).unwrap_or(false);
+    !pending || info.last_checked_at < now - Duration::hours(1)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -195,7 +205,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rechecks_each_startup_when_current_but_throttles_pending_upgrade() {
+    fn open_interpreter_rechecks_each_startup_but_throttles_pending_upgrade() {
+        use codex_product_info::Product;
+
         let now = Utc::now();
         let fresh = now - Duration::minutes(1);
         let info = |latest: &str, checked| VersionInfo {
@@ -204,14 +216,46 @@ mod tests {
             dismissed_version: None,
         };
 
-        assert!(should_check_for_update(None, now));
-        assert!(should_check_for_update(
+        let oi = Product::OpenInterpreter;
+        assert!(should_check_for_update_for_product(oi, None, now));
+        assert!(should_check_for_update_for_product(
+            oi,
             Some(&info(CODEX_CLI_VERSION, fresh)),
             now
         ));
-        assert!(!should_check_for_update(Some(&info("999.0.0", fresh)), now));
-        assert!(should_check_for_update(
+        assert!(!should_check_for_update_for_product(
+            oi,
+            Some(&info("999.0.0", fresh)),
+            now
+        ));
+        assert!(should_check_for_update_for_product(
+            oi,
             Some(&info("999.0.0", now - Duration::hours(2))),
+            now
+        ));
+    }
+
+    #[test]
+    fn codex_keeps_upstream_twenty_hour_throttle() {
+        use codex_product_info::Product;
+
+        let now = Utc::now();
+        let info = |checked| VersionInfo {
+            latest_version: CODEX_CLI_VERSION.to_string(),
+            last_checked_at: checked,
+            dismissed_version: None,
+        };
+
+        let codex = Product::Codex;
+        assert!(should_check_for_update_for_product(codex, None, now));
+        assert!(!should_check_for_update_for_product(
+            codex,
+            Some(&info(now - Duration::hours(1))),
+            now
+        ));
+        assert!(should_check_for_update_for_product(
+            codex,
+            Some(&info(now - Duration::hours(21))),
             now
         ));
     }

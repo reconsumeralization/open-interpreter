@@ -22,6 +22,8 @@
 
 > [!NOTE]
 > June 8th 2026: **Open Interpreter 1.0 is in pre-release.** Check out the [blog post](https://www.openinterpreter.com/blog/open-interpreter-1-0) and let us know what you think on [Discord](https://discord.gg/Hvz9Axh84z).
+>
+> This is the new Rust version of Open Interpreter. Looking for the original Python project? It lives on as a community-maintained fork at [endolith/open-interpreter](https://github.com/endolith/open-interpreter).
 
 ### Installation
 
@@ -70,9 +72,20 @@ Open Interpreter ships with a QA skill that lets any model operate and test inte
 - Switches providers and models from the TUI with `/model`.
 - Inspects or switches Rust-native model harnesses with `/harness`.
 - Tests web and native apps through the built-in QA skill.
-- Shares one local runtime across terminal tabs instead of starting a full agent runtime for every session.
+- Runs as an [Agent Client Protocol](https://agentclientprotocol.com/) agent for editors with `interpreter acp`.
 - Keeps config and session state local under `~/.openinterpreter`.
 - Supports `exec`, MCP, skills, hooks, permissions, and `AGENTS.md`.
+
+### Relationship to Codex
+
+Open Interpreter is built on [OpenAI's Codex](https://github.com/openai/codex)
+and continuously merges upstream Codex changes. The goal is to stay a small,
+focused layer on top of Codex rather than a divergent fork: everything we add
+falls into a handful of areas — native harness emulation (kept modular so new
+harnesses are easy to add), a broader model provider catalog, the Open
+Interpreter identity and release channel, and ACP support for editors.
+Everything else is upstream Codex, and we would rather reuse or upstream a
+change than carry it.
 
 ### Documentation
 
