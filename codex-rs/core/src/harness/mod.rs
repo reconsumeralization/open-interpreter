@@ -10,6 +10,7 @@ pub(crate) mod minimal;
 pub(crate) mod opencode;
 pub(crate) mod pi;
 pub(crate) mod qwen_code;
+pub(crate) mod request;
 pub(crate) mod routing;
 pub(crate) mod swe_agent;
 pub(crate) mod terminus_2;
