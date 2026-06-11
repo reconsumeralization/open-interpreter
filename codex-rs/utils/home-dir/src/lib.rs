@@ -34,13 +34,15 @@ fn find_codex_home_from_env(
     open_interpreter_home_env: Option<&str>,
     codex_home_env: Option<&str>,
 ) -> std::io::Result<AbsolutePathBuf> {
+    // Open Interpreter deliberately does not honor CODEX_HOME: sharing the
+    // Codex home leaks Codex config, update caches, and credentials into the
+    // Interpreter identity. Migration goes through the explicit /import flow.
     let env_home = if is_open_interpreter_argv0() {
         interpreter_home_env
             .map(|value| (INTERPRETER_HOME_ENV_VAR, value))
             .or_else(|| {
                 open_interpreter_home_env.map(|value| (OPEN_INTERPRETER_HOME_ENV_VAR, value))
             })
-            .or_else(|| codex_home_env.map(|value| (CODEX_HOME_ENV_VAR, value)))
     } else {
         codex_home_env.map(|value| (CODEX_HOME_ENV_VAR, value))
     };
