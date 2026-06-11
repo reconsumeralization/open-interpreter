@@ -85,9 +85,6 @@ use codex_protocol::protocol::AskForApproval;
 use codex_protocol::user_input::UserInput;
 use codex_terminal_detection::TerminalName;
 
-/// Codex CLI
-///
-/// If no subcommand is specified, options will be forwarded to the interactive CLI.
 #[derive(Debug, Parser)]
 #[clap(
     author,
@@ -97,8 +94,11 @@ use codex_terminal_detection::TerminalName;
     // The executable is sometimes invoked via a platform‑specific name like
     // `codex-x86_64-unknown-linux-musl`, but the help output should always use
     // the generic command name users run: `codex`, or `interpreter` when this
-    // binary ships as Open Interpreter.
+    // binary ships as Open Interpreter. The same product detection drives the
+    // version line and help description.
+    name = product_command_name(),
     bin_name = product_command_name(),
+    about = product_about(),
     override_usage = product_usage()
 )]
 struct MultitoolCli {
@@ -925,6 +925,16 @@ fn stage_str(stage: Stage) -> &'static str {
 
 fn product_command_name() -> &'static str {
     codex_product_info::Product::current().command_name()
+}
+
+fn product_about() -> String {
+    format!(
+        "{}\n\nIf no subcommand is specified, options will be forwarded to the interactive CLI.",
+        match codex_product_info::Product::current() {
+            codex_product_info::Product::Codex => "Codex CLI",
+            codex_product_info::Product::OpenInterpreter => "Open Interpreter",
+        }
+    )
 }
 
 fn product_usage() -> String {

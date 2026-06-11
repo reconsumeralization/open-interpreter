@@ -169,9 +169,6 @@ python_args=(
   --archive-output "$gzip_archive_path"
   --archive-output "$zstd_archive_path"
 )
-if [[ "$bundle" == "open-interpreter" ]]; then
-  python_args+=(--managed-codex-bin "${entrypoint_dir%/}/codex${exe_suffix}")
-fi
 if ((${#resource_args[@]} > 0)); then
   python_args+=("${resource_args[@]}")
 fi
