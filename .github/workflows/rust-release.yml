@@ -122,9 +122,12 @@ jobs:
       run:
         working-directory: codex-rs
     env:
-      # Release runners have no sccache; an empty value overrides any
-      # configured rustc wrapper, matching cargo-ci.
-      RUSTC_WRAPPER: ""
+      # Compiler cache, matching cargo-ci. GitHub-hosted macOS runners cannot
+      # cold-build this workspace inside the 6-hour job limit; sccache makes
+      # re-runs warm (a timed-out first run still populates the cache).
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_CACHE_SIZE: 10G
       # Cargo's libgit2 transport hangs fetching git dependencies with nested
       # submodules (it wedged a release build for 5+ hours on a macOS runner).
       # Use the system git CLI like the other cargo workflows.
@@ -141,6 +144,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
         with:
           targets: ${{ matrix.target }}
+
+      - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
       - name: Install musl build tools
         if: contains(matrix.target, 'unknown-linux-musl')
