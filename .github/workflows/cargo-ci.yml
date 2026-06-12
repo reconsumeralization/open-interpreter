@@ -36,7 +36,9 @@ jobs:
       - name: Free runner disk space
         run: |
           df -h /
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/hostedtoolcache/CodeQL \
+            /usr/local/.ghcup /usr/share/swift /usr/local/share/boost \
+            /usr/local/lib/node_modules /usr/local/julia* /opt/microsoft
           df -h /
       - name: Install Linux build dependencies
         run: |
