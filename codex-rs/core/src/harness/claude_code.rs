@@ -65,22 +65,6 @@ const CLAUDE_CODE_TITLE_PROMPT: &str = "Generate a concise, sentence-case title 
 const CLAUDE_CODE_TODO_REMINDER_STALENESS_THRESHOLD: usize = 10;
 const CLAUDE_CODE_TODO_UNUSED_REMINDER: &str = "<system-reminder>\nThe task tools haven't been used recently. If you're working on tasks that would benefit from tracking progress, consider using TaskCreate to add new tasks and TaskUpdate to update task status (set to in_progress when starting, completed when done). Also consider cleaning up the task list if it has become stale. Only use these if relevant to the current work. This is just a gentle reminder - ignore if not applicable.\n\n</system-reminder>";
 const CLAUDE_CODE_TODO_REMINDER_PREFIX: &str = "<system-reminder>\nThe task tools haven't been used recently. If you're working on tasks that would benefit from tracking progress, consider using TaskCreate to add new tasks and TaskUpdate to update task status (set to in_progress when starting, completed when done). Also consider cleaning up the task list if it has become stale. Only use these if relevant to the current work. This is just a gentle reminder - ignore if not applicable.\n\n\nHere are the existing contents of your task list:\n\n";
-const CLAUDE_REFERENCE_SKILLS_REMINDER: &str = r#"- deep-research: Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. - When the user wants a deep, multi-source, fact-checked research report on any topic. BEFORE invoking, check if the question is specific enough to research directly — if underspecified (e.g., "what car to buy" without budget/use-case/region), ask 2-3 clarifying questions to narrow scope. Then pass the refined question as args, weaving the answers in.
-- update-config: Use this skill to configure the Claude Code harness via settings.json. Automated behaviors ("from now on when X", "each time X", "whenever X", "before/after X") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions ("allow X", "add permission", "move permission to"), env vars ("set X=Y"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: "allow npm commands", "add bq permission to global settings", "move permission to user settings", "set DEBUG=true", "when claude stops show X". For simple settings like theme/model, suggest the /config command.
-- keybindings-help: Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: "rebind ctrl+s", "add a chord shortcut", "change the submit key", "customize keybindings".
-- verify: Verify that a code change actually does what it's supposed to by running the app and observing behavior. Use when asked to verify a PR, confirm a fix works, test a change manually, check that a feature works, or validate local changes before pushing.
-- code-review: Review the current diff for correctness bugs and reuse/simplification/efficiency cleanups at the given effort level (low/medium: fewer, high-confidence findings; high→max: broader coverage, may include uncertain findings). Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review.
-- simplify: Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.
-- fewer-permission-prompts: Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.
-- loop: Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo, defaults to 10m) - When the user wants to set up a recurring task, poll for status, or run something repeatedly on an interval (e.g. "check the deploy every 5 minutes", "keep running /babysit-prs"). Do NOT invoke for one-off tasks.
-- claude-api: Build, debug, and optimize Claude API / Anthropic SDK apps. Apps built with this skill should include prompt caching. Also handles migrating existing Claude API code between Claude model versions (4.5 → 4.6, 4.6 → 4.7, retired-model replacements).
-TRIGGER when: code imports `anthropic`/`@anthropic-ai/sdk`; user asks for the Claude API, Anthropic SDK, or Managed Agents; user adds/modifies/tunes a Claude feature (caching, thinking, compaction, tool use, batch, files, citations, memory) or model (Opus/Sonnet/Haiku) in a file; questions about prompt caching / cache hit rate in an Anthropic SDK project.
-SKIP: file imports `openai`/other-provider SDK, filename like `*-openai.py`/`*-generic.py`, provider-neutral code, general programming/ML.
-- run: Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).
-- init: Initialize a new CLAUDE.md file with codebase documentation
-- review: Review a pull request
-- security-review: Complete a security review of the pending changes on the current branch"#;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ClaudeCodeProfile {
     Full,
@@ -126,11 +110,14 @@ pub(crate) fn build_request_for_profile(
         session_source,
         Some(SessionSource::SubAgent(SubAgentSource::ThreadSpawn { .. }))
     );
-    let mut messages = build_messages(
-        &prompt.input,
-        !is_child_agent_request && !profile.is_bare(),
-        !profile.is_bare(),
-    )?;
+    let skills_rendering = if is_child_agent_request {
+        ClaudeCodeSkillsRendering::Omit
+    } else if profile.is_bare() {
+        ClaudeCodeSkillsRendering::NativePassthrough
+    } else {
+        ClaudeCodeSkillsRendering::SkillToolReminder
+    };
+    let mut messages = build_messages(&prompt.input, skills_rendering, !profile.is_bare())?;
     prepend_current_date_reminder(&mut messages);
     apply_message_cache_breakpoint(&mut messages);
     normalize_plain_text_messages(&mut messages);
@@ -403,9 +390,26 @@ fn current_local_date() -> chrono::NaiveDate {
     chrono::Local::now().date_naive()
 }
 
+/// How runtime skills (the `<skills_instructions>` developer message assembled
+/// above the harness layer) are surfaced to the model. Skills must never be
+/// dropped per-harness; each profile maps them to the closest shape it
+/// supports.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ClaudeCodeSkillsRendering {
+    /// Child-agent requests: the parent session already owns skill routing.
+    Omit,
+    /// Full profile: reshape into the captured `<system-reminder>` Skill-tool
+    /// list (`- name: description`).
+    SkillToolReminder,
+    /// Bare profile: no Skill tool exists, so pass the native
+    /// `<skills_instructions>` block through unchanged (it carries the
+    /// SKILL.md file paths the model can Read).
+    NativePassthrough,
+}
+
 fn build_messages(
     items: &[ResponseItem],
-    include_skills_reminder: bool,
+    skills_rendering: ClaudeCodeSkillsRendering,
     include_todo_reminders: bool,
 ) -> Result<Vec<AnthropicMessage>, serde_json::Error> {
     let mut messages = Vec::new();
@@ -474,9 +478,7 @@ fn build_messages(
                     let blocks = content
                         .iter()
                         .filter_map(|item| {
-                            include_skills_reminder
-                                .then(|| map_claude_code_developer_content_item(item))
-                                .flatten()
+                            map_claude_code_developer_content_item(item, skills_rendering)
                         })
                         .collect::<Vec<_>>();
                     push_message(&mut messages, "user", blocks);
@@ -898,14 +900,32 @@ fn parse_base64_data_url(url: &str) -> Option<(String, String)> {
     Some((media_type.to_string(), data.to_string()))
 }
 
-fn map_claude_code_developer_content_item(item: &ContentItem) -> Option<AnthropicContentBlock> {
+fn map_claude_code_developer_content_item(
+    item: &ContentItem,
+    skills_rendering: ClaudeCodeSkillsRendering,
+) -> Option<AnthropicContentBlock> {
     let ContentItem::InputText { text } = item else {
         return None;
     };
-    extract_claude_code_skills_reminder(text).map(|text| AnthropicContentBlock::Text {
-        text,
-        cache_control: None,
-    })
+    match skills_rendering {
+        ClaudeCodeSkillsRendering::Omit => None,
+        ClaudeCodeSkillsRendering::SkillToolReminder => extract_claude_code_skills_reminder(text)
+            .map(|text| AnthropicContentBlock::Text {
+                text,
+                cache_control: None,
+            }),
+        ClaudeCodeSkillsRendering::NativePassthrough => is_skills_instructions_text(text)
+            .then(|| AnthropicContentBlock::Text {
+                text: text.clone(),
+                cache_control: None,
+            }),
+    }
+}
+
+fn is_skills_instructions_text(text: &str) -> bool {
+    text.strip_prefix(SKILLS_INSTRUCTIONS_OPEN_TAG)
+        .and_then(|rest| rest.strip_suffix(SKILLS_INSTRUCTIONS_CLOSE_TAG))
+        .is_some()
 }
 
 fn extract_claude_code_skills_reminder(text: &str) -> Option<String> {
@@ -922,9 +942,27 @@ fn extract_claude_code_skills_reminder(text: &str) -> Option<String> {
     if available_skills.is_empty() {
         return None;
     }
+    let skills_list = available_skills
+        .lines()
+        .map(strip_skill_file_location)
+        .collect::<Vec<_>>()
+        .join("\n");
     Some(format!(
-        "<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n{CLAUDE_REFERENCE_SKILLS_REMINDER}\n</system-reminder>\n"
+        "<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n{skills_list}\n</system-reminder>\n"
     ))
+}
+
+/// Native skill lines render as `- name: description (file: /path/SKILL.md)`,
+/// while the Claude Code reminder lists skills as `- name: description`. Skill
+/// invocation goes through the Skill tool by name, so the file location is
+/// dropped here.
+fn strip_skill_file_location(line: &str) -> &str {
+    if !line.starts_with("- ") {
+        return line;
+    }
+    line.strip_suffix(')')
+        .and_then(|rest| rest.rsplit_once(" (file: "))
+        .map_or(line, |(head, _)| head.trim_end())
 }
 
 fn is_claude_code_skills_reminder_block(block: &AnthropicContentBlock) -> bool {
@@ -2767,9 +2805,8 @@ mod tests {
             request.messages[0].content,
             AnthropicMessageContent::Blocks(vec![
                 AnthropicContentBlock::Text {
-                    text: format!(
-                        "<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n{CLAUDE_REFERENCE_SKILLS_REMINDER}\n</system-reminder>\n"
-                    ),
+                    text: "<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- alpha: first skill\n- beta: second skill\n</system-reminder>\n"
+                        .to_string(),
                     cache_control: None,
                 },
                 AnthropicContentBlock::Text {
@@ -2784,6 +2821,94 @@ mod tests {
                     cache_control: Some(AnthropicCacheControl::ephemeral()),
                 },
             ])
+        );
+    }
+
+    fn skills_prompt(skills_instructions: &str) -> Prompt {
+        Prompt {
+            input: vec![
+                ResponseItem::Message {
+                    id: None,
+                    role: "developer".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: skills_instructions.to_string(),
+                    }],
+                    phase: None,
+                },
+                ResponseItem::Message {
+                    id: None,
+                    role: "user".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: "Run the QA pass".to_string(),
+                    }],
+                    phase: None,
+                },
+            ],
+            cwd: Some(PathBuf::from("/tmp/workspace")),
+            tools: vec![],
+            parallel_tool_calls: false,
+            base_instructions: BaseInstructions {
+                text: "ignored".to_string(),
+            },
+            personality: None,
+            output_schema: None,
+            output_schema_strict: true,
+        }
+    }
+
+    const QA_TESTING_SKILLS_INSTRUCTIONS: &str = "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file.\n### Available skills\n- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)\n### How to use skills\n- Discovery: ...\n</skills_instructions>";
+
+    #[test]
+    fn session_skills_replace_reference_skills_in_reminder() {
+        let prompt = skills_prompt(QA_TESTING_SKILLS_INSTRUCTIONS);
+
+        let request = build_request(
+            &prompt,
+            &test_model_info("claude-sonnet-4-6"),
+            None,
+            "session-123",
+            None,
+        )
+        .expect("build request");
+
+        let request_json = serde_json::to_string(&request).expect("serialize request");
+        let AnthropicMessageContent::Blocks(blocks) = &request.messages[0].content else {
+            panic!("expected blocks in first message");
+        };
+        let AnthropicContentBlock::Text { text, .. } = &blocks[0] else {
+            panic!("expected text block first");
+        };
+        assert_eq!(
+            text,
+            "<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- qa-testing: Run the project's QA test plan against a live build\n</system-reminder>\n"
+        );
+        // The captured reference-trace skills must not leak into the request.
+        assert!(!request_json.contains("update-config"));
+        assert!(!request_json.contains("claude-api"));
+    }
+
+    #[test]
+    fn bare_profile_passes_session_skills_through_natively() {
+        let prompt = skills_prompt(QA_TESTING_SKILLS_INSTRUCTIONS);
+
+        let request = build_request_for_profile(
+            &prompt,
+            &test_model_info("claude-sonnet-4-6"),
+            None,
+            "session-123",
+            None,
+            ClaudeCodeProfile::Bare,
+        )
+        .expect("build request");
+
+        let request_json = serde_json::to_string(&request).expect("serialize request");
+        assert!(request_json.contains("qa-testing"));
+        assert!(
+            request_json.contains("Run the project's QA test plan against a live build")
+        );
+        assert!(
+            request_json
+                .contains("(file: /home/user/skills/.system/qa-testing/SKILL.md)")
         );
     }
 
