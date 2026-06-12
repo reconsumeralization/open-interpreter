@@ -210,7 +210,9 @@ pub fn default_harness_for_provider_model(
         || provider_name.contains("deepseek")
         || base_url.contains("api.deepseek.com")
     {
-        return Some("deepseek-tui");
+        // Product decision: claude-code-bare gets the best results out of
+        // DeepSeek models; deepseek-tui remains selectable via /harness.
+        return Some("claude-code-bare");
     }
 
     None
