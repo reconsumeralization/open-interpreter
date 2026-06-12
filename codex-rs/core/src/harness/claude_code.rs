@@ -914,11 +914,12 @@ fn map_claude_code_developer_content_item(
                 text,
                 cache_control: None,
             }),
-        ClaudeCodeSkillsRendering::NativePassthrough => is_skills_instructions_text(text)
-            .then(|| AnthropicContentBlock::Text {
+        ClaudeCodeSkillsRendering::NativePassthrough => {
+            is_skills_instructions_text(text).then(|| AnthropicContentBlock::Text {
                 text: text.clone(),
                 cache_control: None,
-            }),
+            })
+        }
     }
 }
 
@@ -2903,13 +2904,8 @@ mod tests {
 
         let request_json = serde_json::to_string(&request).expect("serialize request");
         assert!(request_json.contains("qa-testing"));
-        assert!(
-            request_json.contains("Run the project's QA test plan against a live build")
-        );
-        assert!(
-            request_json
-                .contains("(file: /home/user/skills/.system/qa-testing/SKILL.md)")
-        );
+        assert!(request_json.contains("Run the project's QA test plan against a live build"));
+        assert!(request_json.contains("(file: /home/user/skills/.system/qa-testing/SKILL.md)"));
     }
 
     #[test]

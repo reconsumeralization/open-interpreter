@@ -211,7 +211,27 @@ fn build_messages(
                         }));
                     }
                 }
-                "developer" => {}
+                // The opencode wire format has no developer role. Per the
+                // workspace harness instruction-role rule, developer messages
+                // (including the `<skills_instructions>` block assembled above
+                // the harness layer) map to user-role content instead of being
+                // dropped.
+                "developer" => {
+                    discard_unanswered_tool_calls(
+                        &mut pending_tool_calls,
+                        &mut awaiting_tool_call_ids,
+                        &mut pending_assistant_content,
+                    );
+                    flush_pending_assistant_message(&mut messages, &mut pending_assistant_content);
+                    if let Some(message_content) = message_content(content)
+                        && !message_content.is_empty()
+                    {
+                        messages.push(json!({
+                            "role": "user",
+                            "content": message_content,
+                        }));
+                    }
+                }
                 _ => {}
             },
             ResponseItem::FunctionCall {
@@ -751,4 +771,87 @@ fn webfetch_description() -> &'static str {
 
 fn write_description() -> &'static str {
     "Writes a file to the local filesystem.\n\nUsage:\n- This tool will overwrite the existing file if there is one at the provided path.\n- If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.\n- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.\n- NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.\n- Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.\n"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_request;
+    use crate::client_common::Prompt;
+    use codex_protocol::models::ContentItem;
+    use codex_protocol::models::ResponseItem;
+    use codex_protocol::openai_models::ModelInfo;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
+    const QA_TESTING_SKILLS_INSTRUCTIONS: &str = "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file.\n### Available skills\n- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)\n### How to use skills\n- Discovery: ...\n</skills_instructions>";
+
+    #[test]
+    fn opencode_request_maps_developer_skills_block_to_user_message() {
+        let prompt = Prompt {
+            input: vec![
+                ResponseItem::Message {
+                    id: Some("developer".to_string()),
+                    role: "developer".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: QA_TESTING_SKILLS_INSTRUCTIONS.to_string(),
+                    }],
+                    phase: None,
+                },
+                ResponseItem::Message {
+                    id: Some("user".to_string()),
+                    role: "user".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: "Run the QA pass".to_string(),
+                    }],
+                    phase: None,
+                },
+            ],
+            cwd: Some(std::env::temp_dir()),
+            ..Prompt::default()
+        };
+
+        let (request, _) = build_request(&prompt, &test_model_info()).expect("build request");
+
+        let messages = request["messages"].as_array().expect("messages array");
+        assert_eq!(messages[0]["role"], "system");
+        // The developer skills block maps to user-role content rather than
+        // being dropped, per the workspace harness instruction-role rule.
+        assert_eq!(messages[1]["role"], "user");
+        assert_eq!(
+            messages[1]["content"].as_str().expect("skills content"),
+            QA_TESTING_SKILLS_INSTRUCTIONS
+        );
+        let request_json = serde_json::to_string(&request).expect("serialize request");
+        assert!(request_json.contains("qa-testing"));
+        assert!(request_json.contains("Run the project's QA test plan against a live build"));
+    }
+
+    fn test_model_info() -> ModelInfo {
+        serde_json::from_value(json!({
+            "slug": "deepseek-chat",
+            "display_name": "DeepSeek Chat",
+            "description": "desc",
+            "default_reasoning_level": null,
+            "supported_reasoning_levels": [],
+            "reasoning_control": "none",
+            "shell_type": "shell_command",
+            "visibility": "list",
+            "supported_in_api": true,
+            "priority": 1,
+            "upgrade": null,
+            "base_instructions": "",
+            "model_messages": null,
+            "supports_reasoning_summaries": false,
+            "support_verbosity": false,
+            "default_verbosity": null,
+            "apply_patch_tool_type": null,
+            "truncation_policy": {"mode": "bytes", "limit": 10000},
+            "supports_parallel_tool_calls": false,
+            "supports_image_detail_original": false,
+            "context_window": 1000000,
+            "auto_compact_token_limit": null,
+            "experimental_supported_tools": []
+        }))
+        .expect("deserialize model info")
+    }
 }

@@ -169,7 +169,10 @@ fn build_system_prompt(
             cached_work_dir_listing(conversation_id, &work_dir),
         ),
         ("KIMI_AGENTS_MD", load_kimi_agents_md(&work_dir)),
-        ("KIMI_SKILLS", discover_kimi_skills(&work_dir)),
+        (
+            "KIMI_SKILLS",
+            render_kimi_skills(&work_dir, session_kimi_skills(&prompt.input)),
+        ),
         ("KIMI_ADDITIONAL_DIRS_INFO", String::new()),
     ] {
         rendered = rendered.replace(format!("${{{name}}}").as_str(), value.as_str());
@@ -963,7 +966,29 @@ fn collect_developer_instruction_text(items: &[ResponseItem]) -> String {
         .join("\n\n")
 }
 
-fn discover_kimi_skills(work_dir: &Path) -> String {
+/// Maps the session's `<skills_instructions>` developer block (assembled
+/// above the harness layer) to Kimi's native skill shape. Session skills get
+/// the `Extra` scope, mirroring how the real Kimi CLI labels skills supplied
+/// from outside the project and user roots.
+pub(super) fn session_kimi_skills(items: &[ResponseItem]) -> Vec<KimiSkill> {
+    super::session_skills::parse_session_skills(items)
+        .into_iter()
+        .map(|skill| KimiSkill {
+            name: skill.name,
+            description: skill.description,
+            path: PathBuf::from(skill.path),
+            scope: KimiSkillScope::Extra,
+        })
+        .collect()
+}
+
+/// Renders the `${KIMI_SKILLS}` system-prompt section from on-disk discovery
+/// (the captured Kimi CLI behavior) plus the session's actual skills. Disk
+/// re-discovery alone misses session skill roots such as
+/// `<home>/skills/.system`, and the workspace harness instruction-role rule
+/// forbids dropping skills assembled above the harness layer, so session
+/// skills that discovery did not already find are appended under `Extra`.
+fn render_kimi_skills(work_dir: &Path, session_skills: Vec<KimiSkill>) -> String {
     let mut seen = HashSet::new();
     let mut skills = kimi_skill_roots(
         work_dir,
@@ -977,6 +1002,12 @@ fn discover_kimi_skills(work_dir: &Path) -> String {
     .filter(|skill| seen.insert(skill.name.to_ascii_lowercase()))
     .collect::<Vec<_>>();
     skills.sort_by(|left, right| left.name.cmp(&right.name));
+    let mut session_skills = session_skills
+        .into_iter()
+        .filter(|skill| seen.insert(skill.name.to_ascii_lowercase()))
+        .collect::<Vec<_>>();
+    session_skills.sort_by(|left, right| left.name.cmp(&right.name));
+    skills.extend(session_skills);
     if skills.is_empty() {
         builtin_kimi_skill_listing().to_string()
     } else {
@@ -1026,7 +1057,7 @@ fn kimi_skill_roots(
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum KimiSkillScope {
+pub(super) enum KimiSkillScope {
     Project,
     User,
     Extra,
@@ -1139,7 +1170,7 @@ fn parse_kimi_skill_frontmatter(text: &str) -> Option<(String, String)> {
     Some((name?, description?))
 }
 
-fn format_kimi_skills_for_prompt(skills: Vec<KimiSkill>) -> String {
+pub(super) fn format_kimi_skills_for_prompt(skills: Vec<KimiSkill>) -> String {
     [
         KimiSkillScope::Project,
         KimiSkillScope::User,
@@ -1167,11 +1198,11 @@ fn format_kimi_skills_for_prompt(skills: Vec<KimiSkill>) -> String {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct KimiSkill {
-    name: String,
-    description: String,
-    path: PathBuf,
-    scope: KimiSkillScope,
+pub(super) struct KimiSkill {
+    pub(super) name: String,
+    pub(super) description: String,
+    pub(super) path: PathBuf,
+    pub(super) scope: KimiSkillScope,
 }
 
 fn render_conditional_block(
@@ -1469,6 +1500,44 @@ mod tests {
                 "content": "do the task",
             })]
         );
+    }
+
+    #[test]
+    fn kimi_session_skills_render_in_system_prompt_skills_section() {
+        let items = vec![
+            ResponseItem::Message {
+                id: Some("developer".to_string()),
+                role: "developer".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file.\n### Available skills\n- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)\n### How to use skills\n- Discovery: ...\n</skills_instructions>"
+                        .to_string(),
+                }],
+                phase: None,
+            },
+            ResponseItem::Message {
+                id: Some("user".to_string()),
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "Run the QA pass".to_string(),
+                }],
+                phase: None,
+            },
+        ];
+        let prompt = Prompt {
+            input: items,
+            cwd: Some(std::env::temp_dir()),
+            ..Prompt::default()
+        };
+
+        let system_prompt = build_system_prompt(&prompt, None, "kimi-session-skills-conversation");
+
+        // The session's skills (which disk re-discovery cannot find under
+        // <home>/skills/.system) render in Kimi's native skills shape.
+        assert!(system_prompt.contains("### Extra"));
+        assert!(system_prompt.contains(
+            "- qa-testing\n  - Path: /home/user/skills/.system/qa-testing/SKILL.md\n  - Description: Run the project's QA test plan against a live build"
+        ));
+        assert!(!system_prompt.contains("<skills_instructions>"));
     }
 
     #[test]

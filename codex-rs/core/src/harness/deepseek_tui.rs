@@ -294,8 +294,12 @@ fn add_omitted_reasoning_to_assistant_tool_calls(messages: &mut [Value]) {
 
 fn build_system_prompt(prompt: &Prompt, model: &str) -> (String, bool) {
     let cwd = prompt.cwd.as_deref();
+    let mut base_prompt = CODEWHALE_BASE_PROMPT.replace("{model_id}", model);
+    if let Some(skills_section) = session_skills_section(&prompt.input) {
+        base_prompt = insert_session_skills_section(base_prompt, &skills_section);
+    }
     let mut sections = vec![
-        CODEWHALE_BASE_PROMPT.replace("{model_id}", model),
+        base_prompt,
         CODEWHALE_CALM_PERSONALITY.to_string(),
         CODEWHALE_YOLO_MODE.to_string(),
         CODEWHALE_AUTO_APPROVAL.to_string(),
@@ -320,6 +324,30 @@ fn build_system_prompt(prompt: &Prompt, model: &str) -> (String, bool) {
             .join("\n\n"),
         should_write_generated_codewhale_instructions,
     )
+}
+
+/// Returns the session's `<skills_instructions>` developer block body, which
+/// natively renders as a `## Skills` markdown section.
+fn session_skills_section(items: &[ResponseItem]) -> Option<String> {
+    let text = super::session_skills::find_skills_instructions_text(items)?;
+    super::session_skills::skills_instructions_body(text).map(str::to_string)
+}
+
+/// Surfaces the session's runtime skills in the CodeWhale system prompt. The
+/// shared kimi-cli message builder skips contextual developer fragments, and
+/// the workspace harness instruction-role rule forbids dropping the skills
+/// block per-harness. The captured base prompt's Toolbox section already
+/// points `load_skill` at "the `## Skills` section above", so the structurally
+/// faithful spot for the native `## Skills` body is right above the Toolbox.
+fn insert_session_skills_section(base_prompt: String, skills_section: &str) -> String {
+    match base_prompt.find("## Toolbox") {
+        Some(index) => format!(
+            "{}{skills_section}\n\n{}",
+            &base_prompt[..index],
+            &base_prompt[index..]
+        ),
+        None => format!("{base_prompt}\n\n{skills_section}"),
+    }
 }
 
 fn add_turn_metadata_to_latest_user_message(messages: &mut [Value], cwd: Option<&Path>) {
@@ -732,6 +760,50 @@ mod tests {
                 .contains("CONSTITUTION OF CODEWHALE")
         );
         assert!(tool_kinds.is_empty());
+    }
+
+    #[test]
+    fn deepseek_tui_request_surfaces_session_skills_above_captured_toolbox() {
+        let prompt = Prompt {
+            input: vec![
+                ResponseItem::Message {
+                    id: None,
+                    role: "developer".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file.\n### Available skills\n- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)\n### How to use skills\n- Discovery: ...\n</skills_instructions>"
+                            .to_string(),
+                    }],
+                    phase: None,
+                },
+                ResponseItem::Message {
+                    id: None,
+                    role: "user".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: "Run the QA pass".to_string(),
+                    }],
+                    phase: None,
+                },
+            ],
+            ..Prompt::default()
+        };
+
+        let (request, _) = build_request(&prompt, &model_info()).expect("request");
+
+        let system = request["messages"][0]["content"]
+            .as_str()
+            .expect("system content");
+        assert!(system.contains(
+            "- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)"
+        ));
+        // The captured Toolbox section references "the `## Skills` section
+        // above", so the rendered skills section must sit above it.
+        let skills_index = system.find("## Skills").expect("skills section");
+        let toolbox_index = system.find("## Toolbox").expect("toolbox section");
+        assert!(skills_index < toolbox_index);
+        // The native developer block stays out of the conversation messages.
+        assert!(!system.contains("<skills_instructions>"));
+        let request_json = serde_json::to_string(&request).expect("serialize request");
+        assert_eq!(request_json.matches("<skills_instructions>").count(), 0);
     }
 
     fn model_info() -> ModelInfo {

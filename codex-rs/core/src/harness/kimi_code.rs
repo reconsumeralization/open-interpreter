@@ -6,6 +6,9 @@ use codex_protocol::openai_models::ModelInfo;
 use serde_json::Value;
 use serde_json::json;
 use std::collections::HashMap;
+use std::hash::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -75,14 +78,33 @@ fn kimi_code_prompt_cache_key(conversation_id: &str) -> String {
 
 fn cached_system_prompt(prompt: &Prompt, conversation_id: &str) -> String {
     let cwd = prompt.cwd.as_deref().unwrap_or_else(|| Path::new("."));
-    let key = format!("{conversation_id}:{}", cwd.display());
+    let skills = session_skills_listing(prompt);
+    let mut skills_hasher = DefaultHasher::new();
+    skills.hash(&mut skills_hasher);
+    let key = format!(
+        "{conversation_id}:{}:{:016x}",
+        cwd.display(),
+        skills_hasher.finish()
+    );
     let mut cache = KIMI_CODE_SYSTEM_PROMPT_CACHE
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     cache
         .entry(key)
-        .or_insert_with(|| build_system_prompt(prompt))
+        .or_insert_with(|| build_system_prompt(prompt, &skills))
         .clone()
+}
+
+/// Renders the session's `<skills_instructions>` developer block (assembled
+/// above the harness layer) into the `{{ KIMI_SKILLS }}` placeholder using the
+/// scope-grouped list shape the real Kimi Code system prompt uses.
+fn session_skills_listing(prompt: &Prompt) -> String {
+    let skills = kimi_cli::session_kimi_skills(&prompt.input);
+    if skills.is_empty() {
+        String::new()
+    } else {
+        kimi_cli::format_kimi_skills_for_prompt(skills)
+    }
 }
 
 fn add_auto_permission_reminders(messages: Vec<Value>) -> Vec<Value> {
@@ -107,7 +129,7 @@ fn add_auto_permission_reminders(messages: Vec<Value>) -> Vec<Value> {
     with_reminders
 }
 
-fn build_system_prompt(prompt: &Prompt) -> String {
+fn build_system_prompt(prompt: &Prompt, skills: &str) -> String {
     let cwd = prompt.cwd.as_deref().unwrap_or_else(|| Path::new("."));
     let listing = kimi_work_dir_listing(cwd);
     KIMI_CODE_SYSTEM_PROMPT
@@ -127,7 +149,7 @@ fn build_system_prompt(prompt: &Prompt) -> String {
         .replace("{{ KIMI_WORK_DIR_LS }}", &listing)
         .replace("{{ KIMI_ADDITIONAL_DIRS_INFO }}", "")
         .replace("{{ KIMI_AGENTS_MD }}", "")
-        .replace("{{ KIMI_SKILLS }}", "")
+        .replace("{{ KIMI_SKILLS }}", skills)
 }
 
 fn kimi_os_label() -> &'static str {
@@ -232,4 +254,121 @@ fn sort_kimi_entries(entries: &mut [std::fs::DirEntry]) {
 
 fn build_tools() -> Vec<Value> {
     serde_json::from_str(KIMI_CODE_TOOLS).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_request;
+    use crate::client_common::Prompt;
+    use codex_protocol::models::ContentItem;
+    use codex_protocol::models::ResponseItem;
+    use codex_protocol::openai_models::ModelInfo;
+    use serde_json::json;
+
+    #[test]
+    fn kimi_code_request_renders_session_skills_into_skills_placeholder() {
+        let prompt = Prompt {
+            input: vec![
+                ResponseItem::Message {
+                    id: Some("developer".to_string()),
+                    role: "developer".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file.\n### Available skills\n- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)\n### How to use skills\n- Discovery: ...\n</skills_instructions>"
+                            .to_string(),
+                    }],
+                    phase: None,
+                },
+                ResponseItem::Message {
+                    id: Some("user".to_string()),
+                    role: "user".to_string(),
+                    content: vec![ContentItem::InputText {
+                        text: "Run the QA pass".to_string(),
+                    }],
+                    phase: None,
+                },
+            ],
+            cwd: Some(std::env::temp_dir()),
+            ..Prompt::default()
+        };
+
+        let (request, _) = build_request(
+            &prompt,
+            &test_model_info(),
+            "kimi-code-session-skills-conversation",
+        )
+        .expect("build request");
+
+        let system = request["messages"][0]["content"]
+            .as_str()
+            .expect("system content");
+        assert!(system.contains(
+            "### Extra\n- qa-testing\n  - Path: /home/user/skills/.system/qa-testing/SKILL.md\n  - Description: Run the project's QA test plan against a live build"
+        ));
+        assert!(!system.contains("{{ KIMI_SKILLS }}"));
+        assert!(!system.contains("<skills_instructions>"));
+    }
+
+    #[test]
+    fn kimi_code_request_without_session_skills_keeps_placeholder_empty() {
+        let prompt = Prompt {
+            input: vec![ResponseItem::Message {
+                id: Some("user".to_string()),
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "hello".to_string(),
+                }],
+                phase: None,
+            }],
+            cwd: Some(std::env::temp_dir()),
+            ..Prompt::default()
+        };
+
+        let (request, _) = build_request(
+            &prompt,
+            &test_model_info(),
+            "kimi-code-no-skills-conversation",
+        )
+        .expect("build request");
+
+        let system = request["messages"][0]["content"]
+            .as_str()
+            .expect("system content");
+        assert!(!system.contains("{{ KIMI_SKILLS }}"));
+        assert!(!system.contains("### Extra"));
+    }
+
+    fn test_model_info() -> ModelInfo {
+        serde_json::from_value(json!({
+            "slug": "kimi-k2.5",
+            "display_name": "Kimi K2.5",
+            "description": null,
+            "supported_reasoning_levels": [],
+            "shell_type": "shell_command",
+            "visibility": "list",
+            "supported_in_api": true,
+            "priority": 1,
+            "availability_nux": null,
+            "upgrade": null,
+            "base_instructions": "base",
+            "model_messages": null,
+            "supports_reasoning_summaries": false,
+            "default_reasoning_summary": "auto",
+            "support_verbosity": false,
+            "default_verbosity": null,
+            "apply_patch_tool_type": "freeform",
+            "truncation_policy": {
+                "mode": "bytes",
+                "limit": 10000
+            },
+            "supports_parallel_tool_calls": false,
+            "supports_image_detail_original": false,
+            "context_window": null,
+            "auto_compact_token_limit": null,
+            "effective_context_window_percent": 95,
+            "experimental_supported_tools": [],
+            "input_modalities": ["text", "image"],
+            "supports_search_tool": false
+        }))
+        .expect("deserialize test model")
+    }
 }
