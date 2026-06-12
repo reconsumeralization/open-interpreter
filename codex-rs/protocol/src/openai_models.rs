@@ -474,16 +474,17 @@ impl ModelInfo {
     }
 
     pub fn auto_compact_token_limit(&self) -> Option<i64> {
-        let context_limit = self
+        // Models with no known context window must still auto-compact:
+        // assume a conservative window rather than letting long sessions
+        // overflow the provider limit with compaction disabled.
+        const FALLBACK_CONTEXT_WINDOW: i64 = 128_000;
+        let context_limit = (self
             .resolved_context_window()
-            .map(|context_window| (context_window * 9) / 10);
+            .unwrap_or(FALLBACK_CONTEXT_WINDOW)
+            * 9)
+            / 10;
         let config_limit = self.auto_compact_token_limit;
-        if let Some(context_limit) = context_limit {
-            return Some(
-                config_limit.map_or(context_limit, |limit| std::cmp::min(limit, context_limit)),
-            );
-        }
-        config_limit
+        Some(config_limit.map_or(context_limit, |limit| std::cmp::min(limit, context_limit)))
     }
 
     pub fn supports_personality(&self) -> bool {
