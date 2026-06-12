@@ -10,6 +10,7 @@ use codex_protocol::models::LocalShellAction;
 use codex_protocol::models::ReasoningItemContent;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::openai_models::ModelInfo;
+use codex_protocol::openai_models::ReasoningControl;
 use codex_protocol::openai_models::ReasoningEffort as ReasoningEffortConfig;
 use codex_tools::ResponsesApiTool;
 use codex_tools::ToolSpec;
@@ -21,7 +22,7 @@ const MINIMAL_SYSTEM_PROMPT: &str = "You are an expert software engineer working
 pub(crate) fn build_request(
     prompt: &Prompt,
     model_info: &ModelInfo,
-    _effort: Option<ReasoningEffortConfig>,
+    effort: Option<ReasoningEffortConfig>,
 ) -> Result<(Value, ToolKinds), serde_json::Error> {
     let mut messages = vec![json!({
         "role": "system",
@@ -35,7 +36,7 @@ pub(crate) fn build_request(
         .map(|tool| (tool.name().to_string(), ToolOutputKind::Function))
         .collect();
 
-    let request = json!({
+    let mut request = json!({
         "model": model_info.slug,
         "messages": messages,
         "stream": true,
@@ -44,6 +45,16 @@ pub(crate) fn build_request(
         },
         "tools": tools,
     });
+
+    if model_info.reasoning_control == ReasoningControl::ThinkingToggle {
+        request["thinking"] = json!({
+            "type": if matches!(effort, Some(ReasoningEffortConfig::None)) {
+                "disabled"
+            } else {
+                "enabled"
+            },
+        });
+    }
 
     Ok((request, tool_kinds))
 }
@@ -428,6 +439,41 @@ mod tests {
             "input_modalities": ["text", "image"]
         }))
         .expect("deserialize model info")
+    }
+
+    fn test_prompt() -> Prompt {
+        Prompt {
+            input: vec![ResponseItem::Message {
+                id: Some("user".to_string()),
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "hello".to_string(),
+                }],
+                phase: None,
+            }],
+            cwd: Some(std::env::temp_dir()),
+            ..Prompt::default()
+        }
+    }
+
+    #[test]
+    fn thinking_toggle_model_sends_enabled_by_default() {
+        let (request, _) = build_request(&test_prompt(), &thinking_toggle_model_info(), None)
+            .expect("build request");
+
+        assert_eq!(request.get("thinking"), Some(&json!({"type": "enabled"})));
+    }
+
+    #[test]
+    fn thinking_toggle_model_sends_disabled_for_none_effort() {
+        let (request, _) = build_request(
+            &test_prompt(),
+            &thinking_toggle_model_info(),
+            Some(ReasoningEffortConfig::None),
+        )
+        .expect("build request");
+
+        assert_eq!(request.get("thinking"), Some(&json!({"type": "disabled"})));
     }
 
     #[test]

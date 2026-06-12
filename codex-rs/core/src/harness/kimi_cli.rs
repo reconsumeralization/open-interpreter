@@ -11,6 +11,7 @@ use codex_protocol::models::LocalShellAction;
 use codex_protocol::models::ReasoningItemContent;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::openai_models::ModelInfo;
+use codex_protocol::openai_models::ReasoningControl;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::SubAgentSource;
@@ -66,8 +67,23 @@ pub(crate) fn build_request(
             },
             "tools": tools,
     });
-    if reasoning_effort.is_some() {
+    if model_info.reasoning_control == ReasoningControl::ThinkingToggle
+        && reasoning_effort == Some(ReasoningEffort::thinking_toggle_on())
+    {
+        // The "Thinking" option of a toggle-shaped model enables thinking
+        // without forcing a reasoning effort level.
+        if let Some(request_object) = request.as_object_mut() {
+            request_object.insert("thinking".to_string(), json!({ "type": "enabled" }));
+        }
+    } else if reasoning_effort.is_some() {
         apply_reasoning_effort(&mut request, reasoning_effort);
+    }
+    if model_info.reasoning_control == ReasoningControl::ThinkingToggle
+        && let Some(request_object) = request.as_object_mut()
+    {
+        request_object
+            .entry("thinking".to_string())
+            .or_insert_with(|| json!({ "type": "disabled" }));
     }
 
     Ok((request, tool_kinds))
@@ -1289,6 +1305,7 @@ mod tests {
     use codex_protocol::models::ReasoningItemContent;
     use codex_protocol::models::ResponseItem;
     use codex_protocol::openai_models::ModelInfo;
+    use codex_protocol::openai_models::ReasoningControl;
     use codex_protocol::openai_models::ReasoningEffort;
     use codex_tools::JsonSchema;
     use codex_tools::ResponsesApiTool;
@@ -1613,6 +1630,81 @@ mod tests {
 
         assert_eq!(request.get("reasoning_effort"), Some(&json!("high")));
         assert_eq!(request.get("thinking"), Some(&json!({ "type": "enabled" })));
+    }
+
+    fn thinking_toggle_model_info() -> ModelInfo {
+        let mut model_info = test_model_info();
+        model_info.reasoning_control = ReasoningControl::ThinkingToggle;
+        model_info
+    }
+
+    fn thinking_toggle_prompt() -> Prompt {
+        Prompt {
+            input: vec![ResponseItem::Message {
+                id: Some("user".to_string()),
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "think".to_string(),
+                }],
+                phase: None,
+            }],
+            cwd: Some(std::env::temp_dir()),
+            ..Prompt::default()
+        }
+    }
+
+    #[test]
+    fn kimi_request_thinking_toggle_on_enables_thinking_without_effort_level() {
+        let (request, _) = build_request(
+            &thinking_toggle_prompt(),
+            &thinking_toggle_model_info(),
+            Some(ReasoningEffort::thinking_toggle_on()),
+            "conversation-id",
+            None,
+            /*yolo_mode*/ false,
+        )
+        .expect("build request");
+
+        assert_eq!(request.get("reasoning_effort"), None);
+        assert_eq!(request.get("thinking"), Some(&json!({ "type": "enabled" })));
+    }
+
+    #[test]
+    fn kimi_request_thinking_toggle_off_disables_thinking() {
+        let (request, _) = build_request(
+            &thinking_toggle_prompt(),
+            &thinking_toggle_model_info(),
+            Some(ReasoningEffort::None),
+            "conversation-id",
+            None,
+            /*yolo_mode*/ false,
+        )
+        .expect("build request");
+
+        assert_eq!(request.get("reasoning_effort"), None);
+        assert_eq!(
+            request.get("thinking"),
+            Some(&json!({ "type": "disabled" }))
+        );
+    }
+
+    #[test]
+    fn kimi_request_thinking_toggle_defaults_to_disabled_without_effort() {
+        let (request, _) = build_request(
+            &thinking_toggle_prompt(),
+            &thinking_toggle_model_info(),
+            None,
+            "conversation-id",
+            None,
+            /*yolo_mode*/ false,
+        )
+        .expect("build request");
+
+        assert_eq!(request.get("reasoning_effort"), None);
+        assert_eq!(
+            request.get("thinking"),
+            Some(&json!({ "type": "disabled" }))
+        );
     }
 
     #[test]

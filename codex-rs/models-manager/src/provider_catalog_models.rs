@@ -5,6 +5,7 @@ use codex_model_provider_info::bundled_provider_catalog_entry;
 use codex_model_provider_info::bundled_provider_catalog_entry_for_base_url;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelVisibility;
+use codex_protocol::openai_models::ReasoningControl;
 use codex_protocol::openai_models::ReasoningEffort;
 
 use crate::ModelsManagerConfig;
@@ -67,6 +68,9 @@ fn model_info_from_bundled_provider_model(model: &BundledProviderModelEntry) -> 
     fallback.description = model.description.clone();
     fallback.default_reasoning_level =
         (model.reasoning || model.thinking_toggle).then_some(ReasoningEffort::Medium);
+    if model.thinking_toggle {
+        fallback.reasoning_control = ReasoningControl::ThinkingToggle;
+    }
     fallback.supported_reasoning_levels = Vec::new();
     fallback.visibility = ModelVisibility::List;
     fallback.supported_in_api = true;
@@ -114,6 +118,23 @@ mod tests {
             Some(ReasoningEffort::Medium)
         );
         assert!(v4_pro.supported_reasoning_levels.is_empty());
+    }
+
+    #[test]
+    fn bundled_provider_models_express_kimi_thinking_toggle() {
+        let models = bundled_provider_model_infos(&provider(
+            "Moonshot AI",
+            "https://api.moonshot.ai/v1",
+            "MOONSHOT_API_KEY",
+            WireApi::Chat,
+        ));
+        let kimi = models
+            .iter()
+            .find(|model| model.slug == "kimi-k2.5")
+            .expect("kimi-k2.5 model");
+        assert_eq!(kimi.reasoning_control, ReasoningControl::ThinkingToggle);
+        assert!(kimi.supported_reasoning_levels.is_empty());
+        assert_eq!(kimi.default_reasoning_level, Some(ReasoningEffort::Medium));
     }
 
     #[test]

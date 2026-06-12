@@ -62,6 +62,18 @@ impl ReasoningEffort {
             Self::Custom(effort) => effort,
         }
     }
+
+    /// The "thinking on" option of a thinking-toggle model's options list.
+    ///
+    /// Models that only advertise a binary thinking control are expressed as
+    /// the two-option case of the generic reasoning options list: this sentinel
+    /// ("Thinking") and [`ReasoningEffort::None`] ("None"). The sentinel
+    /// round-trips through config as a custom effort; request builders map it
+    /// to the provider's "thinking enabled" wire shape instead of sending it
+    /// as a literal reasoning effort.
+    pub fn thinking_toggle_on() -> Self {
+        Self::Custom("Thinking".to_string())
+    }
 }
 
 impl fmt::Display for ReasoningEffort {
@@ -581,19 +593,63 @@ pub struct ModelsResponse {
     pub models: Vec<ModelInfo>,
 }
 
+/// Express a model's reasoning controls as one generic options list.
+///
+/// Models with explicit reasoning levels pass them through unchanged. Models
+/// that only advertise a binary thinking toggle are expressed as the two-option
+/// case of the same list ("Thinking" / "None") so pickers render every model's
+/// thinking choices with the same options-list UI. The "Thinking" option maps
+/// to [`ReasoningEffort::thinking_toggle_on`] and "None" maps to
+/// [`ReasoningEffort::None`], matching how request builders translate the
+/// stored effort into the provider's thinking on/off wire shape.
+fn reasoning_options_from_model_info(
+    info: &ModelInfo,
+) -> (ReasoningEffort, Vec<ReasoningEffortPreset>) {
+    let thinking_toggle_only = matches!(
+        info.reasoning_control,
+        ReasoningControl::ThinkingToggle | ReasoningControl::ThinkingBudget
+    ) && info.supported_reasoning_levels.is_empty();
+    if !thinking_toggle_only {
+        return (
+            info.default_reasoning_level
+                .clone()
+                .unwrap_or(ReasoningEffort::None),
+            info.supported_reasoning_levels.clone(),
+        );
+    }
+
+    let thinking_on = ReasoningEffort::thinking_toggle_on();
+    let default_reasoning_effort = if info.default_reasoning_level == Some(ReasoningEffort::None) {
+        ReasoningEffort::None
+    } else {
+        thinking_on.clone()
+    };
+    let options = vec![
+        ReasoningEffortPreset {
+            effort: thinking_on,
+            description: "Use the model's default thinking behavior.".to_string(),
+        },
+        ReasoningEffortPreset {
+            effort: ReasoningEffort::None,
+            description: "Disable thinking explicitly for this model.".to_string(),
+        },
+    ];
+    (default_reasoning_effort, options)
+}
+
 // convert ModelInfo to ModelPreset
 impl From<ModelInfo> for ModelPreset {
     fn from(info: ModelInfo) -> Self {
         let supports_personality = info.supports_personality();
+        let (default_reasoning_effort, supported_reasoning_efforts) =
+            reasoning_options_from_model_info(&info);
         ModelPreset {
             id: info.slug.clone(),
             model: info.slug.clone(),
             display_name: info.display_name,
             description: info.description.unwrap_or_default(),
-            default_reasoning_effort: info
-                .default_reasoning_level
-                .unwrap_or(ReasoningEffort::None),
-            supported_reasoning_efforts: info.supported_reasoning_levels.clone(),
+            default_reasoning_effort,
+            supported_reasoning_efforts,
             supports_personality,
             additional_speed_tiers: info.additional_speed_tiers,
             service_tiers: info.service_tiers,
@@ -1053,6 +1109,75 @@ mod tests {
 
         assert_eq!(model.resolved_context_window(), Some(400_000));
         assert_eq!(model.auto_compact_token_limit(), Some(360_000));
+    }
+
+    #[test]
+    fn model_preset_expresses_thinking_toggle_as_two_option_list() {
+        let preset = ModelPreset::from(ModelInfo {
+            reasoning_control: ReasoningControl::ThinkingToggle,
+            default_reasoning_level: Some(ReasoningEffort::Medium),
+            ..test_model(/*spec*/ None)
+        });
+
+        assert_eq!(
+            (
+                preset.default_reasoning_effort,
+                preset.supported_reasoning_efforts,
+            ),
+            (
+                ReasoningEffort::thinking_toggle_on(),
+                vec![
+                    ReasoningEffortPreset {
+                        effort: ReasoningEffort::thinking_toggle_on(),
+                        description: "Use the model's default thinking behavior.".to_string(),
+                    },
+                    ReasoningEffortPreset {
+                        effort: ReasoningEffort::None,
+                        description: "Disable thinking explicitly for this model.".to_string(),
+                    },
+                ],
+            )
+        );
+    }
+
+    #[test]
+    fn model_preset_marks_no_thinking_default_for_thinking_toggle_models() {
+        let preset = ModelPreset::from(ModelInfo {
+            reasoning_control: ReasoningControl::ThinkingBudget,
+            default_reasoning_level: Some(ReasoningEffort::None),
+            ..test_model(/*spec*/ None)
+        });
+
+        assert_eq!(preset.default_reasoning_effort, ReasoningEffort::None);
+        assert_eq!(preset.supported_reasoning_efforts.len(), 2);
+    }
+
+    #[test]
+    fn model_preset_keeps_explicit_levels_for_thinking_toggle_models() {
+        let levels = vec![
+            ReasoningEffortPreset {
+                effort: ReasoningEffort::Low,
+                description: "low".to_string(),
+            },
+            ReasoningEffortPreset {
+                effort: ReasoningEffort::High,
+                description: "high".to_string(),
+            },
+        ];
+        let preset = ModelPreset::from(ModelInfo {
+            reasoning_control: ReasoningControl::ThinkingToggle,
+            default_reasoning_level: Some(ReasoningEffort::Low),
+            supported_reasoning_levels: levels.clone(),
+            ..test_model(/*spec*/ None)
+        });
+
+        assert_eq!(
+            (
+                preset.default_reasoning_effort,
+                preset.supported_reasoning_efforts,
+            ),
+            (ReasoningEffort::Low, levels)
+        );
     }
 
     #[test]

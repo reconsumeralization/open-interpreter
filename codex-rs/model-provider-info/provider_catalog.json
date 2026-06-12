@@ -7270,6 +7270,7 @@
           "display_name": "Kimi K2.5",
           "description": "kimi-k2.5 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
           "reasoning": true,
+          "thinking_toggle": true,
           "input_modalities": [
             "text",
             "image"
@@ -7503,6 +7504,7 @@
           "display_name": "Kimi K2.5",
           "description": "kimi-k2.5 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
           "reasoning": true,
+          "thinking_toggle": true,
           "input_modalities": [
             "text",
             "image"
