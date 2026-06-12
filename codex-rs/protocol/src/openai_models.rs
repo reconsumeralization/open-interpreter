@@ -129,6 +129,37 @@ impl FromStr for ReasoningEffort {
     }
 }
 
+/// How a model's reasoning behavior can be controlled by the client UI/API.
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Display,
+    JsonSchema,
+    TS,
+    Hash,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ReasoningControl {
+    /// No known reasoning control.
+    #[default]
+    None,
+    /// Reasoning exists, but this client should not show a user-facing control.
+    Fixed,
+    /// OpenAI-style enum control such as low/medium/high.
+    Effort,
+    /// Boolean thinking on/off control.
+    ThinkingToggle,
+    /// Token-budget thinking control.
+    ThinkingBudget,
+}
+
 /// Canonical user-input modality tags advertised by a model.
 #[derive(
     Debug,
@@ -352,6 +383,9 @@ pub struct ModelInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_reasoning_level: Option<ReasoningEffort>,
     pub supported_reasoning_levels: Vec<ReasoningEffortPreset>,
+    /// User-facing reasoning control shape advertised by model metadata.
+    #[serde(default)]
+    pub reasoning_control: ReasoningControl,
     pub shell_type: ConfigShellToolType,
     pub visibility: ModelVisibility,
     pub supported_in_api: bool,
@@ -648,6 +682,7 @@ mod tests {
             description: None,
             default_reasoning_level: None,
             supported_reasoning_levels: vec![],
+            reasoning_control: ReasoningControl::None,
             shell_type: ConfigShellToolType::ShellCommand,
             visibility: ModelVisibility::List,
             supported_in_api: true,
