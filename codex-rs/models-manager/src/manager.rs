@@ -1,5 +1,6 @@
 use super::cache::ModelsCacheManager;
 use crate::collaboration_mode_presets::builtin_collaboration_mode_presets;
+use crate::compatibility_enrichment::apply_compatibility_catalog;
 use crate::config::ModelsManagerConfig;
 use crate::model_info;
 use async_trait::async_trait;
@@ -182,6 +183,9 @@ pub type SharedModelsManager = Arc<dyn ModelsManager>;
 pub struct OpenAiModelsManager {
     remote_models: RwLock<Vec<ModelInfo>>,
     base_models: Vec<ModelInfo>,
+    /// Whether the base models came from the generated provider catalog, in
+    /// which case the bundled compatibility catalog refines their metadata.
+    enrich_with_compatibility_catalog: bool,
     etag: RwLock<Option<String>>,
     cache_manager: ModelsCacheManager,
     endpoint_client: SharedModelsEndpointClient,
@@ -215,15 +219,18 @@ impl OpenAiModelsManager {
     ) -> Self {
         let cache_path = codex_home.join(MODEL_CACHE_FILE);
         let cache_manager = ModelsCacheManager::new(cache_path, DEFAULT_MODEL_CACHE_TTL);
-        let base_models = if base_models.is_empty() {
-            load_remote_models_from_file().unwrap_or_default()
+        // Provider-catalog models are refined with the bundled compatibility
+        // catalog; the curated codex `models.json` fallback stays authoritative.
+        let (base_models, enrich_with_compatibility_catalog) = if base_models.is_empty() {
+            (load_remote_models_from_file().unwrap_or_default(), false)
         } else {
-            base_models
+            (apply_compatibility_catalog(base_models), true)
         };
         let remote_models = base_models.clone();
         Self {
             remote_models: RwLock::new(remote_models),
             base_models,
+            enrich_with_compatibility_catalog,
             etag: RwLock::new(None),
             cache_manager,
             endpoint_client,
@@ -372,6 +379,9 @@ impl OpenAiModelsManager {
             } else {
                 existing_models.push(model);
             }
+        }
+        if self.enrich_with_compatibility_catalog {
+            existing_models = apply_compatibility_catalog(existing_models);
         }
         existing_models
     }
