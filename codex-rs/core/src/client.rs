@@ -124,6 +124,7 @@ use crate::harness::claude_code::CLAUDE_CODE_STARTUP_HEAD_USER_AGENT;
 use crate::harness::claude_code::CLAUDE_CODE_TITLE_BETA_HEADER;
 use crate::harness::claude_code::CLAUDE_CODE_USER_AGENT;
 use crate::harness::claude_code::ClaudeCodeProfile;
+use crate::harness::claude_code::build_claude_code_responses_shaped_request;
 use crate::harness::claude_code::build_request_for_profile as build_claude_code_request;
 use crate::harness::claude_code::build_title_request_for_profile as build_claude_code_title_request;
 use crate::harness::request::ChatHarnessRequest;
@@ -132,6 +133,7 @@ use crate::harness::request::apply_chat_harness_postprocess;
 use crate::harness::request::build_chat_harness_request;
 use crate::harness::request::prompt_with_harness_guidance;
 use crate::harness::routing::ChatHarnessRoute;
+use crate::harness::routing::ClaudeCodeProfileRoute;
 use crate::harness::routing::MessagesHarnessRoute;
 use crate::harness::routing::StreamTransportRoute;
 use crate::harness::routing::resolve_stream_transport_route;
@@ -1528,6 +1530,246 @@ impl ModelClientSession {
         }
     }
 
+    /// Streams a claude-code turn over the chat-completions wire.
+    ///
+    /// The Claude Code system prompt + profile tool surface are produced by the
+    /// shared shaping in `harness::claude_code` and rendered into a
+    /// Responses-style request, which the chat-wire-compat converter turns into
+    /// a `/chat/completions` body. This is what lets `claude-code-bare` run on a
+    /// chat-only provider (e.g. DeepSeek) instead of 404ing on `/responses`.
+    #[instrument(
+        name = "model_client.stream_claude_code_chat_api",
+        level = "info",
+        skip_all,
+        fields(
+            model = %model_info.slug,
+            wire_api = %self.client.state.provider.info().wire_api,
+            transport = "chat_completions",
+            http.method = "POST",
+            api.path = "chat/completions"
+        )
+    )]
+    async fn stream_claude_code_chat_api(
+        &self,
+        profile: ClaudeCodeProfile,
+        prompt: &Prompt,
+        model_info: &ModelInfo,
+        session_telemetry: &SessionTelemetry,
+    ) -> Result<ResponseStream> {
+        let auth_manager = self.client.state.provider.auth_manager();
+        let mut auth_recovery = auth_manager
+            .as_ref()
+            .map(AuthManager::unauthorized_recovery);
+        let mut pending_retry = PendingUnauthorizedRetry::default();
+        let guided_prompt = prompt_with_harness_guidance(
+            prompt,
+            &self.client.state.harness,
+            self.client.state.harness_guidance,
+        );
+        loop {
+            let auth = self.client.state.provider.auth().await;
+            let api_provider = self.client.state.provider.api_provider().await?;
+            let api_auth = self.client.state.provider.api_auth().await?;
+            let request_auth_context = AuthRequestTelemetryContext::new(
+                auth.as_ref().map(CodexAuth::auth_mode),
+                api_auth.as_ref(),
+                pending_retry,
+            );
+            let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
+                session_telemetry,
+                request_auth_context,
+                RequestRouteTelemetry::for_endpoint(CHAT_COMPLETIONS_ENDPOINT),
+                self.client.state.auth_env_telemetry.clone(),
+            );
+            let request = build_claude_code_responses_shaped_request(
+                &guided_prompt,
+                model_info,
+                Some(&self.client.state.session_source),
+                profile,
+                Some(self.client.prompt_cache_key()),
+            )
+            .map_err(|err| {
+                CodexErr::InvalidRequest(format!("invalid claude-code chat request: {err}"))
+            })?;
+            let client = ChatCompletionsCompatClient::new(
+                ReqwestTransport::new(build_reqwest_client()),
+                api_provider,
+                api_auth,
+            )
+            .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
+            match client
+                .stream_request(request, self.chat_harness_options())
+                .await
+            {
+                Ok(stream) => {
+                    let (stream, _) = map_response_stream(
+                        stream,
+                        session_telemetry.clone(),
+                        InferenceTraceAttempt::disabled(),
+                    );
+                    return Ok(stream);
+                }
+                Err(ApiError::Transport(
+                    unauthorized_transport @ TransportError::Http { status, .. },
+                )) if status == StatusCode::UNAUTHORIZED => {
+                    pending_retry = PendingUnauthorizedRetry::from_recovery(
+                        handle_unauthorized(
+                            unauthorized_transport,
+                            &mut auth_recovery,
+                            session_telemetry,
+                        )
+                        .await?,
+                    );
+                }
+                Err(err) => return Err(map_api_error(err)),
+            }
+        }
+    }
+
+    /// Streams a claude-code turn over the Responses wire (`/responses`).
+    ///
+    /// Reuses the standard Responses request builder for reasoning/cache/text
+    /// controls, then overrides instructions + tools + input with the shared
+    /// claude-code shaping so the same prompt and tool surface drive this wire.
+    #[allow(clippy::too_many_arguments)]
+    #[instrument(
+        name = "model_client.stream_claude_code_responses_api",
+        level = "info",
+        skip_all,
+        fields(
+            model = %model_info.slug,
+            wire_api = %self.client.state.provider.info().wire_api,
+            transport = "responses_http",
+            http.method = "POST",
+            api.path = "responses"
+        )
+    )]
+    async fn stream_claude_code_responses_api(
+        &self,
+        profile: ClaudeCodeProfile,
+        window_id: &str,
+        prompt: &Prompt,
+        model_info: &ModelInfo,
+        session_telemetry: &SessionTelemetry,
+        effort: Option<ReasoningEffortConfig>,
+        summary: ReasoningSummaryConfig,
+        service_tier: Option<String>,
+        turn_metadata_header: Option<&str>,
+        inference_trace: &InferenceTraceContext,
+    ) -> Result<ResponseStream> {
+        let auth_manager = self.client.state.provider.auth_manager();
+        let mut auth_recovery = auth_manager
+            .as_ref()
+            .map(AuthManager::unauthorized_recovery);
+        let mut pending_retry = PendingUnauthorizedRetry::default();
+        let guided_prompt = prompt_with_harness_guidance(
+            prompt,
+            &self.client.state.harness,
+            self.client.state.harness_guidance,
+        );
+        loop {
+            let client_setup = self.client.current_client_setup().await?;
+            let transport = ReqwestTransport::new(build_reqwest_client());
+            let request_auth_context = AuthRequestTelemetryContext::new(
+                client_setup.auth.as_ref().map(CodexAuth::auth_mode),
+                client_setup.api_auth.as_ref(),
+                pending_retry,
+            );
+            let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
+                session_telemetry,
+                request_auth_context,
+                RequestRouteTelemetry::for_endpoint(RESPONSES_ENDPOINT),
+                self.client.state.auth_env_telemetry.clone(),
+            );
+            let compression = self.responses_request_compression(client_setup.auth.as_ref());
+            let mut options = self
+                .build_responses_options(
+                    window_id,
+                    turn_metadata_header,
+                    compression,
+                    model_info.use_responses_lite,
+                )
+                .await;
+
+            // Start from the standard Responses request to inherit reasoning,
+            // cache key, text, and service-tier handling, then overlay the
+            // claude-code shaping (system prompt + tools + input).
+            let mut request = self.client.build_responses_request(
+                &client_setup.api_provider,
+                &guided_prompt,
+                model_info,
+                effort.clone(),
+                summary,
+                service_tier.clone(),
+                window_id,
+            )?;
+            let shaped = build_claude_code_responses_shaped_request(
+                &guided_prompt,
+                model_info,
+                Some(&self.client.state.session_source),
+                profile,
+                None,
+            )
+            .map_err(|err| {
+                CodexErr::InvalidRequest(format!("invalid claude-code responses request: {err}"))
+            })?;
+            request.instructions = shaped.instructions;
+            request.tools = shaped.tools;
+            request.input = shaped.input;
+            request.parallel_tool_calls = shaped.parallel_tool_calls;
+
+            let inference_trace_attempt = inference_trace.start_attempt();
+            inference_trace_attempt.add_request_headers(&mut options.extra_headers);
+            inference_trace_attempt.record_started(&request);
+            let client = ApiResponsesClient::new(
+                transport,
+                client_setup.api_provider,
+                client_setup.api_auth,
+            )
+            .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
+            match client.stream_request(request, options).await {
+                Ok(stream) => {
+                    let (stream, _) = map_response_stream(
+                        stream,
+                        session_telemetry.clone(),
+                        inference_trace_attempt,
+                    );
+                    return Ok(stream);
+                }
+                Err(ApiError::Transport(
+                    unauthorized_transport @ TransportError::Http { status, .. },
+                )) if status == StatusCode::UNAUTHORIZED => {
+                    let response_debug_context =
+                        extract_response_debug_context(&unauthorized_transport);
+                    inference_trace_attempt.record_failed(
+                        &unauthorized_transport,
+                        response_debug_context.request_id.as_deref(),
+                        /*output_items*/ &[],
+                    );
+                    pending_retry = PendingUnauthorizedRetry::from_recovery(
+                        handle_unauthorized(
+                            unauthorized_transport,
+                            &mut auth_recovery,
+                            session_telemetry,
+                        )
+                        .await?,
+                    );
+                }
+                Err(err) => {
+                    let response_debug_context =
+                        extract_response_debug_context_from_api_error(&err);
+                    let err = map_api_error(err);
+                    inference_trace_attempt.record_failed(
+                        &err,
+                        response_debug_context.request_id.as_deref(),
+                        /*output_items*/ &[],
+                    );
+                    return Err(err);
+                }
+            }
+        }
+    }
+
     #[instrument(
         name = "model_client.stream_claude_code_api",
         level = "info",
@@ -2042,6 +2284,30 @@ impl ModelClientSession {
                 ))
                 .await
             }
+            StreamTransportRoute::ClaudeCodeResponses(profile) => {
+                Box::pin(self.stream_claude_code_responses_api(
+                    claude_code_profile_for_route(profile),
+                    window_id,
+                    prompt,
+                    model_info,
+                    session_telemetry,
+                    effort,
+                    summary,
+                    service_tier,
+                    turn_metadata_header,
+                    inference_trace,
+                ))
+                .await
+            }
+            StreamTransportRoute::ClaudeCodeChat(profile) => {
+                Box::pin(self.stream_claude_code_chat_api(
+                    claude_code_profile_for_route(profile),
+                    prompt,
+                    model_info,
+                    session_telemetry,
+                ))
+                .await
+            }
         }
     }
 
@@ -2061,6 +2327,13 @@ impl ModelClientSession {
             .force_http_fallback(session_telemetry, model_info);
         self.websocket_session = WebsocketSession::default();
         activated
+    }
+}
+
+fn claude_code_profile_for_route(profile: ClaudeCodeProfileRoute) -> ClaudeCodeProfile {
+    match profile {
+        ClaudeCodeProfileRoute::Full => ClaudeCodeProfile::Full,
+        ClaudeCodeProfileRoute::Bare => ClaudeCodeProfile::Bare,
     }
 }
 

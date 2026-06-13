@@ -7,6 +7,17 @@ pub(crate) enum MessagesHarnessRoute {
     ClaudeCode,
 }
 
+/// Which claude-code tool/prompt surface a non-Messages wire should shape.
+///
+/// `claude-code` and `claude-code-bare` share the same shaping primitives but
+/// differ in system prompt and tool set; this carries that distinction onto the
+/// Responses and Chat transports.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum ClaudeCodeProfileRoute {
+    Full,
+    Bare,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum ChatHarnessRoute {
     DeepSeekTui,
@@ -28,6 +39,11 @@ pub(crate) enum StreamTransportRoute {
     ChatCompletionsCompat,
     ChatHarness(ChatHarnessRoute),
     MessagesHarness(MessagesHarnessRoute),
+    /// claude-code shaping carried over the Responses wire (`/responses`).
+    ClaudeCodeResponses(ClaudeCodeProfileRoute),
+    /// claude-code shaping carried over the chat-completions wire
+    /// (`/chat/completions`), via the chat-wire-compat converter.
+    ClaudeCodeChat(ClaudeCodeProfileRoute),
 }
 
 impl StreamTransportRoute {
@@ -41,15 +57,13 @@ pub(crate) fn resolve_stream_transport_route(
     harness: &Harness,
 ) -> Result<StreamTransportRoute, CodexErr> {
     match (wire_api, harness) {
-        (WireApi::Responses, Harness::ClaudeCode | Harness::ClaudeCodeBare) => {
-            Err(CodexErr::InvalidRequest(
-                format!(
-                    "harness = \"{}\" requires a provider with wire_api = \"messages\"",
-                    harness_config_name(harness)
-                ),
-            ))
-        }
+        (WireApi::Responses, Harness::ClaudeCode | Harness::ClaudeCodeBare) => Ok(
+            StreamTransportRoute::ClaudeCodeResponses(claude_code_profile_route(harness)),
+        ),
         (WireApi::Responses, _) => Ok(StreamTransportRoute::ResponsesApi),
+        (WireApi::Chat, Harness::ClaudeCode | Harness::ClaudeCodeBare) => Ok(
+            StreamTransportRoute::ClaudeCodeChat(claude_code_profile_route(harness)),
+        ),
         (WireApi::Chat, Harness::KimiCli) => {
             Ok(StreamTransportRoute::ChatHarness(ChatHarnessRoute::KimiCli))
         }
@@ -133,6 +147,16 @@ pub(crate) fn resolve_stream_transport_route(
     }
 }
 
+/// Maps the claude-code harness flavor onto the shaping profile used by the
+/// non-Messages wires. Callers only reach this for `ClaudeCode`/`ClaudeCodeBare`.
+fn claude_code_profile_route(harness: &Harness) -> ClaudeCodeProfileRoute {
+    match harness {
+        Harness::ClaudeCodeBare => ClaudeCodeProfileRoute::Bare,
+        _ => ClaudeCodeProfileRoute::Full,
+    }
+}
+
+#[allow(dead_code)]
 fn harness_config_name(harness: &Harness) -> &str {
     match harness {
         Harness::ClaudeCode => "claude-code",
@@ -180,11 +204,59 @@ mod tests {
     }
 
     #[test]
-    fn claude_code_chat_wire_uses_chat_compat_route() {
+    fn claude_code_messages_wire_uses_messages_harness_route() {
+        assert_eq!(
+            resolve_stream_transport_route(WireApi::Messages, &Harness::ClaudeCode)
+                .expect("messages claude-code route"),
+            StreamTransportRoute::MessagesHarness(MessagesHarnessRoute::ClaudeCode)
+        );
+    }
+
+    #[test]
+    fn claude_code_bare_messages_wire_uses_messages_harness_route() {
+        assert_eq!(
+            resolve_stream_transport_route(WireApi::Messages, &Harness::ClaudeCodeBare)
+                .expect("messages claude-code-bare route"),
+            StreamTransportRoute::MessagesHarness(MessagesHarnessRoute::ClaudeCode)
+        );
+    }
+
+    #[test]
+    fn claude_code_responses_wire_carries_full_shaping() {
+        assert_eq!(
+            resolve_stream_transport_route(WireApi::Responses, &Harness::ClaudeCode)
+                .expect("responses claude-code route"),
+            StreamTransportRoute::ClaudeCodeResponses(ClaudeCodeProfileRoute::Full)
+        );
+    }
+
+    #[test]
+    fn claude_code_bare_responses_wire_carries_bare_shaping() {
+        assert_eq!(
+            resolve_stream_transport_route(WireApi::Responses, &Harness::ClaudeCodeBare)
+                .expect("responses claude-code-bare route"),
+            StreamTransportRoute::ClaudeCodeResponses(ClaudeCodeProfileRoute::Bare)
+        );
+    }
+
+    #[test]
+    fn claude_code_chat_wire_carries_full_shaping() {
         assert_eq!(
             resolve_stream_transport_route(WireApi::Chat, &Harness::ClaudeCode)
                 .expect("chat claude-code route"),
-            StreamTransportRoute::ChatCompletionsCompat
+            StreamTransportRoute::ClaudeCodeChat(ClaudeCodeProfileRoute::Full)
+        );
+    }
+
+    #[test]
+    fn claude_code_bare_chat_wire_carries_bare_shaping() {
+        // claude-code-bare is the default harness for DeepSeek, whose provider
+        // declares wire_api = "chat"; this must NOT fall through to a generic
+        // chat route or the Responses transport.
+        assert_eq!(
+            resolve_stream_transport_route(WireApi::Chat, &Harness::ClaudeCodeBare)
+                .expect("chat claude-code-bare route"),
+            StreamTransportRoute::ClaudeCodeChat(ClaudeCodeProfileRoute::Bare)
         );
     }
 
@@ -222,17 +294,6 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "wire_api = \"messages\" requires a harness-native transport; configure harness = \"claude-code\" or \"claude-code-bare\" for Anthropic-style sessions"
-        );
-    }
-
-    #[test]
-    fn claude_code_harness_rejects_responses_wire() {
-        let err = resolve_stream_transport_route(WireApi::Responses, &Harness::ClaudeCode)
-            .expect_err("claude-code on responses should fail");
-
-        assert_eq!(
-            err.to_string(),
-            "harness = \"claude-code\" requires a provider with wire_api = \"messages\""
         );
     }
 

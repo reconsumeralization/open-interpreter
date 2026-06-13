@@ -143,19 +143,10 @@ pub(crate) fn build_request_for_profile(
         )
     };
 
-    let tools = build_tools(&prompt.tools, is_child_agent_request, profile)?;
-    let system_prompt = if is_child_agent_request {
-        build_child_agent_system_prompt(prompt, model_info.slug.as_str())
-    } else if profile.is_bare() {
-        build_bare_system_prompt(prompt)
-    } else {
-        let shell_tool_name = if tools.iter().any(|tool| tool.name == "Bash") {
-            ClaudeCodeShellToolName::Bash
-        } else {
-            ClaudeCodeShellToolName::PowerShell
-        };
-        build_system_prompt(prompt, model_info.slug.as_str(), shell_tool_name)
-    };
+    let ClaudeCodeSystemAndTools {
+        system_prompt,
+        tools,
+    } = claude_code_system_and_tools(prompt, model_info, profile, is_child_agent_request)?;
     let mut system = vec![AnthropicTextBlock::new(build_billing_header(
         "message",
         model_info.slug.as_str(),
@@ -190,6 +181,105 @@ pub(crate) fn build_request_for_profile(
         temperature: is_child_agent_request.then_some(1),
         max_tokens,
         stream: true,
+    })
+}
+
+/// Wire-agnostic claude-code shaping: the Claude Code system prompt plus the
+/// profile-appropriate tool surface, both produced from the same builders that
+/// drive the Anthropic Messages request.
+///
+/// The Messages wire keeps the structured [`AnthropicTool`] shape (above); the
+/// Responses and Chat wires take the same selection rendered into flat
+/// Responses-style function tools so a single source of truth shapes all three
+/// provider protocols.
+pub(crate) struct ClaudeCodeSystemAndTools {
+    pub(crate) system_prompt: String,
+    pub(crate) tools: Vec<AnthropicTool>,
+}
+
+fn claude_code_system_and_tools(
+    prompt: &Prompt,
+    model_info: &ModelInfo,
+    profile: ClaudeCodeProfile,
+    is_child_agent_request: bool,
+) -> Result<ClaudeCodeSystemAndTools, serde_json::Error> {
+    let tools = build_tools(&prompt.tools, is_child_agent_request, profile)?;
+    let system_prompt = if is_child_agent_request {
+        build_child_agent_system_prompt(prompt, model_info.slug.as_str())
+    } else if profile.is_bare() {
+        build_bare_system_prompt(prompt)
+    } else {
+        let shell_tool_name = if tools.iter().any(|tool| tool.name == "Bash") {
+            ClaudeCodeShellToolName::Bash
+        } else {
+            ClaudeCodeShellToolName::PowerShell
+        };
+        build_system_prompt(prompt, model_info.slug.as_str(), shell_tool_name)
+    };
+    Ok(ClaudeCodeSystemAndTools {
+        system_prompt,
+        tools,
+    })
+}
+
+/// Renders the claude-code tool surface as flat Responses-style function tools
+/// (`{"type":"function","name","description","parameters"}`). Both the Chat and
+/// Responses wires consume tools in this shape; the chat-wire-compat converter
+/// turns them into the chat `tools` array, and the Responses API accepts them
+/// directly.
+fn claude_code_tools_as_responses_json(tools: &[AnthropicTool]) -> Vec<Value> {
+    tools
+        .iter()
+        .map(|tool| {
+            json!({
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.input_schema,
+            })
+        })
+        .collect()
+}
+
+/// Builds a Responses-style request carrying claude-code shaping (system prompt
+/// as `instructions`, the profile tool surface, and the conversation input).
+///
+/// This is the single shaping path for the non-Messages wires: the Responses
+/// transport sends it as-is to `/responses`, and the Chat transport feeds it to
+/// the chat-wire-compat converter which emits a `/chat/completions` body. The
+/// Claude Code prompt + tool definitions therefore drive all three provider
+/// protocols from one place.
+pub(crate) fn build_claude_code_responses_shaped_request(
+    prompt: &Prompt,
+    model_info: &ModelInfo,
+    session_source: Option<&SessionSource>,
+    profile: ClaudeCodeProfile,
+    prompt_cache_key: Option<String>,
+) -> Result<codex_api::ResponsesApiRequest, serde_json::Error> {
+    let is_child_agent_request = matches!(
+        session_source,
+        Some(SessionSource::SubAgent(SubAgentSource::ThreadSpawn { .. }))
+    );
+    let ClaudeCodeSystemAndTools {
+        system_prompt,
+        tools,
+    } = claude_code_system_and_tools(prompt, model_info, profile, is_child_agent_request)?;
+    let tools = claude_code_tools_as_responses_json(&tools);
+    Ok(codex_api::ResponsesApiRequest {
+        model: model_info.slug.clone(),
+        instructions: system_prompt,
+        input: prompt.get_formatted_input(),
+        tools,
+        tool_choice: "auto".to_string(),
+        parallel_tool_calls: prompt.parallel_tool_calls,
+        reasoning: None,
+        store: false,
+        stream: true,
+        include: Vec::new(),
+        service_tier: None,
+        prompt_cache_key,
+        text: None,
+        client_metadata: None,
     })
 }
 
@@ -4326,5 +4416,115 @@ mod tests {
             Some(AnthropicThinkingConfig::enabled(31_999))
         );
         assert_eq!(request.output_config, None);
+    }
+
+    fn test_function_tool(name: &str) -> ToolSpec {
+        ToolSpec::Function(codex_tools::ResponsesApiTool {
+            name: name.to_string(),
+            description: name.to_string(),
+            strict: false,
+            defer_loading: None,
+            parameters: codex_tools::JsonSchema::object(BTreeMap::new(), None, None),
+            output_schema: None,
+        })
+    }
+
+    #[test]
+    fn bare_chat_shaping_carries_bare_prompt_and_bare_tool_set() {
+        // claude-code-bare over the chat wire must shape the Claude Code bare
+        // system prompt and only the Bash/Edit/Read tool surface, rendered as
+        // flat Responses-style function tools the chat-wire-compat converter
+        // consumes. Tools outside the bare set (e.g. Grep) are dropped.
+        let prompt = Prompt {
+            input: vec![ResponseItem::Message {
+                id: None,
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "Write hello.txt containing exactly DONE then stop.".to_string(),
+                }],
+                phase: None,
+            }],
+            cwd: Some(PathBuf::from("/tmp/workspace")),
+            tools: vec![
+                test_function_tool("Bash"),
+                test_function_tool("Edit"),
+                test_function_tool("Read"),
+                test_function_tool("Grep"),
+            ],
+            parallel_tool_calls: false,
+            base_instructions: BaseInstructions {
+                text: "ignored".to_string(),
+            },
+            personality: None,
+            output_schema: None,
+            output_schema_strict: true,
+        };
+
+        let request = build_claude_code_responses_shaped_request(
+            &prompt,
+            &test_model_info("deepseek-v4-pro"),
+            None,
+            ClaudeCodeProfile::Bare,
+            Some("thread-123".to_string()),
+        )
+        .expect("build bare chat shaping");
+
+        // System prompt is the Claude Code bare prompt (CWD/Date header).
+        assert!(request.instructions.starts_with("CWD: /tmp/workspace"));
+        assert!(request.instructions.contains("Date:"));
+
+        // The conversation input round-trips for the converter.
+        assert_eq!(request.input.len(), 1);
+
+        // Tools are flat Responses-style function tools, limited to the bare set.
+        let tool_names: Vec<&str> = request
+            .tools
+            .iter()
+            .map(|tool| {
+                assert_eq!(tool["type"], "function");
+                assert!(tool.get("parameters").is_some());
+                tool["name"].as_str().expect("tool name")
+            })
+            .collect();
+        assert_eq!(tool_names, vec!["Bash", "Edit", "Read"]);
+        assert_eq!(request.prompt_cache_key.as_deref(), Some("thread-123"));
+    }
+
+    #[test]
+    fn full_chat_shaping_carries_full_claude_code_prompt() {
+        let prompt = Prompt {
+            input: vec![ResponseItem::Message {
+                id: None,
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "Update files".to_string(),
+                }],
+                phase: None,
+            }],
+            cwd: Some(PathBuf::from("/tmp/workspace")),
+            tools: vec![test_bash_tool()],
+            parallel_tool_calls: false,
+            base_instructions: BaseInstructions {
+                text: "ignored".to_string(),
+            },
+            personality: None,
+            output_schema: None,
+            output_schema_strict: true,
+        };
+
+        let request = build_claude_code_responses_shaped_request(
+            &prompt,
+            &test_model_info("claude-opus-4-7"),
+            None,
+            ClaudeCodeProfile::Full,
+            None,
+        )
+        .expect("build full chat shaping");
+
+        // The full profile renders the rich Claude Code agent system prompt.
+        assert!(request.instructions.contains("Claude Code"));
+        // Tools are flat Responses-style function tools and include Bash.
+        assert!(request.tools.iter().all(|tool| tool["type"] == "function"));
+        assert!(request.tools.iter().any(|tool| tool["name"] == "Bash"));
     }
 }
