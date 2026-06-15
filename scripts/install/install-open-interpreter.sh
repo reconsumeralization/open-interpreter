@@ -10,7 +10,7 @@ case "$script_name" in
     ;;
 esac
 
-export CODEX_GITHUB_REPO="${OPEN_INTERPRETER_GITHUB_REPO:-${CODEX_GITHUB_REPO:-KillianLucas/oix}}"
+export CODEX_GITHUB_REPO="${OPEN_INTERPRETER_GITHUB_REPO:-${CODEX_GITHUB_REPO:-openinterpreter/openinterpreter}}"
 export CODEX_INSTALL_PRODUCT_NAME="${CODEX_INSTALL_PRODUCT_NAME:-Open Interpreter}"
 export CODEX_PACKAGE_ASSET_STEM="${CODEX_PACKAGE_ASSET_STEM:-open-interpreter-package}"
 export CODEX_COMMAND_NAME="${CODEX_COMMAND_NAME:-interpreter}"

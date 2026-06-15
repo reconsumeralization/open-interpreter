@@ -13,7 +13,7 @@ if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
 
 if ([string]::IsNullOrWhiteSpace($env:CODEX_GITHUB_REPO)) {
     $env:CODEX_GITHUB_REPO = if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_GITHUB_REPO)) {
-        "KillianLucas/oix"
+        "openinterpreter/openinterpreter"
     } else {
         $env:OPEN_INTERPRETER_GITHUB_REPO
     }

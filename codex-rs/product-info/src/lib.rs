@@ -2,26 +2,24 @@ pub const OPEN_INTERPRETER_BRAND_ENV_VAR: &str = "OPEN_INTERPRETER_BRAND";
 
 const CODEX_RELEASE_NOTES_URL: &str = "https://github.com/openai/codex/releases/latest";
 const OPEN_INTERPRETER_RELEASE_NOTES_URL: &str =
-    "https://github.com/KillianLucas/oix/releases/latest";
+    "https://github.com/openinterpreter/openinterpreter/releases/latest";
 const CODEX_LATEST_RELEASE_URL: &str = "https://api.github.com/repos/openai/codex/releases/latest";
 const OPEN_INTERPRETER_LATEST_RELEASE_URL: &str =
-    "https://api.github.com/repos/KillianLucas/oix/releases/latest";
+    "https://api.github.com/repos/openinterpreter/openinterpreter/releases/latest";
 const CODEX_INSTALLER_URL: &str = "https://chatgpt.com/codex/install.sh";
-const OPEN_INTERPRETER_INSTALLER_URL: &str =
-    "https://github.com/KillianLucas/oix/releases/latest/download/install.sh";
+const OPEN_INTERPRETER_INSTALLER_URL: &str = "https://www.openinterpreter.com/install";
 const CODEX_INSTALL_COMMAND: &str = "curl -fsSL https://chatgpt.com/codex/install.sh | sh";
 const OPEN_INTERPRETER_INSTALL_COMMAND: &str = "\
-curl -fsSL https://github.com/KillianLucas/oix/releases/latest/download/install.sh | sh";
+curl -fsSL https://www.openinterpreter.com/install | sh";
 const CODEX_STANDALONE_UNIX_UPDATE_COMMAND: &str =
     "curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh";
 const OPEN_INTERPRETER_STANDALONE_UNIX_UPDATE_COMMAND: &str = "\
-curl -fsSL https://github.com/KillianLucas/oix/releases/latest/download/install.sh | \
-CODEX_NON_INTERACTIVE=1 sh";
+curl -fsSL https://www.openinterpreter.com/install | CODEX_NON_INTERACTIVE=1 sh";
 const CODEX_STANDALONE_WINDOWS_UPDATE_COMMAND: &str =
     "$env:CODEX_NON_INTERACTIVE=1; irm https://chatgpt.com/codex/install.ps1 | iex";
 const OPEN_INTERPRETER_STANDALONE_WINDOWS_UPDATE_COMMAND: &str = "\
 $env:CODEX_NON_INTERACTIVE=1; \
-irm https://github.com/KillianLucas/oix/releases/latest/download/install.ps1 | iex";
+irm https://www.openinterpreter.com/install.ps1 | iex";
 const CODEX_STANDALONE_UNIX_UPDATE_ARGS: &[&str] = &["-c", CODEX_STANDALONE_UNIX_UPDATE_COMMAND];
 const OPEN_INTERPRETER_STANDALONE_UNIX_UPDATE_ARGS: &[&str] =
     &["-c", OPEN_INTERPRETER_STANDALONE_UNIX_UPDATE_COMMAND];
@@ -218,23 +216,23 @@ mod tests {
     }
 
     #[test]
-    fn open_interpreter_product_uses_oix_release_channel() {
+    fn open_interpreter_product_uses_openinterpreter_release_channel() {
         assert_eq!(
             Product::OpenInterpreter.release_notes_url(),
-            "https://github.com/KillianLucas/oix/releases/latest"
+            "https://github.com/openinterpreter/openinterpreter/releases/latest"
         );
         assert_eq!(
             Product::OpenInterpreter.latest_release_url(),
-            "https://api.github.com/repos/KillianLucas/oix/releases/latest"
+            "https://api.github.com/repos/openinterpreter/openinterpreter/releases/latest"
         );
         assert_eq!(
             Product::OpenInterpreter.installer_url(),
-            "https://github.com/KillianLucas/oix/releases/latest/download/install.sh"
+            "https://www.openinterpreter.com/install"
         );
         assert!(
             Product::OpenInterpreter
                 .install_command()
-                .contains("github.com/KillianLucas/oix/releases/latest/download/install.sh")
+                .contains("https://www.openinterpreter.com/install")
         );
         assert_eq!(
             Product::OpenInterpreter.installer_env(),

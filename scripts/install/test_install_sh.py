@@ -45,7 +45,7 @@ class InstallShLatestResolutionTests(unittest.TestCase):
         self,
         release_list: str,
         *,
-        repo: str = "KillianLucas/oix",
+        repo: str = "openinterpreter/openinterpreter",
         product_name: str = "Open Interpreter",
         package_asset_stem: str = "open-interpreter-package",
         command_name: str = "interpreter",
@@ -324,7 +324,7 @@ class InstallShLatestResolutionTests(unittest.TestCase):
                 env={
                     **os.environ,
                     "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
-                    "CODEX_GITHUB_REPO": "KillianLucas/oix",
+                    "CODEX_GITHUB_REPO": "openinterpreter/openinterpreter",
                     "CODEX_INSTALL_PRODUCT_NAME": "Open Interpreter",
                     "CODEX_PACKAGE_ASSET_STEM": "open-interpreter-package",
                     "CODEX_COMMAND_NAME": "interpreter",

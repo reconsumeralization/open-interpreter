@@ -239,7 +239,7 @@ mod tests {
         );
         assert_eq!(
             ProductUpdateSource::OpenInterpreter.release_notes_url(),
-            "https://github.com/KillianLucas/oix/releases/latest"
+            "https://github.com/openinterpreter/openinterpreter/releases/latest"
         );
         assert_eq!(
             ProductUpdateSource::Codex.latest_release_url(),
@@ -247,7 +247,7 @@ mod tests {
         );
         assert_eq!(
             ProductUpdateSource::OpenInterpreter.latest_release_url(),
-            "https://api.github.com/repos/KillianLucas/oix/releases/latest"
+            "https://api.github.com/repos/openinterpreter/openinterpreter/releases/latest"
         );
     }
 }
