@@ -59,7 +59,7 @@ pub(crate) fn build_request(
         "content": build_system_prompt(prompt, model_info),
     })];
     messages.extend(build_messages(
-        &prompt.get_formatted_input(),
+        prompt.get_formatted_input(),
         search_agent || task_agent,
     )?);
     let tools = if search_agent {

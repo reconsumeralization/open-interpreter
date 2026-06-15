@@ -6,7 +6,7 @@ description: Install and run Open Interpreter on Windows.
 Install from PowerShell:
 
 ```powershell
-irm https://openinterpreter.com/install.ps1 | iex
+irm https://www.openinterpreter.com/install.ps1 | iex
 ```
 
 Restart the terminal, then verify:
@@ -21,7 +21,7 @@ WSL is a good choice when your project already uses Linux tooling. Install with
 the macOS/Linux command inside WSL:
 
 ```bash
-curl -fsSL https://openinterpreter.com/install | sh
+curl -fsSL https://www.openinterpreter.com/install | sh
 ```
 
 ## Paths and Shells

@@ -171,14 +171,14 @@ fn build_messages(prompt: &Prompt, kind: &Terminus2RequestKind) -> Vec<Value> {
         match item {
             ResponseItem::Message { role, content, .. } => match role.as_str() {
                 "user" if !saw_initial_prompt => {
-                    if let Some(text) = plain_text_content(&content)
+                    if let Some(text) = plain_text_content(content)
                         && is_problem_statement_candidate(&text)
                     {
                         initial_user = Some(text);
                     }
                 }
                 "user" => {
-                    if let Some(text) = plain_text_content(&content) {
+                    if let Some(text) = plain_text_content(content) {
                         pending_parse_error = text.starts_with(TERMINUS_2_PARSE_ERROR_PREFIX);
                         messages.push(json!({
                             "role": "user",
@@ -188,7 +188,7 @@ fn build_messages(prompt: &Prompt, kind: &Terminus2RequestKind) -> Vec<Value> {
                 }
                 "assistant" => {
                     emit_initial_user(&mut messages, &mut initial_user, &mut saw_initial_prompt);
-                    if let Some(text) = plain_text_content(&content) {
+                    if let Some(text) = plain_text_content(content) {
                         messages.push(json!({
                             "role": "assistant",
                             "content": text,
@@ -206,7 +206,7 @@ fn build_messages(prompt: &Prompt, kind: &Terminus2RequestKind) -> Vec<Value> {
                     continue;
                 }
                 let _command = pending_commands.pop_front();
-                let terminal_output = terminus_terminal_output(&output);
+                let terminal_output = terminus_terminal_output(output);
                 messages.push(json!({
                     "role": "user",
                     "content": terminal_output,

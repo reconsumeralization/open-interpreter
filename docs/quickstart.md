@@ -10,13 +10,13 @@ files, run commands, review diffs, and resume work later.
 <Steps>
   <Step title="Install">
     ```bash
-    curl -fsSL https://openinterpreter.com/install | sh
+    curl -fsSL https://www.openinterpreter.com/install | sh
     ```
 
     On Windows, run:
 
     ```powershell
-    irm https://openinterpreter.com/install.ps1 | iex
+    irm https://www.openinterpreter.com/install.ps1 | iex
     ```
   </Step>
   <Step title="Open a project">

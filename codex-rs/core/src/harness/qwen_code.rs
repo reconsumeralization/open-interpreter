@@ -29,7 +29,7 @@ pub(crate) fn build_request(
             "content": "Got it. Thanks for the context!",
         }),
     ];
-    messages.extend(build_qwen_messages(&prompt.get_formatted_input())?);
+    messages.extend(build_qwen_messages(prompt.get_formatted_input())?);
     let tools = super::kimi_cli::build_tools(&prompt.tools)?;
     let tool_kinds = prompt
         .tools

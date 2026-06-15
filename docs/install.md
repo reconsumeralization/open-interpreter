@@ -9,12 +9,12 @@ the managed standalone layout used by Open Interpreter's self-update logic.
 <Tabs>
   <Tab title="macOS / Linux">
     ```bash
-    curl -fsSL https://openinterpreter.com/install | sh
+    curl -fsSL https://www.openinterpreter.com/install | sh
     ```
   </Tab>
   <Tab title="Windows PowerShell">
     ```powershell
-    irm https://openinterpreter.com/install.ps1 | iex
+    irm https://www.openinterpreter.com/install.ps1 | iex
     ```
   </Tab>
 </Tabs>

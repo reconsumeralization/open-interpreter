@@ -22,13 +22,13 @@
 macOS and Linux:
 
 ```bash
-curl -fsSL https://openinterpreter.com/install | sh
+curl -fsSL https://www.openinterpreter.com/install | sh
 ```
 
 Windows:
 
 ```powershell
-irm https://openinterpreter.com/install.ps1 | iex
+irm https://www.openinterpreter.com/install.ps1 | iex
 ```
 
 Then type `i` or `interpreter` in your terminal to start a session.

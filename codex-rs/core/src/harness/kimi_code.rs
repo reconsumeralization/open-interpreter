@@ -30,7 +30,7 @@ pub(crate) fn build_request(
     })];
     messages.extend(add_auto_permission_reminders(
         kimi_cli::build_messages_with_options(
-            &prompt.get_formatted_input(),
+            prompt.get_formatted_input(),
             kimi_cli::MessageBuildOptions::kimi_code(),
         )?
         .collect(),

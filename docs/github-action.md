@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Open Interpreter
-        run: curl -fsSL https://openinterpreter.com/install | sh
+        run: curl -fsSL https://www.openinterpreter.com/install | sh
 
       - name: Review the patch
         env:

@@ -56,7 +56,7 @@ pub(crate) fn build_request(
         "content": system_prompt,
     })];
     messages.extend(super::kimi_cli::build_messages_with_options(
-        &prompt.get_formatted_input(),
+        prompt.get_formatted_input(),
         super::kimi_cli::MessageBuildOptions::deepseek_tui(),
     )?);
     add_omitted_reasoning_to_assistant_tool_calls(&mut messages);

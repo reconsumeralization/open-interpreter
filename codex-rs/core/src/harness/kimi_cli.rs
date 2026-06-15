@@ -48,7 +48,7 @@ pub(crate) fn build_request(
         "role": "system",
         "content": system_prompt,
     })];
-    messages.extend(build_messages(&prompt.get_formatted_input())?);
+    messages.extend(build_messages(prompt.get_formatted_input())?);
     let tools = build_tools(&prompt.tools)?;
     let tool_kinds = prompt
         .tools

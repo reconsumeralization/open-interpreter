@@ -2306,6 +2306,7 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     use crate::session::tests::make_session_and_context;
+    use crate::session::turn_context::TurnEnvironment;
     use crate::tools::context::ToolCallSource;
     use crate::tools::registry::ToolExecutor;
     use crate::turn_diff_tracker::TurnDiffTracker;
@@ -2324,7 +2325,13 @@ mod tests {
         {
             turn.cwd = workspace_root.clone();
         }
-        turn.environments.turn_environments[0].cwd = workspace_root.clone();
+        let current = turn.environments.turn_environments[0].clone();
+        turn.environments.turn_environments[0] = TurnEnvironment::new(
+            current.environment_id,
+            current.environment,
+            workspace_root.clone(),
+            current.shell,
+        );
         let file_system_sandbox_policy =
             FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry {
                 path: FileSystemPath::Path {

@@ -110,7 +110,7 @@ fn build_messages(prompt: &Prompt) -> Result<Vec<Value>, serde_json::Error> {
     let input = prompt.get_formatted_input();
     let mut item_index = 0;
     while item_index < input.len() {
-        if is_format_retry_pair(&input, item_index) {
+        if is_format_retry_pair(input, item_index) {
             item_index += 2;
             continue;
         }
