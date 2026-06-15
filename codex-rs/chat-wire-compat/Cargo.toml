@@ -26,6 +26,5 @@ tokio = { workspace = true, features = ["sync", "time"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
-async-trait = { workspace = true }
 pretty_assertions = { workspace = true }
 wiremock = { workspace = true }

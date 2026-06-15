@@ -42,6 +42,7 @@ use anyhow::anyhow;
 use async_channel::Sender;
 use codex_config::Constrained;
 use codex_config::McpServerTransportConfig;
+use codex_config::types::AuthKeyringBackendKind;
 use codex_config::types::OAuthCredentialsStoreMode;
 use codex_login::CodexAuth;
 use codex_product_info::Product;
@@ -120,6 +121,7 @@ impl McpConnectionManager {
     pub async fn new(
         mcp_servers: &HashMap<String, EffectiveMcpServer>,
         store_mode: OAuthCredentialsStoreMode,
+        keyring_backend_kind: AuthKeyringBackendKind,
         auth_entries: HashMap<String, McpAuthStatusEntry>,
         approval_policy: &Constrained<AskForApproval>,
         submit_id: String,
@@ -199,6 +201,7 @@ impl McpConnectionManager {
                 server_name.clone(),
                 server,
                 store_mode,
+                keyring_backend_kind,
                 cancel_token.clone(),
                 tx_event.clone(),
                 elicitation_requests.clone(),
@@ -349,6 +352,10 @@ impl McpConnectionManager {
         !self.clients.is_empty()
     }
 
+    pub(crate) fn contains_server(&self, server_name: &str) -> bool {
+        self.clients.contains_key(server_name)
+    }
+
     /// Stop all MCP clients owned by this manager and terminate stdio server processes.
     pub async fn shutdown(&self) {
         self.startup_cancellation_token.cancel();
@@ -373,6 +380,22 @@ impl McpConnectionManager {
     pub fn plugin_id_for_mcp_server_name(&self, server_name: &str) -> Option<&str> {
         self.tool_plugin_provenance
             .plugin_id_for_mcp_server_name(server_name)
+    }
+
+    pub fn is_selected_plugin_mcp_server(&self, server_name: &str) -> bool {
+        self.tool_plugin_provenance
+            .is_selected_plugin_mcp_server(server_name)
+    }
+
+    pub fn tool_approval_mode(
+        &self,
+        server_name: &str,
+        tool_name: &str,
+    ) -> codex_config::AppToolApproval {
+        self.server_metadata
+            .get(server_name)
+            .map(|metadata| metadata.tool_approval_mode(tool_name))
+            .unwrap_or_default()
     }
 
     pub fn is_host_owned_codex_apps_server(&self, server_name: &str) -> bool {

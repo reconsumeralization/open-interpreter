@@ -268,7 +268,7 @@ pub(crate) fn build_claude_code_responses_shaped_request(
     Ok(codex_api::ResponsesApiRequest {
         model: model_info.slug.clone(),
         instructions: system_prompt,
-        input: prompt.get_formatted_input(),
+        input: prompt.get_formatted_input().to_vec(),
         tools,
         tool_choice: "auto".to_string(),
         parallel_tool_calls: prompt.parallel_tool_calls,

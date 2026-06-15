@@ -1053,6 +1053,7 @@ mod tests {
     use codex_arg0::Arg0DispatchPaths;
     use codex_cloud_config::cloud_config_bundle_loader_for_storage;
     use codex_config::types::AuthCredentialsStoreMode;
+    use codex_login::AuthKeyringBackendKind;
 
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
@@ -1076,6 +1077,7 @@ mod tests {
                 codex_home_path.clone(),
                 /*enable_codex_api_key_env*/ false,
                 AuthCredentialsStoreMode::File,
+                AuthKeyringBackendKind::default(),
                 "https://chatgpt.com/backend-api/".to_string(),
             )
             .await,

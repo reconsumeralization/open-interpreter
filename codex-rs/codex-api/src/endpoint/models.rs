@@ -255,6 +255,7 @@ fn anthropic_model_info_from_capabilities(model: AnthropicModel) -> ModelInfo {
         default_service_tier: None,
         availability_nux: None,
         upgrade: None,
+        comp_hash: None,
         base_instructions: String::new(),
         model_messages: None,
         supports_reasoning_summaries: false,
@@ -355,6 +356,7 @@ fn openai_compatible_model_info_from_id(model: OpenAiCompatibleModel) -> ModelIn
         default_service_tier: None,
         availability_nux: None,
         upgrade: None,
+        comp_hash: None,
         base_instructions: String::new(),
         model_messages: None,
         supports_reasoning_summaries: false,
@@ -618,7 +620,6 @@ mod tests {
     use super::*;
     use crate::auth::AuthProvider;
     use crate::provider::RetryConfig;
-    use async_trait::async_trait;
     use codex_client::Request;
     use codex_client::Response;
     use codex_client::StreamResponse;
@@ -648,7 +649,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl HttpTransport for CapturingTransport {
         async fn execute(&self, req: Request) -> Result<Response, TransportError> {
             *self.last_request.lock().unwrap() = Some(req);
