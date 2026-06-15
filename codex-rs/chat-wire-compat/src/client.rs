@@ -409,7 +409,6 @@ fn subagent_header(source: &Option<codex_protocol::protocol::SessionSource>) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use codex_api::Compression;
     use codex_api::OpenAiVerbosity;
     use codex_api::ResponsesApiRequest;
@@ -433,22 +432,27 @@ mod tests {
         last_request: Mutex<Option<Request>>,
     }
 
-    #[async_trait]
     impl HttpTransport for RecordingTransport {
-        async fn execute(&self, _req: Request) -> Result<Response, TransportError> {
-            unreachable!("chat wire compat tests only use streaming requests")
+        fn execute(
+            &self,
+            _req: Request,
+        ) -> impl std::future::Future<Output = Result<Response, TransportError>> + Send {
+            async { unreachable!("chat wire compat tests only use streaming requests") }
         }
 
-        async fn stream(
+        fn stream(
             &self,
             req: Request,
-        ) -> Result<codex_client::StreamResponse, TransportError> {
-            *self.last_request.lock().expect("record last request") = Some(req);
-            Ok(codex_client::StreamResponse {
-                status: http::StatusCode::OK,
-                headers: HeaderMap::new(),
-                bytes: Box::pin(futures::stream::empty()),
-            })
+        ) -> impl std::future::Future<Output = Result<codex_client::StreamResponse, TransportError>> + Send
+        {
+            async move {
+                *self.last_request.lock().expect("record last request") = Some(req);
+                Ok(codex_client::StreamResponse {
+                    status: http::StatusCode::OK,
+                    headers: HeaderMap::new(),
+                    bytes: Box::pin(futures::stream::empty()),
+                })
+            }
         }
     }
 
