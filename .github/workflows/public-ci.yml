@@ -31,8 +31,8 @@ jobs:
           shellcheck -s sh scripts/install/install-open-interpreter.sh
           grep -q 'open-interpreter-package' scripts/install/install-open-interpreter.sh
           grep -q 'open-interpreter-package' scripts/install/install-open-interpreter.ps1
-          grep -q 'KillianLucas/oix' scripts/install/install-open-interpreter.sh
-          grep -q 'KillianLucas/oix' scripts/install/install-open-interpreter.ps1
+          grep -q 'openinterpreter/openinterpreter' scripts/install/install-open-interpreter.sh
+          grep -q 'openinterpreter/openinterpreter' scripts/install/install-open-interpreter.ps1
 
       - name: Test packaging and installer scripts
         run: |
