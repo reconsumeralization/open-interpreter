@@ -469,9 +469,8 @@ fn compatible_description(
         capability_tags.push("Reasoning effort");
     } else if reasoning_control_from_metadata(supported_parameters, catalog_entry)
         != ReasoningControl::None
+        || supports_reasoning_parameter(supported_parameters)
     {
-        capability_tags.push("Reasoning");
-    } else if supports_reasoning_parameter(supported_parameters) {
         capability_tags.push("Reasoning");
     }
     if supports_search_parameter(supported_parameters) {
