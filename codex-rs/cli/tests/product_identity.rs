@@ -1,0 +1,159 @@
+//! The product identity must hold under every name users actually invoke.
+//!
+//! Regression coverage for the split-brain bug where the `i` alias passed one
+//! crate's brand check but not another's hand-rolled copy, so the process ran
+//! with Open Interpreter branding on top of Codex's home directory, update
+//! cache, and keychain credentials.
+
+use std::path::Path;
+use std::process::Command;
+
+fn run(bin: &Path, args: &[&str], envs: &[(&str, &str)], removed: &[&str]) -> (String, String) {
+    run_in(bin, args, envs, removed, None)
+}
+
+fn run_in(
+    bin: &Path,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    removed: &[&str],
+    cwd: Option<&Path>,
+) -> (String, String) {
+    let mut command = Command::new(bin);
+    command.args(args);
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    for key in removed {
+        command.env_remove(key);
+    }
+    let output = command.output().expect("spawn binary");
+    (
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+fn canonical_str(path: &Path) -> String {
+    path.canonicalize()
+        .expect("canonicalize")
+        .to_string_lossy()
+        .into_owned()
+}
+
+#[test]
+fn i_alias_runs_as_open_interpreter_with_interpreter_home() -> anyhow::Result<()> {
+    let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
+    let alias_dir = tempfile::tempdir()?;
+    let alias = alias_dir.path().join("i");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&codex_bin, &alias)?;
+    #[cfg(not(unix))]
+    std::fs::copy(&codex_bin, &alias)?;
+
+    let interpreter_home = tempfile::tempdir()?;
+    let codex_home_decoy = tempfile::tempdir()?;
+    let envs = [
+        ("INTERPRETER_HOME", canonical_str(interpreter_home.path())),
+        ("CODEX_HOME", canonical_str(codex_home_decoy.path())),
+    ];
+    let env_refs: Vec<(&str, &str)> = envs
+        .iter()
+        .map(|(key, value)| (*key, value.as_str()))
+        .collect();
+
+    // Brand: the version line must identify as interpreter, not codex.
+    let (stdout, _) = run(&alias, &["--version"], &env_refs, &[]);
+    assert!(
+        stdout.starts_with("interpreter "),
+        "expected interpreter version line, got: {stdout}"
+    );
+
+    // Home isolation: the resolved home must be INTERPRETER_HOME, and the
+    // CODEX_HOME decoy must not leak into the resolved configuration.
+    let (stdout, stderr) = run(&alias, &["doctor", "--json"], &env_refs, &[]);
+    let interpreter_home_str = canonical_str(interpreter_home.path());
+    let decoy_str = canonical_str(codex_home_decoy.path());
+    assert!(
+        stdout.contains(&interpreter_home_str),
+        "doctor output should reference INTERPRETER_HOME {interpreter_home_str}; stdout: {stdout}; stderr: {stderr}"
+    );
+    assert!(
+        !stdout.contains(&decoy_str),
+        "doctor output must not reference CODEX_HOME decoy {decoy_str}; stdout: {stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn codex_name_keeps_codex_identity_in_dev_builds() -> anyhow::Result<()> {
+    let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
+    let (stdout, _) = run(&codex_bin, &["--version"], &[], &["OPEN_INTERPRETER_BRAND"]);
+    assert!(
+        stdout.starts_with("codex "),
+        "dev codex binary should keep codex identity, got: {stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn i_alias_never_loads_codex_project_config() -> anyhow::Result<()> {
+    let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
+    let alias_dir = tempfile::tempdir()?;
+    let alias = alias_dir.path().join("i");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&codex_bin, &alias)?;
+    #[cfg(not(unix))]
+    std::fs::copy(&codex_bin, &alias)?;
+
+    let project = tempfile::tempdir()?;
+    let project_path = canonical_str(project.path());
+    let interpreter_home = tempfile::tempdir()?;
+    std::fs::write(
+        interpreter_home.path().join("config.toml"),
+        format!("[projects.\"{project_path}\"]\ntrust_level = \"trusted\"\n"),
+    )?;
+
+    // A repository's Codex configuration must never load as Interpreter
+    // project config.
+    std::fs::create_dir_all(project.path().join(".codex"))?;
+    std::fs::write(
+        project.path().join(".codex/config.toml"),
+        "model = \"codex-leak-canary\"\n",
+    )?;
+    let home_str = canonical_str(interpreter_home.path());
+    let envs = [("INTERPRETER_HOME", home_str.as_str())];
+    let (stdout, stderr) = run_in(
+        &alias,
+        &["doctor", "--json"],
+        &envs,
+        &[],
+        Some(project.path()),
+    );
+    assert!(
+        !stdout.contains("codex-leak-canary") && !stderr.contains("codex-leak-canary"),
+        "Interpreter must not load .codex project config; stdout: {stdout}"
+    );
+
+    // Interpreter's own project config folder does load.
+    std::fs::create_dir_all(project.path().join(".openinterpreter"))?;
+    std::fs::write(
+        project.path().join(".openinterpreter/config.toml"),
+        "model = \"interpreter-canary\"\n",
+    )?;
+    let (stdout, stderr) = run_in(
+        &alias,
+        &["doctor", "--json"],
+        &envs,
+        &[],
+        Some(project.path()),
+    );
+    assert!(
+        stdout.contains("interpreter-canary"),
+        "Interpreter should load .openinterpreter project config; stdout: {stdout}; stderr: {stderr}"
+    );
+    Ok(())
+}

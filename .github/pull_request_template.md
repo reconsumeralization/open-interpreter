@@ -1,15 +1,8 @@
-### Describe the changes you have made:
+# External (non-OpenAI) Pull Request Requirements
 
-### Reference any relevant issues (e.g. "Fixes #000"):
+External code contributions are by invitation only. Please read the dedicated "Contributing" markdown file for details:
+https://github.com/openai/codex/blob/main/docs/contributing.md
 
-### Pre-Submission Checklist (optional but appreciated):
+If your PR conforms to our contribution guidelines, replace this text with a detailed and high quality description of your changes.
 
-- [ ] I have included relevant documentation updates (stored in /docs)
-- [ ] I have read `docs/CONTRIBUTING.md`
-- [ ] I have read `docs/ROADMAP.md`
-
-### OS Tests (optional but appreciated):
-
-- [ ] Tested on Windows
-- [ ] Tested on MacOS
-- [ ] Tested on Linux
+Include a link to a bug report or enhancement request.
