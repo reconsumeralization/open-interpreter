@@ -90,12 +90,6 @@ pub(crate) fn build_request(
 }
 
 fn kimi_prompt_cache_key(conversation_id: &str) -> String {
-    if let Ok(value) = std::env::var("OPEN_INTERPRETER_KIMI_PROMPT_CACHE_KEY_OVERRIDE")
-        && !value.trim().is_empty()
-    {
-        return value;
-    }
-
     conversation_id.to_string()
 }
 
@@ -205,6 +199,13 @@ pub(super) struct MessageBuildOptions {
     pub merge_assistant_text_with_following_tool_calls: bool,
     pub preserve_empty_tool_output: bool,
     pub trim_user_message_trailing_newlines: bool,
+    pub tool_call_id_format: ToolCallIdFormat,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum ToolCallIdFormat {
+    Preserve,
+    KimiCodeUnderscore,
 }
 
 impl MessageBuildOptions {
@@ -215,6 +216,7 @@ impl MessageBuildOptions {
             merge_assistant_text_with_following_tool_calls: false,
             preserve_empty_tool_output: false,
             trim_user_message_trailing_newlines: true,
+            tool_call_id_format: ToolCallIdFormat::Preserve,
         }
     }
 
@@ -225,6 +227,7 @@ impl MessageBuildOptions {
             merge_assistant_text_with_following_tool_calls: false,
             preserve_empty_tool_output: false,
             trim_user_message_trailing_newlines: false,
+            tool_call_id_format: ToolCallIdFormat::KimiCodeUnderscore,
         }
     }
 
@@ -235,6 +238,7 @@ impl MessageBuildOptions {
             merge_assistant_text_with_following_tool_calls: true,
             preserve_empty_tool_output: true,
             trim_user_message_trailing_newlines: true,
+            tool_call_id_format: ToolCallIdFormat::Preserve,
         }
     }
 }
@@ -346,6 +350,7 @@ pub(super) fn build_messages_with_options(
                         &mut pending_reasoning_content,
                     );
                 }
+                let call_id = format_tool_call_id(call_id, options.tool_call_id_format);
                 awaiting_tool_call_ids.clear();
                 pending_tool_calls.push(json!({
                     "type": "function",
@@ -372,6 +377,7 @@ pub(super) fn build_messages_with_options(
                         &mut pending_reasoning_content,
                     );
                 }
+                let call_id = format_tool_call_id(call_id, options.tool_call_id_format);
                 awaiting_tool_call_ids.clear();
                 pending_tool_calls.push(json!({
                     "type": "function",
@@ -401,6 +407,7 @@ pub(super) fn build_messages_with_options(
                         "local_shell history item missing call id",
                     ))
                 })?;
+                let call_id = format_tool_call_id(&call_id, options.tool_call_id_format);
                 let arguments = match action {
                     LocalShellAction::Exec(exec) => json!({
                         "command": exec.command,
@@ -425,7 +432,7 @@ pub(super) fn build_messages_with_options(
                     &mut awaiting_tool_call_ids,
                     &mut pending_assistant_content,
                     &mut pending_reasoning_content,
-                    call_id,
+                    &format_tool_call_id(call_id, options.tool_call_id_format),
                     kimi_tool_output_content(output, options),
                 );
             }
@@ -438,7 +445,7 @@ pub(super) fn build_messages_with_options(
                     &mut awaiting_tool_call_ids,
                     &mut pending_assistant_content,
                     &mut pending_reasoning_content,
-                    call_id,
+                    &format_tool_call_id(call_id, options.tool_call_id_format),
                     kimi_tool_output_content(output, options),
                 );
             }
@@ -641,6 +648,13 @@ fn format_function_arguments(arguments: &str, compact: bool) -> String {
         return compact_json_whitespace_preserving_order(arguments);
     }
     arguments.to_string()
+}
+
+fn format_tool_call_id(call_id: &str, format: ToolCallIdFormat) -> String {
+    match format {
+        ToolCallIdFormat::Preserve => call_id.to_string(),
+        ToolCallIdFormat::KimiCodeUnderscore => call_id.replace(':', "_"),
+    }
 }
 
 fn compact_json_whitespace_preserving_order(input: &str) -> String {
@@ -1239,10 +1253,11 @@ fn render_conditional_block(
 }
 
 fn current_kimi_now() -> String {
-    if let Ok(value) = std::env::var("OPEN_INTERPRETER_KIMI_NOW_OVERRIDE")
-        && !value.trim().is_empty()
-    {
-        return value;
+    if let Ok(fake_time) = std::env::var("HARNESS_LAB_FAKE_TIME") {
+        if let Some((date, time)) = fake_time.split_once(' ') {
+            return format!("{date}T{time}.000000+00:00");
+        }
+        return fake_time;
     }
     chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, false)
 }
@@ -1390,6 +1405,48 @@ mod tests {
             vec![json!({
                 "role": "user",
                 "content": "hello\n",
+            })]
+        );
+    }
+
+    #[test]
+    fn kimi_user_messages_preserve_image_content() {
+        let items = vec![ResponseItem::Message {
+            id: Some("user".to_string()),
+            role: "user".to_string(),
+            content: vec![
+                ContentItem::InputText {
+                    text: "Describe this screenshot.\n".to_string(),
+                },
+                ContentItem::InputImage {
+                    image_url: "data:image/png;base64,KIMIVISION".to_string(),
+                    detail: None,
+                },
+            ],
+            phase: None,
+        }];
+
+        let messages = build_messages(&items)
+            .expect("build messages")
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            messages,
+            vec![json!({
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Describe this screenshot.",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": "data:image/png;base64,KIMIVISION",
+                            "id": null,
+                        }
+                    }
+                ],
             })]
         );
     }
@@ -2316,6 +2373,74 @@ mod tests {
                     "role": "tool",
                     "content": "<system>ERROR: Command failed with exit code: 1.</system>",
                     "tool_call_id": "Shell:7",
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn kimi_messages_preserve_image_tool_output_content() {
+        let items = vec![
+            ResponseItem::FunctionCall {
+                id: Some("fc-1".to_string()),
+                name: "ReadMediaFile".to_string(),
+                namespace: None,
+                arguments: r#"{"path":"screenshot.png"}"#.to_string(),
+                call_id: "ReadMediaFile:1".to_string(),
+            },
+            ResponseItem::FunctionCallOutput {
+                call_id: "ReadMediaFile:1".to_string(),
+                output: FunctionCallOutputPayload {
+                    body: codex_protocol::models::FunctionCallOutputBody::ContentItems(vec![
+                        FunctionCallOutputContentItem::InputText {
+                            text: "screenshot.png".to_string(),
+                        },
+                        FunctionCallOutputContentItem::InputImage {
+                            image_url: "data:image/png;base64,TOOLVISION".to_string(),
+                            detail: None,
+                        },
+                    ]),
+                    success: Some(true),
+                },
+            },
+        ];
+
+        let messages = build_messages(&items)
+            .expect("build messages")
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            messages,
+            vec![
+                json!({
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "type": "function",
+                            "id": "ReadMediaFile:1",
+                            "function": {
+                                "name": "ReadMediaFile",
+                                "arguments": r#"{"path":"screenshot.png"}"#,
+                            },
+                        }
+                    ],
+                }),
+                json!({
+                    "role": "tool",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "screenshot.png",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "data:image/png;base64,TOOLVISION",
+                                "id": null,
+                            }
+                        }
+                    ],
+                    "tool_call_id": "ReadMediaFile:1",
                 }),
             ]
         );

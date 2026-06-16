@@ -77,6 +77,7 @@ pub enum HarnessAliasHandler {
     BashLower,
     Read,
     ReadLower,
+    ReadMediaFile,
     Write,
     WriteLower,
     Edit,
@@ -116,6 +117,7 @@ impl ToolExecutor<ToolInvocation> for HarnessAliasHandler {
             Self::BashLower => "bash",
             Self::Read => "Read",
             Self::ReadLower => "read",
+            Self::ReadMediaFile => "ReadMediaFile",
             Self::Write => "Write",
             Self::WriteLower => "write",
             Self::Edit => "Edit",
@@ -171,6 +173,7 @@ impl HarnessAliasHandler {
             Self::Bash => handle_bash(invocation).await,
             Self::BashLower => handle_plain_bash(invocation).await,
             Self::Read | Self::ReadLower => handle_read(invocation).await,
+            Self::ReadMediaFile => handle_read_media_file(invocation).await,
             Self::Write | Self::WriteLower => handle_write(invocation).await,
             Self::Edit | Self::EditLower => handle_edit(invocation).await,
             Self::Glob | Self::GlobLower => handle_glob(invocation).await,
@@ -742,6 +745,38 @@ async fn handle_read(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, 
         format!(
             "{body}\n<system>{lines_read} {line_label} read from file starting from line {offset}. Total lines in file: {total_lines}.{end_summary}</system>",
         ),
+        Some(true),
+    )))
+}
+
+async fn handle_read_media_file(
+    invocation: ToolInvocation,
+) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
+    let arguments = function_arguments(&invocation.payload)?;
+    let args: ReadArgs = parse_arguments(arguments)?;
+    let path = harness_fs::checked_read_path(&invocation, &args.path, "ReadMediaFile")?;
+    let Some(mime_type) = image_mime_type(&path) else {
+        return Err(FunctionCallError::RespondToModel(format!(
+            "ReadMediaFile failed: `{}` is not a supported image file",
+            display_model_path(&invocation, &path)
+        )));
+    };
+    let data = std::fs::read(&path)
+        .map_err(|err| FunctionCallError::RespondToModel(format!("ReadMediaFile failed: {err}")))?;
+    let image_url = format!("data:{mime_type};base64,{}", BASE64_STANDARD.encode(data));
+    Ok(boxed_tool_output(FunctionToolOutput::from_content(
+        vec![
+            FunctionCallOutputContentItem::InputText {
+                text: format!(
+                    "<system>Read media file `{}` as {mime_type}.</system>",
+                    display_model_path(&invocation, &path)
+                ),
+            },
+            FunctionCallOutputContentItem::InputImage {
+                image_url,
+                detail: None,
+            },
+        ],
         Some(true),
     )))
 }
@@ -1335,7 +1370,7 @@ async fn handle_deepseek_list_dir(
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     let args: ReadArgs = parse_arguments(function_arguments(&invocation.payload)?)?;
     let path = harness_fs::checked_read_path(&invocation, &args.path, "list_dir")?;
-    let mut entries = std::fs::read_dir(&path)
+    let entries = std::fs::read_dir(&path)
         .map_err(|err| FunctionCallError::RespondToModel(format!("list_dir failed: {err}")))?
         .map(|entry| {
             let entry = entry?;
@@ -1346,21 +1381,6 @@ async fn handle_deepseek_list_dir(
         })
         .collect::<std::io::Result<Vec<_>>>()
         .map_err(|err| FunctionCallError::RespondToModel(format!("list_dir failed: {err}")))?;
-    entries.sort_by(|left, right| {
-        let left_name = left
-            .get("name")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("");
-        let right_name = right
-            .get("name")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("");
-        let left_git = left_name == ".git";
-        let right_git = right_name == ".git";
-        left_git
-            .cmp(&right_git)
-            .then_with(|| left_name.cmp(right_name))
-    });
     let output = format_deepseek_list_dir(&entries);
     Ok(boxed_tool_output(FunctionToolOutput::from_text(
         output,
@@ -1520,22 +1540,26 @@ async fn handle_deepseek_apply_patch(
                 line.strip_prefix('-')
                     .filter(|line| !line.starts_with("--"))
             })
-            .unwrap_or(first_line);
+            .unwrap_or(first_line)
+            .trim_end_matches("\\n");
         return Ok(boxed_tool_output(FunctionToolOutput::from_text(
             format!(
-                "Error: Failed to apply hunk 1/1 for `{}`: could not find matching context near line 1 (searched around line 1 with offset +0 and fuzz up to 50). Expected context preview:\n  -{}\nFile snippet near line 1:\n     1: {}\nHints: ensure the patch matches the current file contents, increase `fuzz`, or regenerate the patch.",
+                "Error: Failed to apply hunk 1/1 for `{}`: could not find matching context near line 1 (searched around line 1 with offset +0 and fuzz up to 50). Expected context preview:\n   {}\nFile snippet near line 1:\n     1: {}\nHints: ensure the patch matches the current file contents, increase `fuzz`, or regenerate the patch.",
                 args.path, expected_context, first_line
             ),
             Some(true),
         )));
     }
-    if args.fuzz.is_some_and(|fuzz| fuzz <= 3) {
+    if args.fuzz.is_some_and(|fuzz| fuzz <= 5) {
         let first_line = text.lines().next().unwrap_or_default();
         let expected_context = first_line.trim_end_matches("\\n");
         return Ok(boxed_tool_output(FunctionToolOutput::from_text(
             format!(
-                "Error: Failed to apply hunk 1/1 for `{}`: could not find matching context near line 1 (searched around line 1 with offset +0 and fuzz up to 3). Expected context preview:\n   {}\nFile snippet near line 1:\n     1: {}\nHints: ensure the patch matches the current file contents, increase `fuzz`, or regenerate the patch.",
-                args.path, expected_context, first_line
+                "Error: Failed to apply hunk 1/1 for `{}`: could not find matching context near line 1 (searched around line 1 with offset +0 and fuzz up to {}). Expected context preview:\n   {}\nFile snippet near line 1:\n     1: {}\nHints: ensure the patch matches the current file contents, increase `fuzz`, or regenerate the patch.",
+                args.path,
+                args.fuzz.unwrap_or_default(),
+                expected_context,
+                first_line
             ),
             Some(true),
         )));
@@ -1595,9 +1619,13 @@ async fn handle_deepseek_tool_search(
     _invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     Ok(boxed_tool_output(FunctionToolOutput::from_text(
-        r#"{"type":"tool_search_tool_search_result","tool_references":[{"type":"tool_reference","tool_name":"edit_file"},{"type":"tool_reference","tool_name":"apply_patch"},{"type":"tool_reference","tool_name":"write_file"},{"type":"tool_reference","tool_name":"agent_open"},{"type":"tool_reference","tool_name":"handle_read"}]}"#.to_string(),
+        deepseek_tool_search_result().to_string(),
         Some(true),
     )))
+}
+
+fn deepseek_tool_search_result() -> &'static str {
+    r#"{"type":"tool_search_tool_search_result","tool_references":[{"type":"tool_reference","tool_name":"apply_patch"},{"type":"tool_reference","tool_name":"edit_file"},{"type":"tool_reference","tool_name":"agent_open"},{"type":"tool_reference","tool_name":"handle_read"},{"type":"tool_reference","tool_name":"tool_agent"}]}"#
 }
 
 async fn handle_git_command(
@@ -2368,6 +2396,19 @@ mod tests {
         Ok(output.log_preview())
     }
 
+    async fn handle_response_item(
+        workspace: &TempDir,
+        handler: HarnessAliasHandler,
+        tool_name: &str,
+        args: serde_json::Value,
+    ) -> Result<codex_protocol::models::ResponseInputItem, FunctionCallError> {
+        let invocation = invocation(workspace, tool_name, args).await;
+        let call_id = invocation.call_id.clone();
+        let payload = invocation.payload.clone();
+        let output = handler.handle(invocation).await?;
+        Ok(output.to_response_item(&call_id, &payload))
+    }
+
     #[tokio::test]
     async fn read_alias_denies_paths_outside_workspace_policy() {
         let workspace = tempfile::tempdir().expect("workspace temp dir");
@@ -2456,6 +2497,111 @@ mod tests {
         .expect("grep succeeds");
 
         assert_eq!(output, "real.txt");
+    }
+
+    #[tokio::test]
+    async fn kimi_read_media_file_alias_returns_image_payload() {
+        let workspace = tempfile::tempdir().expect("workspace temp dir");
+        std::fs::write(workspace.path().join("red.png"), b"png-bytes").expect("write image file");
+
+        let response_item = handle_response_item(
+            &workspace,
+            HarnessAliasHandler::ReadMediaFile,
+            "ReadMediaFile",
+            json!({ "path": "red.png" }),
+        )
+        .await
+        .expect("read media file succeeds");
+
+        let codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } =
+            response_item
+        else {
+            panic!("expected function call output");
+        };
+        let codex_protocol::models::FunctionCallOutputBody::ContentItems(items) = output.body
+        else {
+            panic!("expected content items");
+        };
+
+        assert_eq!(
+            items[0],
+            FunctionCallOutputContentItem::InputText {
+                text: "<system>Read media file `red.png` as image/png.</system>".to_string(),
+            }
+        );
+        let FunctionCallOutputContentItem::InputImage { image_url, detail } = &items[1] else {
+            panic!("expected image item");
+        };
+        assert!(image_url.starts_with("data:image/png;base64,"));
+        assert_eq!(*detail, None);
+    }
+
+    #[tokio::test]
+    async fn deepseek_apply_patch_failure_uses_clean_expected_context() {
+        let workspace = tempfile::tempdir().expect("workspace temp dir");
+        std::fs::write(
+            workspace.path().join("module.py"),
+            "VALUE = \"NEEDLE_NEW\"\\n",
+        )
+        .expect("write module");
+
+        let output = handle_text(
+            &workspace,
+            HarnessAliasHandler::DeepSeekApplyPatch,
+            "apply_patch",
+            json!({
+                "path": "module.py",
+                "patch": "@@\n-VALUE = \"NEEDLE_NEW\"\\n\n+VALUE = \"NEEDLE_NEW\"\\nPATCH_OK = True\n",
+            }),
+        )
+        .await
+        .expect("apply_patch failure output");
+
+        assert!(output.contains(
+            "Expected context preview:\n   VALUE = \"NEEDLE_NEW\"\nFile snippet near line 1:"
+        ));
+        assert!(!output.contains("Expected context preview:\n  -VALUE"));
+
+        let output = handle_text(
+            &workspace,
+            HarnessAliasHandler::DeepSeekApplyPatch,
+            "apply_patch",
+            json!({
+                "path": "module.py",
+                "patch": "@@\n VALUE = \"NEEDLE_NEW\"\\n\n+PATCH_OK = True\n",
+                "fuzz": 5,
+            }),
+        )
+        .await
+        .expect("apply_patch fuzz failure output");
+
+        assert!(output.contains("fuzz up to 5"));
+        assert!(output.contains(
+            "Expected context preview:\n   VALUE = \"NEEDLE_NEW\"\nFile snippet near line 1:"
+        ));
+    }
+
+    #[test]
+    fn deepseek_list_dir_formatter_preserves_input_order() {
+        let entries = vec![
+            json!({ "name": "README.md", "is_dir": false }),
+            json!({ "name": ".codewhale", "is_dir": true }),
+            json!({ "name": "module.py", "is_dir": false }),
+            json!({ "name": ".git", "is_dir": true }),
+        ];
+
+        assert_eq!(
+            format_deepseek_list_dir(&entries),
+            "[\n  {\n    \"name\": \"README.md\",\n    \"is_dir\": false\n  },\n  {\n    \"name\": \".codewhale\",\n    \"is_dir\": true\n  },\n  {\n    \"name\": \"module.py\",\n    \"is_dir\": false\n  },\n  {\n    \"name\": \".git\",\n    \"is_dir\": true\n  }\n]"
+        );
+    }
+
+    #[test]
+    fn deepseek_tool_search_result_matches_captured_order() {
+        assert_eq!(
+            deepseek_tool_search_result(),
+            r#"{"type":"tool_search_tool_search_result","tool_references":[{"type":"tool_reference","tool_name":"apply_patch"},{"type":"tool_reference","tool_name":"edit_file"},{"type":"tool_reference","tool_name":"agent_open"},{"type":"tool_reference","tool_name":"handle_read"},{"type":"tool_reference","tool_name":"tool_agent"}]}"#
+        );
     }
 
     #[cfg(unix)]

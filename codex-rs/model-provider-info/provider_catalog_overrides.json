@@ -21,6 +21,13 @@
       "url": "https://api.moonshot.ai/v1/models",
       "auth": "bearer",
       "auth_env": ["MOONSHOT_API_KEY", "KIMI_API_KEY"]
+    },
+    "groq": {
+      "url": "https://api.groq.com/openai/v1/models",
+      "auth": "bearer",
+      "auth_env": ["GROQ_API_KEY"],
+      "filter_existing_to_live_ids": true,
+      "append_new_models": false
     }
   },
   "provider_model_metadata_overrides": {
@@ -33,7 +40,11 @@
         "description": "Tool calling; Image input",
         "reasoning": false,
         "input_modalities": ["text", "image"],
-        "context_window": 262144
+        "context_window": 262144,
+        "priority": -1
+      },
+      "kimi-k2-0905-preview": {
+        "priority": 1000
       }
     },
     "moonshotai-cn": {

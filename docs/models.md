@@ -31,7 +31,7 @@ Metadata is layered:
 | Source | Role |
 | --- | --- |
 | Provider `/models` endpoint | Live model ids for the active provider when the endpoint is available. |
-| `model-provider-info/provider_catalog.json` | Bundled provider/model seed data generated from `models.dev` and live Moonshot models. |
+| `model-provider-info/provider_catalog.json` | Bundled provider/model seed data generated from `models.dev` and configured live provider model sources. |
 | `codex-api/model_compatibility_catalog.json` | Compatibility metadata such as supported parameters, search support, reasoning levels, and input modalities. |
 | `models-manager/models.json` | OpenAI-style model preset metadata used by the manager. |
 | Config `model_catalog` | Optional user-supplied static catalog for a provider/session. |

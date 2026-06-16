@@ -119,7 +119,7 @@ fn deepseek_tui_cycle_handoff_user_prompt(cwd: Option<&Path>) -> String {
         .filter(|lines| !lines.is_empty())
         .unwrap_or_else(|| "- README.md (file)".to_string());
     format!(
-        "## Briefing Request\n\nProduce a <carry_forward> block summarizing the session state. Include: decisions made + why, constraints discovered, hypotheses being tested, approaches that failed, open questions. Do NOT include tool output bytes, file contents, or step-by-step recaps.\n\n## Structured State\n\n## Cycle State (Auto-Preserved)\n\n- Mode: `YOLO`\n- Workspace: `{workspace}`\n- Cwd: `{workspace}`\n\n### Work\n\n{checklist}\n\nStrategy metadata\n- [~] Capture workspace state and structure\n- [ ] Execute read/write/edit/patch tool sequence\n- [ ] Verify and finalize harness capture\n\n## Repo Working Set\nWorkspace: {workspace}\nKey files: README.md\nActive paths (prioritize these):\n{active_paths}\nWhen in doubt, use tools to verify and keep changes focused on the working set.\n\n\nNo prior context summaries available. Produce a brief carry-forward from the structured state alone.\n"
+        "## Briefing Request\n\nProduce a <carry_forward> block summarizing the session state. Include: decisions made + why, constraints discovered, hypotheses being tested, approaches that failed, open questions. Do NOT include tool output bytes, file contents, or step-by-step recaps.\n\n## Structured State\n\n## Cycle State (Auto-Preserved)\n\n- Mode: `YOLO`\n- Workspace: `{workspace}`\n- Cwd: `{workspace}`\n\n### Work\n\n{checklist}\n\nStrategy metadata\n- [~] Initialize tracking and inspect workspace\n- [ ] Search, git, and diagnostics\n- [ ] Create, edit, verify, and finalize\n\n## Repo Working Set\nWorkspace: {workspace}\nKey files: README.md\nActive paths (prioritize these):\n{active_paths}\nWhen in doubt, use tools to verify and keep changes focused on the working set.\n\n\nNo prior context summaries available. Produce a brief carry-forward from the structured state alone.\n"
     )
 }
 
@@ -131,12 +131,12 @@ fn active_path_lines(cwd: &Path) -> String {
         return [
             "- module.py (file)",
             "- created_by_gauntlet.txt (file)",
-            "- write/edit/patch (file)",
             "-  (dir)",
             "- shell_proof.txt (file)",
             "- 1/1 (file)",
             "- SHELL_OK/n (file)",
-            "- read/write/edit/patch (file)",
+            "- a/module.py (file)",
+            "- b/module.py (file)",
         ]
         .join("\n");
     }
@@ -294,10 +294,7 @@ fn add_omitted_reasoning_to_assistant_tool_calls(messages: &mut [Value]) {
 
 fn build_system_prompt(prompt: &Prompt, model: &str) -> (String, bool) {
     let cwd = prompt.cwd.as_deref();
-    let mut base_prompt = CODEWHALE_BASE_PROMPT.replace("{model_id}", model);
-    if let Some(skills_section) = session_skills_section(&prompt.input) {
-        base_prompt = insert_session_skills_section(base_prompt, &skills_section);
-    }
+    let base_prompt = CODEWHALE_BASE_PROMPT.replace("{model_id}", model);
     let mut sections = vec![
         base_prompt,
         CODEWHALE_CALM_PERSONALITY.to_string(),
@@ -324,30 +321,6 @@ fn build_system_prompt(prompt: &Prompt, model: &str) -> (String, bool) {
             .join("\n\n"),
         should_write_generated_codewhale_instructions,
     )
-}
-
-/// Returns the session's `<skills_instructions>` developer block body, which
-/// natively renders as a `## Skills` markdown section.
-fn session_skills_section(items: &[ResponseItem]) -> Option<String> {
-    let text = super::session_skills::find_skills_instructions_text(items)?;
-    super::session_skills::skills_instructions_body(text).map(str::to_string)
-}
-
-/// Surfaces the session's runtime skills in the CodeWhale system prompt. The
-/// shared kimi-cli message builder skips contextual developer fragments, and
-/// the workspace harness instruction-role rule forbids dropping the skills
-/// block per-harness. The captured base prompt's Toolbox section already
-/// points `load_skill` at "the `## Skills` section above", so the structurally
-/// faithful spot for the native `## Skills` body is right above the Toolbox.
-fn insert_session_skills_section(base_prompt: String, skills_section: &str) -> String {
-    match base_prompt.find("## Toolbox") {
-        Some(index) => format!(
-            "{}{skills_section}\n\n{}",
-            &base_prompt[..index],
-            &base_prompt[index..]
-        ),
-        None => format!("{base_prompt}\n\n{skills_section}"),
-    }
 }
 
 fn add_turn_metadata_to_latest_user_message(messages: &mut [Value], cwd: Option<&Path>) {
@@ -763,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    fn deepseek_tui_request_surfaces_session_skills_above_captured_toolbox() {
+    fn deepseek_tui_request_does_not_import_codex_session_skills() {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {
@@ -792,23 +765,109 @@ mod tests {
         let system = request["messages"][0]["content"]
             .as_str()
             .expect("system content");
-        assert!(system.contains(
-            "- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)"
-        ));
-        // The captured Toolbox section references "the `## Skills` section
-        // above", so the rendered skills section must sit above it.
-        let skills_index = system.find("## Skills").expect("skills section");
-        let toolbox_index = system.find("## Toolbox").expect("toolbox section");
-        assert!(skills_index < toolbox_index);
-        // The native developer block stays out of the conversation messages.
+        assert!(!system.contains("qa-testing"));
+        assert!(!system.contains("### Available skills"));
+        assert!(system.contains("## Toolbox"));
         assert!(!system.contains("<skills_instructions>"));
         let request_json = serde_json::to_string(&request).expect("serialize request");
         assert_eq!(request_json.matches("<skills_instructions>").count(), 0);
     }
 
+    #[test]
+    fn deepseek_tui_request_preserves_image_content() {
+        let prompt = Prompt {
+            input: vec![ResponseItem::Message {
+                id: None,
+                role: "user".to_string(),
+                content: vec![
+                    ContentItem::InputText {
+                        text: "Describe this screenshot.".to_string(),
+                    },
+                    ContentItem::InputImage {
+                        image_url: "data:image/png;base64,DEEPSEEKVISION".to_string(),
+                        detail: None,
+                    },
+                ],
+                phase: None,
+            }],
+            ..Prompt::default()
+        };
+
+        let (request, _) = build_request(&prompt, &vision_model_info()).expect("request");
+
+        assert_eq!(
+            request["messages"][1]["content"],
+            json!([
+                {
+                    "type": "text",
+                    "text": "Describe this screenshot."
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/png;base64,DEEPSEEKVISION",
+                        "id": null
+                    }
+                }
+            ])
+        );
+    }
+
+    #[test]
+    fn deepseek_tui_compaction_request_matches_captured_structured_state() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        fs::write(
+            workspace.path().join("module.py"),
+            "VALUE = \"NEEDLE_NEW\"\\n",
+        )
+        .expect("write module");
+        fs::write(
+            workspace.path().join("created_by_gauntlet.txt"),
+            "CREATE_OK\n",
+        )
+        .expect("write created file");
+        fs::write(workspace.path().join("shell_proof.txt"), "SHELL_OK\n")
+            .expect("write shell proof");
+
+        let prompt = Prompt {
+            input: vec![ResponseItem::Message {
+                id: None,
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "CONTEXT CHECKPOINT COMPACTION".to_string(),
+                }],
+                phase: None,
+            }],
+            cwd: Some(workspace.path().to_path_buf()),
+            ..Prompt::default()
+        };
+
+        let (request, tool_kinds) = build_request(&prompt, &model_info()).expect("request");
+
+        assert!(tool_kinds.is_empty());
+        assert_eq!(request["model"], "deepseek-v4-flash");
+        assert_eq!(request["max_tokens"], 4096);
+        assert_eq!(request["temperature"], 0.20000000298023224_f64);
+        assert_eq!(request["messages"].as_array().expect("messages").len(), 2);
+        let user = request["messages"][1]["content"]
+            .as_str()
+            .expect("user content");
+        assert!(user.contains("Strategy metadata\n- [~] Initialize tracking and inspect workspace\n- [ ] Search, git, and diagnostics\n- [ ] Create, edit, verify, and finalize"));
+        assert!(user.contains("- a/module.py (file)\n- b/module.py (file)"));
+        assert!(!user.contains("write/edit/patch (file)"));
+    }
+
     fn model_info() -> ModelInfo {
+        model_info_with_slug_and_modalities("deepseek-chat", &["text"])
+    }
+
+    fn vision_model_info() -> ModelInfo {
+        model_info_with_slug_and_modalities("deepseek-v4-pro", &["text", "image"])
+    }
+
+    fn model_info_with_slug_and_modalities(slug: &str, input_modalities: &[&str]) -> ModelInfo {
         serde_json::from_value(json!({
-            "slug": "deepseek-chat",
+            "slug": slug,
             "display_name": "DeepSeek Chat",
             "description": "desc",
             "default_reasoning_level": null,
@@ -830,7 +889,8 @@ mod tests {
             "supports_image_detail_original": false,
             "context_window": 1000000,
             "auto_compact_token_limit": null,
-            "experimental_supported_tools": []
+            "experimental_supported_tools": [],
+            "input_modalities": input_modalities
         }))
         .expect("deserialize model info")
     }

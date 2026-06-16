@@ -197,6 +197,19 @@ def merge_live_provider_models(
     live_ids = live_model_ids(payload)
     if not live_ids:
         raise SystemExit(f"live_model_sources.{provider_id} returned no models")
+    if source.get("filter_existing_to_live_ids") is True:
+        live_id_set = set(live_ids)
+        models[:] = [
+            model
+            for model in models
+            if isinstance(model.get("id"), str) and model["id"] in live_id_set
+        ]
+        for priority, model in enumerate(models):
+            model["priority"] = priority
+        existing = {model["id"] for model in models if isinstance(model.get("id"), str)}
+        next_priority = len(models)
+    if source.get("append_new_models") is False:
+        return
     for model_id in live_ids:
         if model_id in existing:
             continue

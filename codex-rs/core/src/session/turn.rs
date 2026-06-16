@@ -757,7 +757,7 @@ async fn track_turn_resolved_config_analytics(
         });
 }
 
-const DEEPSEEK_TUI_CYCLE_TOKEN_LIMIT: i64 = 31_800;
+const DEEPSEEK_TUI_CYCLE_TOKEN_LIMIT: i64 = 28_800;
 
 #[derive(Debug)]
 struct AutoCompactTokenStatus {

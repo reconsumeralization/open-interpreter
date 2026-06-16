@@ -595,6 +595,9 @@ fn add_harness_alias_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mu
     planned_tools.add(HarnessAliasHandler::Grep);
     planned_tools.add(HarnessAliasHandler::GrepLower);
     planned_tools.add(HarnessAliasHandler::AskUserQuestion);
+    if matches!(harness, Harness::KimiCode) {
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ReadMediaFile);
+    }
     if matches!(harness, Harness::DeepSeekTui) {
         planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekApplyPatch);
         planned_tools.add_dispatch_only(HarnessAliasHandler::ChecklistAdd);

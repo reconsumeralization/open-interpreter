@@ -9,6 +9,10 @@ use codex_core::config::Config;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::WireApi;
 
+#[cfg(test)]
+#[path = "interpreter_catalog_tests.rs"]
+mod tests;
+
 struct HarnessDefinition {
     id: &'static str,
     label: &'static str,
@@ -52,6 +56,18 @@ const HARNESS_DEFINITIONS: &[HarnessDefinition] = &[
         wire_apis: CHAT_WIRE_APIS,
     },
     HarnessDefinition {
+        id: "kimi-code",
+        label: "Kimi Code",
+        description: "Use the Kimi Code-style tool harness.",
+        wire_apis: CHAT_WIRE_APIS,
+    },
+    HarnessDefinition {
+        id: "little-coder",
+        label: "Little Coder",
+        description: "Use the Little Coder-style tool harness.",
+        wire_apis: CHAT_WIRE_APIS,
+    },
+    HarnessDefinition {
         id: "qwen-code",
         label: "Qwen Code",
         description: "Use the Qwen Code-style tool harness.",
@@ -73,6 +89,12 @@ const HARNESS_DEFINITIONS: &[HarnessDefinition] = &[
         id: "opencode",
         label: "opencode",
         description: "Use the opencode-style tool harness.",
+        wire_apis: CHAT_WIRE_APIS,
+    },
+    HarnessDefinition {
+        id: "pi",
+        label: "Pi",
+        description: "Use the Pi-style tool harness.",
         wire_apis: CHAT_WIRE_APIS,
     },
     HarnessDefinition {

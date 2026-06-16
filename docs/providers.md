@@ -85,28 +85,31 @@ refresh_interval_ms = 300000
 
 ## Generated Hosted Providers
 
-The generated catalog is built from `https://models.dev/api.json` plus the live
-Moonshot model list at `https://api.moonshot.ai/v1/models`. The generator
+The generated catalog is built from `https://models.dev/api.json`, plus live
+provider model endpoints configured in
+`codex-rs/model-provider-info/provider_catalog_overrides.json`. The generator
 includes providers backed by supported AI SDK packages, excludes unsupported or
 local-only entries, requires a usable base URL, and keeps only models that
-advertise tool calling and text output.
+advertise tool calling and text output. Some provider entries are further
+filtered against live model IDs so decommissioned upstream models do not remain
+visible.
 
-The current bundled generated catalog contains these providers:
+Common generated providers include:
 
 | Provider ID | Name | Wire API | Auth env | Models |
 | --- | --- | --- | --- | ---: |
-| `anthropic` | Anthropic | `messages` | `ANTHROPIC_API_KEY` | 23 |
-| `openrouter` | OpenRouter | `chat` | `OPENROUTER_API_KEY` | 264 |
-| `groq` | Groq | `chat` | `GROQ_API_KEY` | 18 |
+| `anthropic` | Anthropic | `messages` | `ANTHROPIC_API_KEY` | 25 |
+| `openrouter` | OpenRouter | `chat` | `OPENROUTER_API_KEY` | 252 |
+| `groq` | Groq | `chat` | `GROQ_API_KEY` | 7 |
 | `github-models` | GitHub Models | `chat` | `GITHUB_TOKEN` | 49 |
-| `opencode` | OpenCode Zen | `chat` | `OPENCODE_API_KEY` | 61 |
-| `opencode-go` | OpenCode Go | `chat` | `OPENCODE_API_KEY` | 14 |
-| `github-copilot` | GitHub Copilot | `chat` | `GITHUB_TOKEN` | 26 |
-| `poe` | Poe | `chat` | `POE_API_KEY` | 102 |
+| `opencode` | OpenCode Zen | `chat` | `OPENCODE_API_KEY` | 70 |
+| `opencode-go` | OpenCode Go | `chat` | `OPENCODE_API_KEY` | 18 |
+| `github-copilot` | GitHub Copilot | `chat` | `GITHUB_TOKEN` | 23 |
+| `poe` | Poe | `chat` | `POE_API_KEY` | 103 |
 | `perplexity-agent` | Perplexity Agent | `chat` | `PERPLEXITY_API_KEY` | 18 |
 | `requesty` | Requesty | `chat` | `REQUESTY_API_KEY` | 37 |
 | `deepseek` | DeepSeek | `chat` | `DEEPSEEK_API_KEY` | 4 |
-| `moonshotai` | Moonshot AI | `chat` | `MOONSHOT_API_KEY` | 14 |
+| `moonshotai` | Moonshot AI | `chat` | `MOONSHOT_API_KEY` | 16 |
 | `moonshotai-cn` | Moonshot AI (China) | `chat` | `MOONSHOT_API_KEY` | 7 |
 | `zhipuai` | Zhipu AI | `chat` | `ZHIPU_API_KEY` | 12 |
 | `zai` | Z.AI | `chat` | `ZHIPU_API_KEY` | 13 |
@@ -194,11 +197,11 @@ The current bundled generated catalog contains these providers:
 | `wandb` | Weights & Biases | `chat` | `WANDB_API_KEY` | 18 |
 | `xiaomi-token-plan-cn` | Xiaomi Token Plan (China) | `chat` | `XIAOMI_API_KEY` | 5 |
 | `xiaomi-token-plan-ams` | Xiaomi Token Plan (Europe) | `chat` | `XIAOMI_API_KEY` | 5 |
-| `xiaomi-token-plan-sgp` | Xiaomi Token Plan (Singapore) | `chat` | `XIAOMI_API_KEY` | 5 |
-| `xpersona` | Xpersona | `chat` | `XPERSONA_API_KEY` | 1 |
-| `zai-coding-plan` | Z.AI Coding Plan | `chat` | `ZHIPU_API_KEY` | 5 |
-| `zenmux` | ZenMux | `chat` | `ZENMUX_API_KEY` | 96 |
-| `zhipuai-coding-plan` | Zhipu AI Coding Plan | `chat` | `ZHIPU_API_KEY` | 5 |
+| `xiaomi-token-plan-sgp` | Xiaomi Token Plan (Singapore) | `chat` | `XIAOMI_API_KEY` | 4 |
+| `xpersona` | Xpersona | `chat` | `XPERSONA_API_KEY` | 2 |
+| `zai-coding-plan` | Z.AI Coding Plan | `chat` | `ZHIPU_API_KEY` | 6 |
+| `zenmux` | ZenMux | `chat` | `ZENMUX_API_KEY` | 110 |
+| `zhipuai-coding-plan` | Zhipu AI Coding Plan | `chat` | `ZHIPU_API_KEY` | 7 |
 
 ## Model Picker Behavior
 
@@ -238,5 +241,7 @@ python3 scripts/write_provider_catalog.py
 python3 scripts/write_model_compatibility_catalog.py
 ```
 
-The Moonshot live source requires `MOONSHOT_API_KEY` or `KIMI_API_KEY`. Missing
-auth is a generator failure, not a reason to silently keep stale data.
+Live sources require their documented provider auth environment variables. For
+example, Moonshot requires `MOONSHOT_API_KEY` or `KIMI_API_KEY`, and Groq
+requires `GROQ_API_KEY`. Missing auth is a generator failure, not a reason to
+silently keep stale data.

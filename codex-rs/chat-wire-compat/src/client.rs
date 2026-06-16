@@ -31,6 +31,8 @@ use tracing::instrument;
 /// client reads it to pick the upstream before building the provider request.
 pub const CHAT_WIRE_UPSTREAM_URL_HEADER: &str = "x-codex-chat-wire-upstream-url";
 
+const OPENROUTER_DEFAULT_TOKEN_LIMIT: u64 = 1024;
+
 pub struct ChatCompletionsCompatClient<T: HttpTransport> {
     transport: T,
     provider: Provider,
@@ -104,6 +106,7 @@ impl<T: HttpTransport> ChatCompletionsCompatClient<T> {
             .get(CHAT_WIRE_UPSTREAM_URL_HEADER)
             .and_then(|value| value.to_str().ok())
             .unwrap_or(self.provider.base_url.as_str());
+        let is_openrouter = is_openrouter_base_url(provider_base_url);
 
         // Drop request fields that the target chat provider does not accept. Some
         // harnesses emit provider-specific extensions (e.g. kimi-cli's
@@ -126,17 +129,36 @@ impl<T: HttpTransport> ChatCompletionsCompatClient<T> {
 
         let streaming = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
         if !streaming {
-            let response = self
+            let response_result = self
                 .execute_with(
                     Method::POST,
                     "chat/completions",
-                    extra_headers,
-                    Some(body),
+                    extra_headers.clone(),
+                    Some(body.clone()),
                     move |request| {
                         request.compression = request_compression;
                     },
                 )
-                .await?;
+                .await;
+            let response = match response_result {
+                Ok(response) => response,
+                Err(error)
+                    if let Some(retry_body) =
+                        openrouter_affordability_retry_body(is_openrouter, &body, &error) =>
+                {
+                    self.execute_with(
+                        Method::POST,
+                        "chat/completions",
+                        extra_headers,
+                        Some(retry_body),
+                        move |request| {
+                            request.compression = request_compression;
+                        },
+                    )
+                    .await?
+                }
+                Err(error) => return Err(error),
+            };
             let sse = synthetic_sse_from_chat_completion_response(&response.body)?;
             let bytes = stream::once(async move { Ok(Bytes::from(sse)) });
             return Ok(spawn_chat_stream(
@@ -147,12 +169,12 @@ impl<T: HttpTransport> ChatCompletionsCompatClient<T> {
             ));
         }
 
-        let stream_response = self
+        let stream_result = self
             .stream_with(
                 Method::POST,
                 "chat/completions",
-                extra_headers,
-                Some(body),
+                extra_headers.clone(),
+                Some(body.clone()),
                 move |request| {
                     request.headers.insert(
                         http::header::ACCEPT,
@@ -161,7 +183,30 @@ impl<T: HttpTransport> ChatCompletionsCompatClient<T> {
                     request.compression = request_compression;
                 },
             )
-            .await?;
+            .await;
+        let stream_response = match stream_result {
+            Ok(response) => response,
+            Err(error)
+                if let Some(retry_body) =
+                    openrouter_affordability_retry_body(is_openrouter, &body, &error) =>
+            {
+                self.stream_with(
+                    Method::POST,
+                    "chat/completions",
+                    extra_headers,
+                    Some(retry_body),
+                    move |request| {
+                        request.headers.insert(
+                            http::header::ACCEPT,
+                            HeaderValue::from_static("text/event-stream"),
+                        );
+                        request.compression = request_compression;
+                    },
+                )
+                .await?
+            }
+            Err(error) => return Err(error),
+        };
 
         Ok(spawn_chat_stream(
             stream_response.bytes,
@@ -269,6 +314,7 @@ impl<T: HttpTransport> ChatCompletionsCompatClient<T> {
 fn sanitize_chat_body_for_provider(body: &mut Value, base_url: &str) {
     let host = base_url.to_ascii_lowercase();
     let is_deepseek = host.contains("api.deepseek.com");
+    let is_openrouter = is_openrouter_base_url(&host);
 
     if is_deepseek && let Some(messages) = body.get_mut("messages").and_then(Value::as_array_mut) {
         for message in messages {
@@ -280,17 +326,31 @@ fn sanitize_chat_body_for_provider(body: &mut Value, base_url: &str) {
         }
     }
 
+    if is_openrouter {
+        cap_chat_token_limits(body, OPENROUTER_DEFAULT_TOKEN_LIMIT);
+        ensure_chat_token_limit(body, OPENROUTER_DEFAULT_TOKEN_LIMIT);
+    }
+
     // Groq's chat completions endpoint is strict about unknown fields.
     let is_groq = host.contains("api.groq.com");
     if !is_groq {
         return;
     }
+    cap_chat_token_limits(body, 32_768);
     if let Some(obj) = body.as_object_mut() {
         // `prompt_cache_key` is a Kimi/OpenAI extension (kimi-cli, kimi-code).
         obj.remove("prompt_cache_key");
         // `thinking` is a Kimi/Anthropic-style toggle (kimi-cli on thinking-toggle
         // models); Groq's chat completions endpoint rejects it.
         obj.remove("thinking");
+        // These optional OpenAI chat extensions are not accepted by Groq's
+        // strict OpenAI-compatible endpoint.
+        obj.remove("parallel_tool_calls");
+        obj.remove("response_format");
+        obj.remove("reasoning_effort");
+        obj.remove("service_tier");
+        obj.remove("store");
+        obj.remove("verbosity");
         // `reasoning_content` echoed back on assistant messages is a DeepSeek
         // extension (deepseek-tui); Groq rejects it on assistant tool calls.
         if let Some(messages) = obj.get_mut("messages").and_then(Value::as_array_mut) {
@@ -301,6 +361,79 @@ fn sanitize_chat_body_for_provider(body: &mut Value, base_url: &str) {
             }
         }
     }
+}
+
+fn cap_chat_token_limits(body: &mut Value, cap: u64) {
+    let Some(obj) = body.as_object_mut() else {
+        return;
+    };
+    for key in ["max_completion_tokens", "max_tokens"] {
+        if let Some(value) = obj.get_mut(key)
+            && value.as_u64().is_some_and(|tokens| tokens > cap)
+        {
+            *value = Value::Number(cap.into());
+        }
+    }
+}
+
+fn ensure_chat_token_limit(body: &mut Value, limit: u64) {
+    let Some(obj) = body.as_object_mut() else {
+        return;
+    };
+    if obj.contains_key("max_completion_tokens") || obj.contains_key("max_tokens") {
+        return;
+    }
+    obj.insert("max_tokens".to_string(), Value::Number(limit.into()));
+}
+
+fn openrouter_affordability_retry_body(
+    is_openrouter: bool,
+    original_body: &Value,
+    error: &ApiError,
+) -> Option<Value> {
+    let affordable_limit = openrouter_affordable_token_limit(is_openrouter, error)?;
+    let mut retry_body = original_body.clone();
+    cap_chat_token_limits(&mut retry_body, affordable_limit);
+    ensure_chat_token_limit(&mut retry_body, affordable_limit);
+    Some(retry_body)
+}
+
+fn openrouter_affordable_token_limit(is_openrouter: bool, error: &ApiError) -> Option<u64> {
+    if !is_openrouter {
+        return None;
+    }
+    let ApiError::Transport(TransportError::Http { status, body, .. }) = error else {
+        return None;
+    };
+    if *status != http::StatusCode::PAYMENT_REQUIRED {
+        return None;
+    }
+    let body = body.as_deref()?;
+    parse_openrouter_affordable_token_limit(body)
+}
+
+fn parse_openrouter_affordable_token_limit(body: &str) -> Option<u64> {
+    let marker = "can only afford ";
+    let start = body.find(marker)? + marker.len();
+    let rest = &body[start..];
+    let mut digits = String::new();
+    for ch in rest.chars() {
+        if ch.is_ascii_digit() {
+            digits.push(ch);
+        } else if (ch == ',' && !digits.is_empty())
+            || (digits.is_empty() && ch.is_ascii_whitespace())
+        {
+            continue;
+        } else {
+            break;
+        }
+    }
+    let limit = digits.parse::<u64>().ok()?;
+    (limit > 0).then_some(limit)
+}
+
+fn is_openrouter_base_url(base_url: &str) -> bool {
+    base_url.to_ascii_lowercase().contains("openrouter.ai")
 }
 
 fn synthetic_sse_from_chat_completion_response(body: &[u8]) -> Result<String, ApiError> {
@@ -415,6 +548,7 @@ mod tests {
     use codex_api::ResponsesOptions;
     use codex_api::RetryConfig;
     use codex_api::TextControls;
+    use codex_client::RequestBody;
     use codex_client::Response;
     use codex_protocol::ThreadId;
     use codex_protocol::models::ContentItem;
@@ -433,26 +567,58 @@ mod tests {
     }
 
     impl HttpTransport for RecordingTransport {
-        fn execute(
-            &self,
-            _req: Request,
-        ) -> impl std::future::Future<Output = Result<Response, TransportError>> + Send {
-            async { unreachable!("chat wire compat tests only use streaming requests") }
+        async fn execute(&self, _req: Request) -> Result<Response, TransportError> {
+            unreachable!("chat wire compat tests only use streaming requests")
         }
 
-        fn stream(
+        async fn stream(
             &self,
             req: Request,
-        ) -> impl std::future::Future<Output = Result<codex_client::StreamResponse, TransportError>> + Send
-        {
-            async move {
-                *self.last_request.lock().expect("record last request") = Some(req);
-                Ok(codex_client::StreamResponse {
-                    status: http::StatusCode::OK,
-                    headers: HeaderMap::new(),
-                    bytes: Box::pin(futures::stream::empty()),
-                })
+        ) -> Result<codex_client::StreamResponse, TransportError> {
+            *self.last_request.lock().expect("record last request") = Some(req);
+            Ok(codex_client::StreamResponse {
+                status: http::StatusCode::OK,
+                headers: HeaderMap::new(),
+                bytes: Box::pin(futures::stream::empty()),
+            })
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct OpenRouterRetryTransport {
+        requests: Mutex<Vec<Request>>,
+        stream_attempts: Mutex<u32>,
+    }
+
+    impl HttpTransport for OpenRouterRetryTransport {
+        async fn execute(&self, _req: Request) -> Result<Response, TransportError> {
+            unreachable!("openrouter retry test only uses streaming requests")
+        }
+
+        async fn stream(
+            &self,
+            req: Request,
+        ) -> Result<codex_client::StreamResponse, TransportError> {
+            self.requests.lock().expect("record requests").push(req);
+            let mut attempts = self.stream_attempts.lock().expect("stream attempts");
+            if *attempts == 0 {
+                *attempts += 1;
+                return Err(TransportError::Http {
+                    status: http::StatusCode::PAYMENT_REQUIRED,
+                    url: Some("https://openrouter.ai/api/v1/chat/completions".to_string()),
+                    headers: None,
+                    body: Some(
+                        r#"{"error":{"message":"This endpoint requested up to 1024 tokens, but can only afford 140. Please try again with fewer max_tokens."}}"#
+                            .to_string(),
+                    ),
+                });
             }
+            *attempts += 1;
+            Ok(codex_client::StreamResponse {
+                status: http::StatusCode::OK,
+                headers: HeaderMap::new(),
+                bytes: Box::pin(futures::stream::empty()),
+            })
         }
     }
 
@@ -491,6 +657,13 @@ mod tests {
         }
     }
 
+    fn openrouter_test_provider() -> Provider {
+        Provider {
+            base_url: "https://openrouter.ai/api/v1".to_string(),
+            ..test_provider()
+        }
+    }
+
     #[test]
     fn deepseek_sanitizer_maps_developer_messages_to_user() {
         let mut body = serde_json::json!({
@@ -509,6 +682,105 @@ mod tests {
         assert_eq!(messages[0]["role"], "system");
         assert_eq!(messages[1]["role"], "user");
         assert_eq!(messages[2]["role"], "user");
+    }
+
+    #[test]
+    fn groq_sanitizer_removes_openai_only_fields() {
+        let mut body = serde_json::json!({
+            "model": "openai/gpt-oss-120b",
+            "messages": [
+                {"role": "assistant", "content": "", "reasoning_content": "hidden"}
+            ],
+            "stream": true,
+            "parallel_tool_calls": true,
+            "prompt_cache_key": "turn-1",
+            "response_format": {"type": "json_object"},
+            "reasoning_effort": "high",
+            "service_tier": "auto",
+            "store": false,
+            "thinking": {"type": "enabled"},
+            "tool_choice": "auto",
+            "verbosity": "low",
+            "max_completion_tokens": 384000,
+            "max_tokens": 64000
+        });
+
+        sanitize_chat_body_for_provider(&mut body, "https://api.groq.com/openai/v1");
+
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "model": "openai/gpt-oss-120b",
+                "messages": [
+                    {"role": "assistant", "content": ""}
+                ],
+                "stream": true,
+                "tool_choice": "auto",
+                "max_completion_tokens": 32768,
+                "max_tokens": 32768
+            })
+        );
+    }
+
+    #[test]
+    fn openrouter_sanitizer_caps_large_token_limits() {
+        let mut body = serde_json::json!({
+            "model": "inclusionai/ling-2.6-1t",
+            "messages": [
+                {"role": "user", "content": "hello"}
+            ],
+            "stream": true,
+            "max_completion_tokens": 32768,
+            "max_tokens": 32768
+        });
+
+        sanitize_chat_body_for_provider(&mut body, "https://openrouter.ai/api/v1");
+
+        assert_eq!(body["max_completion_tokens"], serde_json::json!(1024));
+        assert_eq!(body["max_tokens"], serde_json::json!(1024));
+    }
+
+    #[test]
+    fn openrouter_sanitizer_inserts_token_limit_when_absent() {
+        let mut body = serde_json::json!({
+            "model": "inclusionai/ling-2.6-1t",
+            "messages": [
+                {"role": "user", "content": "hello"}
+            ],
+            "stream": true
+        });
+
+        sanitize_chat_body_for_provider(&mut body, "https://openrouter.ai/api/v1");
+
+        assert_eq!(body["max_tokens"], serde_json::json!(1024));
+    }
+
+    #[test]
+    fn openrouter_affordability_retry_body_caps_to_reported_limit() {
+        let body = serde_json::json!({
+            "model": "moonshotai/kimi-k2.7-code",
+            "messages": [
+                {"role": "user", "content": "hello"}
+            ],
+            "stream": true,
+            "max_completion_tokens": 1024,
+            "max_tokens": 1024
+        });
+        let error = ApiError::Transport(TransportError::Http {
+            status: http::StatusCode::PAYMENT_REQUIRED,
+            url: None,
+            headers: None,
+            body: Some(
+                r#"{"error":{"message":"requested up to 1,024 tokens, but can only afford 140"}}"#
+                    .to_string(),
+            ),
+        });
+
+        let retry_body =
+            openrouter_affordability_retry_body(true, &body, &error).expect("retry body");
+
+        assert_eq!(retry_body["max_completion_tokens"], serde_json::json!(140));
+        assert_eq!(retry_body["max_tokens"], serde_json::json!(140));
     }
 
     #[test]
@@ -639,5 +911,54 @@ mod tests {
                 .and_then(|value| value.to_str().ok()),
             Some("acct_123")
         );
+    }
+
+    #[tokio::test]
+    async fn stream_chat_request_retries_openrouter_with_affordable_token_limit() {
+        let transport = OpenRouterRetryTransport::default();
+        let client = ChatCompletionsCompatClient::new(
+            transport,
+            openrouter_test_provider(),
+            Arc::new(StaticAuth),
+        );
+        let body = serde_json::json!({
+            "model": "moonshotai/kimi-k2.7-code",
+            "messages": [
+                {"role": "user", "content": "hello"}
+            ],
+            "stream": true,
+            "max_tokens": 32768
+        });
+
+        let _stream = client
+            .stream_chat_request_value(
+                body,
+                HashMap::new(),
+                ResponsesOptions {
+                    session_id: None,
+                    thread_id: None,
+                    session_source: None,
+                    extra_headers: HeaderMap::new(),
+                    compression: Compression::None,
+                    turn_state: Some(Arc::new(OnceLock::new())),
+                },
+            )
+            .await
+            .expect("second openrouter request should stream");
+
+        let requests = client.transport.requests.lock().expect("requests");
+        assert_eq!(requests.len(), 2);
+        let first_body = requests[0]
+            .body
+            .as_ref()
+            .and_then(RequestBody::json)
+            .expect("first json body");
+        let second_body = requests[1]
+            .body
+            .as_ref()
+            .and_then(RequestBody::json)
+            .expect("second json body");
+        assert_eq!(first_body["max_tokens"], serde_json::json!(1024));
+        assert_eq!(second_body["max_tokens"], serde_json::json!(140));
     }
 }
