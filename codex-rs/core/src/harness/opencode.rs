@@ -278,7 +278,9 @@ fn build_messages(
                     }
                 }));
             }
-            ResponseItem::FunctionCallOutput { call_id, output }
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            }
             | ResponseItem::CustomToolCallOutput {
                 call_id, output, ..
             } => {
@@ -321,7 +323,7 @@ fn build_messages(
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }
@@ -796,6 +798,8 @@ mod tests {
                         text: QA_TESTING_SKILLS_INSTRUCTIONS.to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: Some("user".to_string()),
@@ -804,6 +808,8 @@ mod tests {
                         text: "Run the QA pass".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),

@@ -222,7 +222,7 @@ fn build_messages(prompt: &Prompt, kind: &Terminus2RequestKind) -> Vec<Value> {
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }
@@ -912,6 +912,7 @@ fn build_harness_follow_up_items(
                     text: question_prompt(original_instruction, content, current_screen),
                 }],
                 phase: None,
+                metadata: None,
             }];
         }
         Terminus2RequestKind::Questions => {
@@ -922,6 +923,7 @@ fn build_harness_follow_up_items(
                     text: answer_questions_prompt(content),
                 }],
                 phase: None,
+                metadata: None,
             }];
         }
         Terminus2RequestKind::AnswerQuestions { questions } => {
@@ -932,6 +934,7 @@ fn build_harness_follow_up_items(
                     text: handoff_prompt(content, questions),
                 }],
                 phase: None,
+                metadata: None,
             }];
         }
         Terminus2RequestKind::Handoff { .. } | Terminus2RequestKind::Action { .. } => {}
@@ -946,6 +949,7 @@ fn build_harness_follow_up_items(
                 text: parse_error_prompt(&parsed.error, &parsed.warning),
             }],
             phase: None,
+            metadata: None,
         }];
     }
 
@@ -960,6 +964,7 @@ fn build_harness_follow_up_items(
                 text: completion_confirmation_prompt(&initial_terminal_state()),
             }],
             phase: None,
+            metadata: None,
         }];
     }
 
@@ -1016,6 +1021,7 @@ fn build_shell_call(commands: Vec<ParsedCommand>, working_directory: String) -> 
             ])),
             user: None,
         }),
+        metadata: None,
     }
 }
 
@@ -1752,6 +1758,8 @@ mod tests {
                     text: "Fix it".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             ..Default::default()
         };
@@ -1851,7 +1859,8 @@ mod tests {
                         text: "Fix the repo".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "assistant".to_string(),
@@ -1859,13 +1868,15 @@ mod tests {
                         text: "{\"analysis\":\"Inspect\",\"plan\":\"pwd\",\"commands\":[{\"keystrokes\":\"pwd\\n\",\"duration\":0.1}]}".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::FunctionCallOutput {
                     call_id: "terminus-2-shell-0".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "root@host:/app# pwd\n/app\nroot@host:/app#\n".to_string(),
                     ),
-                },
+
+                    metadata: None,},
             ],
             ..Default::default()
         };
@@ -1904,7 +1915,8 @@ mod tests {
                         .to_string(),
                 }],
                 phase: None,
-            }],
+
+                metadata: None,}],
             ..Default::default()
         };
         let (_, _, kind) = build_request(&prompt, &model_info()).expect("request");
@@ -1928,7 +1940,8 @@ mod tests {
                         text: "Original Task: Fix the repo".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "user".to_string(),
@@ -1937,7 +1950,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "assistant".to_string(),
@@ -1945,7 +1959,8 @@ mod tests {
                         text: "Summary so far".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
             ],
             ..Default::default()
         };
@@ -1975,7 +1990,8 @@ mod tests {
                         text: "Original Task: Fix the repo".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "user".to_string(),
@@ -1984,7 +2000,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "assistant".to_string(),
@@ -1993,7 +2010,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
             ],
             ..Default::default()
         };
@@ -2023,7 +2041,8 @@ mod tests {
                         text: "Original Task: Fix the repo".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "assistant".to_string(),
@@ -2031,7 +2050,8 @@ mod tests {
                         text: "Summary so far".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "user".to_string(),
@@ -2040,7 +2060,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
             ],
             ..Default::default()
         };
@@ -2070,6 +2091,8 @@ mod tests {
                         text: "Original Task: Fix the repo".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -2079,6 +2102,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -2088,6 +2113,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             ..Default::default()

@@ -55,6 +55,7 @@ pub(crate) fn inject_no_tool_call_format_error(stream: ResponseStream) -> Respon
                                     text: MINI_SWE_AGENT_NO_TOOL_CALL_ERROR.to_string(),
                                 }],
                                 phase: None,
+                                metadata: None,
                             })))
                             .await
                             .is_err()
@@ -311,7 +312,9 @@ fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde_json::Erro
                     "type": "function",
                 }));
             }
-            ResponseItem::FunctionCallOutput { call_id, output }
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            }
             | ResponseItem::CustomToolCallOutput {
                 call_id, output, ..
             } => {
@@ -349,7 +352,7 @@ fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde_json::Erro
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }
@@ -638,6 +641,8 @@ mod tests {
                     text: "do the task".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             tools: vec![test_bash_tool()],
             ..Prompt::default()
@@ -673,6 +678,8 @@ mod tests {
                         text: "do the task".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: Some("assistant".to_string()),
@@ -681,6 +688,8 @@ mod tests {
                         text: "I will run pwd.\n\n```bash\npwd\n```".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: Some("call".to_string()),
@@ -688,12 +697,16 @@ mod tests {
                     namespace: None,
                     arguments: "{\"command\":\"pwd\"}".to_string(),
                     call_id: "bash:0".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "bash:0".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "{\n  \"returncode\": 0,\n  \"output\": \"/workspace\\n\"\n}".to_string(),
                     ),
+
+                    metadata: None,
                 },
             ],
             tools: vec![test_bash_tool()],
@@ -724,6 +737,8 @@ mod tests {
             arguments: "{\"command\":\" echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\n\"}"
                 .to_string(),
             call_id: "bash:0".to_string(),
+
+            metadata: None,
         };
 
         assert!(is_terminal_submit_call(&item));
@@ -744,6 +759,8 @@ mod tests {
                     text: "I forgot the tool.".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             })))
             .await
             .expect("send message");
@@ -800,6 +817,8 @@ mod tests {
                     text: "Running pwd.".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             })))
             .await
             .expect("send message");
@@ -811,6 +830,8 @@ mod tests {
                     namespace: None,
                     arguments: "{\"command\":\"pwd\"}".to_string(),
                     call_id: "bash:0".to_string(),
+
+                    metadata: None,
                 },
             )))
             .await

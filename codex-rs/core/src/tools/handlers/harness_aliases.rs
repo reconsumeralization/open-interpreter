@@ -533,6 +533,7 @@ pub(crate) fn take_claude_code_bare_completed_task_notification() -> Option<Resp
         role: "user".to_string(),
         content: vec![ContentItem::InputText { text }],
         phase: Some(MessagePhase::Commentary),
+        metadata: None,
     })
 }
 

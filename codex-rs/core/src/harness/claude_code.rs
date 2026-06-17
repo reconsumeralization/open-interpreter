@@ -509,7 +509,9 @@ fn build_messages(
     let mut todo_reminder = ClaudeTodoReminderState::default();
     for item in items {
         match item {
-            ResponseItem::FunctionCallOutput { call_id, output } => {
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            } => {
                 pending_tool_results.push(PendingToolResult {
                     order: tool_order_by_call_id
                         .get(call_id)
@@ -680,7 +682,7 @@ fn build_messages(
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {
                 flush_pending_tool_results(
@@ -2565,6 +2567,8 @@ mod tests {
                         text: "Update files".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2573,12 +2577,16 @@ mod tests {
                     arguments: "{\"command\":\"printf 'WRITE_OK\\\\n' > /tmp/output.txt\"}"
                         .to_string(),
                     call_id: "toolu_1".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "toolu_1".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "(Bash completed with no output)".to_string(),
                     ),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2586,10 +2594,14 @@ mod tests {
                     namespace: None,
                     arguments: "{\"file_path\":\"/tmp/input.txt\"}".to_string(),
                     call_id: "toolu_2".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "toolu_2".to_string(),
                     output: FunctionCallOutputPayload::from_text("1\tREAD_OK".to_string()),
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -2725,6 +2737,8 @@ mod tests {
                         text: "Run setup checks".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2732,6 +2746,8 @@ mod tests {
                     namespace: None,
                     arguments: "{\"command\":\"git clone repo\"}".to_string(),
                     call_id: "toolu_clone".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2739,16 +2755,22 @@ mod tests {
                     namespace: None,
                     arguments: "{\"command\":\"python3 --version\"}".to_string(),
                     call_id: "toolu_python".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "toolu_python".to_string(),
                     output: FunctionCallOutputPayload::from_text("Python 3.13.7\n".to_string()),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "toolu_clone".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "Cloning into '/app/pyknotid'...\n\n".to_string(),
                     ),
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -2801,6 +2823,8 @@ mod tests {
                         text: "Patch ccomplexity".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2813,6 +2837,8 @@ mod tests {
                     })
                     .to_string(),
                     call_id: "toolu_edit".to_string(),
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -2862,7 +2888,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "user".to_string(),
@@ -2870,7 +2897,8 @@ mod tests {
                         text: "Audit the environment".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -2925,6 +2953,8 @@ mod tests {
                         text: skills_instructions.to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -2933,6 +2963,8 @@ mod tests {
                         text: "Run the QA pass".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -3010,6 +3042,8 @@ mod tests {
                     text: "hi".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(temp_dir.path().to_path_buf()),
             tools: vec![],
@@ -3054,6 +3088,8 @@ mod tests {
                     text: "run a command".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![test_bash_tool()],
@@ -3093,6 +3129,8 @@ mod tests {
                     text: "Create child-proof.txt and reply with CHILD_DONE.".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -3147,6 +3185,8 @@ mod tests {
                         text: "Make a todo list".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -3154,12 +3194,16 @@ mod tests {
                     namespace: None,
                     arguments: "{\"command\":\"echo \\\"TodoWrite done\\\"\"}".to_string(),
                     call_id: "toolu_bash".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "toolu_bash".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "\nTodoWrite done\n\n   ".to_string(),
                     ),
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -3204,6 +3248,8 @@ mod tests {
                         text: "Use the Write tool once".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3212,6 +3258,8 @@ mod tests {
                         text: "TURN1_DONE".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3220,6 +3268,8 @@ mod tests {
                         text: "Now use Bash once".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -3278,6 +3328,8 @@ mod tests {
                     text: "Process the dossier".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3285,12 +3337,16 @@ mod tests {
                 namespace: None,
                 arguments: todos,
                 call_id: "todo_1".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
+
+                metadata: None,
             },
         ];
         for index in 1..=CLAUDE_CODE_TODO_REMINDER_STALENESS_THRESHOLD {
@@ -3305,12 +3361,16 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
+
+                metadata: None,
             });
         }
         let prompt = Prompt {
@@ -3362,6 +3422,8 @@ mod tests {
                     text: "Process the dossier".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3369,12 +3431,16 @@ mod tests {
                 namespace: None,
                 arguments: todos,
                 call_id: "todo_1".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
+
+                metadata: None,
             },
         ];
         for index in 1..CLAUDE_CODE_TODO_REMINDER_STALENESS_THRESHOLD {
@@ -3387,12 +3453,16 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
+
+                metadata: None,
             });
         }
         let prompt = Prompt {
@@ -3433,6 +3503,8 @@ mod tests {
                 text: "Audit numpy compatibility".to_string(),
             }],
             phase: None,
+
+            metadata: None,
         }];
         for index in 1..=CLAUDE_CODE_TODO_REMINDER_STALENESS_THRESHOLD {
             if index == 5 || index == 9 {
@@ -3443,6 +3515,8 @@ mod tests {
                         text: format!("Finished search batch {index}."),
                     }],
                     phase: None,
+
+                    metadata: None,
                 });
             }
             input.push(ResponseItem::FunctionCall {
@@ -3454,10 +3528,14 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("grep_{index}"),
+
+                metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 call_id: format!("grep_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("MATCH_{index}")),
+
+                metadata: None,
             });
         }
         let prompt = Prompt {
@@ -3529,6 +3607,8 @@ mod tests {
                     text: "Process the dossier".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3536,12 +3616,16 @@ mod tests {
                 namespace: None,
                 arguments: todos,
                 call_id: "todo_1".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
+
+                metadata: None,
             },
         ];
         for index in 1..=7 {
@@ -3553,6 +3637,8 @@ mod tests {
                         text: format!("Found CHECKPOINT_{:02}. Continuing.", index - 1),
                     }],
                     phase: None,
+
+                    metadata: None,
                 });
             }
             input.push(ResponseItem::FunctionCall {
@@ -3564,12 +3650,16 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
+
+                metadata: None,
             });
         }
         let prompt = Prompt {
@@ -3617,6 +3707,8 @@ mod tests {
                     text: "Process the dossier".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3624,12 +3716,16 @@ mod tests {
                 namespace: None,
                 arguments: todos,
                 call_id: "todo_1".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
+
+                metadata: None,
             },
         ];
         for index in 1..8 {
@@ -3642,12 +3738,16 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
+
+                metadata: None,
             });
         }
         let prompt = Prompt {
@@ -3691,6 +3791,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3701,6 +3803,8 @@ mod tests {
                         ),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3709,6 +3813,8 @@ mod tests {
                         text: "Write output.txt".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -3973,6 +4079,8 @@ mod tests {
                         text: "Create output.txt".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -3981,12 +4089,16 @@ mod tests {
                     arguments: "{\"command\":\"printf 'DOT_OK\\\\n' > /tmp/output.txt\"}"
                         .to_string(),
                     call_id: "toolu_1".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "toolu_1".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "(Bash completed with no output)".to_string(),
                     ),
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3995,6 +4107,8 @@ mod tests {
                         text: "DONE".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -4003,6 +4117,8 @@ mod tests {
                         text: "Edit output.txt".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -4064,6 +4180,8 @@ mod tests {
                     text: "Use the Write tool to create output.txt".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4118,6 +4236,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Other,
                 ResponseItem::Message {
@@ -4129,6 +4249,8 @@ mod tests {
                         ),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -4137,6 +4259,8 @@ mod tests {
                         text: "Use the Read tool exactly once".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -4222,6 +4346,8 @@ mod tests {
                     text: "hi".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4264,6 +4390,8 @@ mod tests {
                     text: "hi".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4306,6 +4434,8 @@ mod tests {
                     text: "hi".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4348,6 +4478,8 @@ mod tests {
                     text: "hi".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4390,6 +4522,8 @@ mod tests {
                     text: "hi".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4443,6 +4577,8 @@ mod tests {
                     text: "Write hello.txt containing exactly DONE then stop.".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![
@@ -4500,6 +4636,8 @@ mod tests {
                     text: "Update files".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![test_bash_tool()],

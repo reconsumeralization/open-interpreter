@@ -240,6 +240,7 @@ async fn process_chat_sse(
                                         text: String::new(),
                                     }]),
                                     encrypted_content: None,
+                                    metadata: None,
                                 },
                             )))
                             .await
@@ -274,6 +275,7 @@ async fn process_chat_sse(
                                         text: String::new(),
                                     }],
                                     phase: None,
+                                    metadata: None,
                                 })))
                                 .await
                                 .is_err()
@@ -429,6 +431,7 @@ async fn finalize_assistant_message(
                 text: state.assistant_text.clone(),
             }],
             phase: None,
+            metadata: None,
         })))
         .await
         .map_err(|_| ApiError::Stream("chat stream channel closed".to_string()))?;
@@ -452,6 +455,7 @@ async fn finalize_reasoning(
                 text: std::mem::take(&mut state.reasoning_content),
             }]),
             encrypted_content: None,
+            metadata: None,
         })))
         .await
         .map_err(|_| ApiError::Stream("chat stream channel closed".to_string()))?;
@@ -496,6 +500,7 @@ async fn finalize_tool_calls_until(
                 namespace: None,
                 arguments: tool_call.arguments,
                 call_id,
+                metadata: None,
             },
             Some(ToolOutputKind::NamespacedFunction {
                 name: output_name,
@@ -506,6 +511,7 @@ async fn finalize_tool_calls_until(
                 namespace: Some(namespace.clone()),
                 arguments: tool_call.arguments,
                 call_id,
+                metadata: None,
             },
             Some(ToolOutputKind::Custom) => {
                 let input = match serde_json::from_str::<Value>(&tool_call.arguments) {
@@ -522,6 +528,7 @@ async fn finalize_tool_calls_until(
                     call_id,
                     name,
                     input,
+                    metadata: None,
                 }
             }
             None => ResponseItem::FunctionCall {
@@ -530,6 +537,7 @@ async fn finalize_tool_calls_until(
                 namespace: None,
                 arguments: tool_call.arguments,
                 call_id,
+                metadata: None,
             },
         };
         tx_event
@@ -606,6 +614,7 @@ mod tests {
                 namespace: None,
                 arguments,
                 call_id,
+                ..
             }) if name == "shell"
                 && call_id == "call-shell-1"
                 && arguments

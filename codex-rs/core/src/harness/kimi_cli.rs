@@ -425,7 +425,9 @@ pub(super) fn build_messages_with_options(
                     }
                 }));
             }
-            ResponseItem::FunctionCallOutput { call_id, output } => {
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            } => {
                 push_tool_output_if_expected(
                     &mut messages,
                     &mut pending_tool_calls,
@@ -462,7 +464,7 @@ pub(super) fn build_messages_with_options(
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }
@@ -1369,6 +1371,8 @@ mod tests {
                 text: "hello\n".to_string(),
             }],
             phase: None,
+
+            metadata: None,
         }];
 
         let messages = build_messages(&items)
@@ -1393,6 +1397,8 @@ mod tests {
                 text: "hello\n".to_string(),
             }],
             phase: None,
+
+            metadata: None,
         }];
 
         let messages =
@@ -1424,6 +1430,8 @@ mod tests {
                 },
             ],
             phase: None,
+
+            metadata: None,
         }];
 
         let messages = build_messages(&items)
@@ -1484,6 +1492,8 @@ mod tests {
                     text: "<skills_instructions>\n- imagegen\n</skills_instructions>".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: Some("user".to_string()),
@@ -1492,6 +1502,8 @@ mod tests {
                     text: "$imagegen what is this".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
         ];
         let prompt = Prompt {
@@ -1527,6 +1539,8 @@ mod tests {
                         .to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: Some("skills".to_string()),
@@ -1535,6 +1549,8 @@ mod tests {
                     text: "<skills_instructions>\nbody\n</skills_instructions>".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: Some("user".to_string()),
@@ -1543,6 +1559,8 @@ mod tests {
                     text: "do the task".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
         ];
 
@@ -1570,7 +1588,8 @@ mod tests {
                         .to_string(),
                 }],
                 phase: None,
-            },
+
+                metadata: None,},
             ResponseItem::Message {
                 id: Some("user".to_string()),
                 role: "user".to_string(),
@@ -1578,7 +1597,8 @@ mod tests {
                     text: "Run the QA pass".to_string(),
                 }],
                 phase: None,
-            },
+
+                metadata: None,},
         ];
         let prompt = Prompt {
             input: items,
@@ -1606,6 +1626,8 @@ mod tests {
                 text: "Prefer small patches.".to_string(),
             }],
             phase: None,
+
+            metadata: None,
         }];
         let prompt = Prompt {
             input: items,
@@ -1675,6 +1697,8 @@ mod tests {
                     text: "hello".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1709,6 +1733,8 @@ mod tests {
                     text: "think".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1738,6 +1764,8 @@ mod tests {
                     text: "think".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1773,6 +1801,8 @@ mod tests {
                     text: "think".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1859,6 +1889,8 @@ mod tests {
                     text: "do the task".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             tools: vec![
                 ToolSpec::Function(ask_user_question),
@@ -1929,6 +1961,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"path":"/app/ars.R","content":"ok"}"#.to_string(),
                 call_id: "WriteFile:6".to_string(),
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: Some("assistant".to_string()),
@@ -1937,6 +1971,8 @@ mod tests {
                     text: "done".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
         ];
 
@@ -1962,6 +1998,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: Some("chat-message-1".to_string()),
@@ -1970,12 +2008,16 @@ mod tests {
                     text: String::new(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     "<system>Command executed successfully.</system>".to_string(),
                 ),
+
+                metadata: None,
             },
         ];
 
@@ -2018,6 +2060,8 @@ mod tests {
                     text: "I need to inspect the files.".to_string(),
                 }]),
                 encrypted_content: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCall {
                 id: Some("fc-1".to_string()),
@@ -2025,10 +2069,14 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"ls"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text("ok".to_string()),
+
+                metadata: None,
             },
         ];
 
@@ -2072,6 +2120,8 @@ mod tests {
                     text: "I should inspect the runtime.".to_string(),
                 }]),
                 encrypted_content: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCall {
                 id: Some("fc-1".to_string()),
@@ -2079,6 +2129,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:1".to_string(),
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: Some("msg-1".to_string()),
@@ -2087,12 +2139,16 @@ mod tests {
                     text: "I'll check whether R is available.".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "Shell:1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     "<system>ERROR: Command failed with exit code: 1.</system>".to_string(),
                 ),
+
+                metadata: None,
             },
         ];
 
@@ -2136,6 +2192,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"./a.out"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "Shell:0".to_string(),
@@ -2147,6 +2205,8 @@ mod tests {
                         text: "\0\0\0".to_string(),
                     },
                 ]),
+
+                metadata: None,
             },
         ];
 
@@ -2197,10 +2257,14 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"printf"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text("a\u{c}b\nc".to_string()),
+
+                metadata: None,
             },
         ];
 
@@ -2227,10 +2291,14 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"path":"/app/ars.R","content":"ok"}"#.to_string(),
                 call_id: "WriteFile:6".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "WriteFile:6".to_string(),
                 output: FunctionCallOutputPayload::from_text("written".to_string()),
+
+                metadata: None,
             },
         ];
 
@@ -2272,6 +2340,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"false"}"#.to_string(),
                 call_id: "Shell:7".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "Shell:7".to_string(),
@@ -2287,6 +2357,8 @@ mod tests {
                     ]),
                     success: Some(false),
                 },
+
+                metadata: None,
             },
         ];
 
@@ -2337,6 +2409,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:7".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "Shell:7".to_string(),
@@ -2346,6 +2420,8 @@ mod tests {
                     ),
                     success: Some(false),
                 },
+
+                metadata: None,
             },
         ];
 
@@ -2387,6 +2463,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"path":"screenshot.png"}"#.to_string(),
                 call_id: "ReadMediaFile:1".to_string(),
+
+                metadata: None,
             },
             ResponseItem::FunctionCallOutput {
                 call_id: "ReadMediaFile:1".to_string(),
@@ -2402,6 +2480,8 @@ mod tests {
                     ]),
                     success: Some(true),
                 },
+
+                metadata: None,
             },
         ];
 
@@ -2452,6 +2532,8 @@ mod tests {
             ResponseItem::FunctionCallOutput {
                 call_id: "WriteFile:6".to_string(),
                 output: FunctionCallOutputPayload::from_text("written".to_string()),
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: Some("assistant".to_string()),
@@ -2460,6 +2542,8 @@ mod tests {
                     text: "done".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             },
         ];
 

@@ -747,7 +747,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "user".to_string(),
@@ -755,7 +756,8 @@ mod tests {
                         text: "Run the QA pass".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
             ],
             ..Prompt::default()
         };
@@ -789,6 +791,8 @@ mod tests {
                     },
                 ],
                 phase: None,
+
+                metadata: None,
             }],
             ..Prompt::default()
         };
@@ -837,6 +841,8 @@ mod tests {
                     text: "CONTEXT CHECKPOINT COMPACTION".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(workspace.path().to_path_buf()),
             ..Prompt::default()

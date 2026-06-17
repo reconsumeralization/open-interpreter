@@ -159,7 +159,9 @@ pub(crate) fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde
                     }
                 }));
             }
-            ResponseItem::FunctionCallOutput { call_id, output }
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            }
             | ResponseItem::CustomToolCallOutput {
                 call_id, output, ..
             } => {
@@ -220,7 +222,7 @@ pub(crate) fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }

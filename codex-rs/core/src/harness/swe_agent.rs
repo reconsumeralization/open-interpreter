@@ -183,7 +183,7 @@ fn build_messages(prompt: &Prompt) -> Result<Vec<Value>, serde_json::Error> {
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }
@@ -251,6 +251,7 @@ fn build_harness_follow_up_item(content: &str, terminal_submit: bool) -> Option<
             text: SWE_AGENT_FORMAT_CORRECTION.to_string(),
         }],
         phase: None,
+        metadata: None,
     })
 }
 
@@ -262,6 +263,7 @@ fn build_swe_agent_command_call(command: String) -> ResponseItem {
         call_id: format!("swe-agent-command-{id}"),
         name: SWE_AGENT_COMMAND_TOOL_NAME.to_string(),
         input: command,
+        metadata: None,
     }
 }
 
@@ -278,6 +280,7 @@ fn build_shell_call(command: String) -> ResponseItem {
             env: None,
             user: None,
         }),
+        metadata: None,
     }
 }
 
@@ -593,6 +596,8 @@ mod tests {
                     text: "Fix it.".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some("/workspace".into()),
             ..Prompt::default()
@@ -680,6 +685,7 @@ mod tests {
             call_id,
             status,
             action,
+            ..
         } = item
         else {
             panic!("expected shell call");
@@ -720,6 +726,8 @@ mod tests {
                     text: SWE_AGENT_FORMAT_CORRECTION.to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }
         );
     }
@@ -820,6 +828,8 @@ mod tests {
                         text: "Fix it.".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -828,6 +838,8 @@ mod tests {
                         text: "<function=bash>bad</function>".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -836,6 +848,8 @@ mod tests {
                         text: SWE_AGENT_FORMAT_CORRECTION.to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -844,6 +858,8 @@ mod tests {
                         text: "DISCUSSION\n```bash\nls\n```".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some("/workspace".into()),

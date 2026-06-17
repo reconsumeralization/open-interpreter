@@ -826,6 +826,7 @@ mod tests {
                     text: "hello".to_string(),
                 }],
                 phase: None,
+                metadata: None,
             }],
             tools: Vec::new(),
             tool_choice: "auto".to_string(),

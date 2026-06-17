@@ -261,6 +261,8 @@ mod tests {
                     text: "Run the QA pass".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -295,7 +297,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
                 ResponseItem::Message {
                     id: Some("user".to_string()),
                     role: "user".to_string(),
@@ -303,7 +306,8 @@ mod tests {
                         text: "hello".to_string(),
                     }],
                     phase: None,
-                },
+
+                    metadata: None,},
             ],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -335,6 +339,8 @@ mod tests {
                         text: "Find Python files".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -342,10 +348,14 @@ mod tests {
                     namespace: None,
                     arguments: r#"{"pattern":"*.py"}"#.to_string(),
                     call_id: "Glob:0".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "Glob:0".to_string(),
                     output: FunctionCallOutputPayload::from_text("module.py".to_string()),
+
+                    metadata: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),
@@ -388,6 +398,8 @@ mod tests {
                     },
                 ],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()

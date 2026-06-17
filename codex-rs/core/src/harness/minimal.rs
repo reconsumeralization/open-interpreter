@@ -177,7 +177,9 @@ fn build_messages(
                     }
                 }));
             }
-            ResponseItem::FunctionCallOutput { call_id, output } => {
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            } => {
                 flush_pending_tool_calls(
                     &mut messages,
                     &mut pending_tool_calls,
@@ -222,7 +224,7 @@ fn build_messages(
             | ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }
@@ -450,6 +452,8 @@ mod tests {
                     text: "hello".to_string(),
                 }],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -488,6 +492,8 @@ mod tests {
                             .to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: Some("user".to_string()),
@@ -496,6 +502,8 @@ mod tests {
                         text: "$imagegen what is this".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),
@@ -529,6 +537,8 @@ mod tests {
                         text: "run date".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
                 ResponseItem::Reasoning {
                     id: "reasoning".to_string(),
@@ -537,6 +547,8 @@ mod tests {
                         text: "I should inspect the clock.".to_string(),
                     }]),
                     encrypted_content: None,
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -544,10 +556,14 @@ mod tests {
                     namespace: None,
                     arguments: json!({"command": "date"}).to_string(),
                     call_id: "call-date".to_string(),
+
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "call-date".to_string(),
                     output: FunctionCallOutputPayload::from_text("Tue Apr 29".to_string()),
+
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: Some("user2".to_string()),
@@ -556,6 +572,8 @@ mod tests {
                         text: "what did you run?".to_string(),
                     }],
                     phase: None,
+
+                    metadata: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),
@@ -596,6 +614,8 @@ mod tests {
                     },
                 ],
                 phase: None,
+
+                metadata: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()

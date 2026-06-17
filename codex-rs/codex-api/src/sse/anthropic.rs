@@ -258,6 +258,7 @@ async fn process_anthropic_event(
                                 text: String::new(),
                             }],
                             phase: None,
+                            metadata: None,
                         })))
                         .await
                         .is_err()
@@ -283,6 +284,7 @@ async fn process_anthropic_event(
                                     text: String::new(),
                                 }]),
                                 encrypted_content: None,
+                                metadata: None,
                             },
                         )))
                         .await
@@ -374,6 +376,7 @@ async fn process_anthropic_event(
                     role: "assistant".to_string(),
                     content: vec![ContentItem::OutputText { text }],
                     phase: None,
+                    metadata: None,
                 },
                 PendingBlock::Thinking {
                     id,
@@ -384,6 +387,7 @@ async fn process_anthropic_event(
                     summary: vec![],
                     content: Some(vec![ReasoningItemContent::ReasoningText { text }]),
                     encrypted_content: signature,
+                    metadata: None,
                 },
                 PendingBlock::ToolUse {
                     id,
@@ -395,6 +399,7 @@ async fn process_anthropic_event(
                     namespace: None,
                     arguments: normalize_tool_arguments(&input_json)?,
                     call_id: id,
+                    metadata: None,
                 },
             };
             if tx_event
@@ -630,6 +635,7 @@ mod tests {
                 namespace,
                 arguments,
                 call_id,
+                ..
             }) => {
                 assert_eq!(id, &None);
                 assert_eq!(name, "Read");
@@ -685,6 +691,7 @@ mod tests {
                 namespace,
                 arguments,
                 call_id,
+                ..
             }) => {
                 assert_eq!(id, &None);
                 assert_eq!(name, "Bash");

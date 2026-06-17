@@ -181,12 +181,16 @@ mod tests {
                 role: "user".to_string(),
                 content: vec![ContentItem::InputText { text: text.clone() }],
                 phase: None,
+
+                metadata: None,
             },
             ResponseItem::Message {
                 id: None,
                 role: "developer".to_string(),
                 content: vec![ContentItem::InputText { text }],
                 phase: None,
+
+                metadata: None,
             },
         ];
 
@@ -203,6 +207,8 @@ mod tests {
                 text: "<skills_instructions>\n- imagegen\n</skills_instructions>".to_string(),
             }],
             phase: None,
+
+            metadata: None,
         }];
 
         assert_eq!(parse_session_skills(&items), Vec::new());

@@ -230,7 +230,9 @@ pub(crate) fn convert_request(
                     },
                 });
             }
-            ResponseItem::FunctionCallOutput { call_id, output } => {
+            ResponseItem::FunctionCallOutput {
+                call_id, output, ..
+            } => {
                 flush_pending_assistant(
                     &mut messages,
                     &mut pending_reasoning_content,
@@ -267,6 +269,7 @@ pub(crate) fn convert_request(
                 status,
                 execution,
                 tools,
+                ..
             } => {
                 flush_pending_assistant(
                     &mut messages,
@@ -296,7 +299,7 @@ pub(crate) fn convert_request(
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::AgentMessage { .. }
             | ResponseItem::Compaction { .. }
-            | ResponseItem::CompactionTrigger
+            | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => {}
         }
@@ -826,6 +829,7 @@ mod tests {
                     text: "hello".to_string(),
                 }],
                 phase: None,
+                metadata: None,
             }],
             tools: vec![json!({
                 "type": "function",
@@ -870,6 +874,7 @@ mod tests {
                     text: "keep going".to_string(),
                 }],
                 phase: None,
+                metadata: None,
             }],
             tools: Vec::new(),
             tool_choice: "auto".to_string(),
@@ -904,6 +909,7 @@ mod tests {
                         text: "list files".to_string(),
                     }],
                     phase: None,
+                    metadata: None,
                 },
                 ResponseItem::Reasoning {
                     id: "reasoning-1".to_string(),
@@ -912,6 +918,7 @@ mod tests {
                         text: "I need to inspect the directory.".to_string(),
                     }]),
                     encrypted_content: None,
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -919,10 +926,12 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls" }).to_string(),
                     call_id: "call-1".to_string(),
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("file.txt".to_string()),
+                    metadata: None,
                 },
             ],
             tools: vec![json!({
@@ -968,6 +977,7 @@ mod tests {
                 namespace: Some("mcp__demo__".to_string()),
                 arguments: json!({ "order_id": "ord_123" }).to_string(),
                 call_id: "call-lookup".to_string(),
+                metadata: None,
             }],
             tools: vec![json!({
                 "type": "namespace",
@@ -1103,6 +1113,7 @@ mod tests {
                         text: "Need to inspect files.".to_string(),
                     }]),
                     encrypted_content: None,
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1111,6 +1122,7 @@ mod tests {
                         text: String::new(),
                     }],
                     phase: None,
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1118,6 +1130,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/file.txt" }).to_string(),
                     call_id: "call-1".to_string(),
+                    metadata: None,
                 },
             ],
             tools: vec![json!({
@@ -1161,6 +1174,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/legacy.py" }).to_string(),
                     call_id: "call-1".to_string(),
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1168,6 +1182,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/data.csv" }).to_string(),
                     call_id: "call-2".to_string(),
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1176,6 +1191,7 @@ mod tests {
                         text: String::new(),
                     }],
                     phase: None,
+                    metadata: None,
                 },
                 ResponseItem::Reasoning {
                     id: "reasoning-1".to_string(),
@@ -1184,6 +1200,7 @@ mod tests {
                         text: "Need to inspect both files.".to_string(),
                     }]),
                     encrypted_content: None,
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1191,18 +1208,22 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/config.ini" }).to_string(),
                     call_id: "call-3".to_string(),
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("legacy".to_string()),
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "call-2".to_string(),
                     output: FunctionCallOutputPayload::from_text("data".to_string()),
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "call-3".to_string(),
                     output: FunctionCallOutputPayload::from_text("config".to_string()),
+                    metadata: None,
                 },
             ],
             tools: vec![json!({
@@ -1250,6 +1271,7 @@ mod tests {
                         text: "Need one more directory listing.".to_string(),
                     }]),
                     encrypted_content: None,
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1258,6 +1280,7 @@ mod tests {
                         text: "I will inspect the directory.".to_string(),
                     }],
                     phase: None,
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1265,6 +1288,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls" }).to_string(),
                     call_id: "call-1".to_string(),
+                    metadata: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1273,6 +1297,7 @@ mod tests {
                         text: " Then I will inspect hidden files.".to_string(),
                     }],
                     phase: None,
+                    metadata: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1280,14 +1305,17 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls -a" }).to_string(),
                     call_id: "call-2".to_string(),
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("file.txt".to_string()),
+                    metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     call_id: "call-2".to_string(),
                     output: FunctionCallOutputPayload::from_text(".git".to_string()),
+                    metadata: None,
                 },
             ],
             tools: vec![json!({
@@ -1339,12 +1367,14 @@ mod tests {
                     status: Some("completed".to_string()),
                     execution: "client".to_string(),
                     arguments: json!({ "query": "search tools" }),
+                    metadata: None,
                 },
                 ResponseItem::ToolSearchOutput {
                     call_id: Some("search-1".to_string()),
                     status: "completed".to_string(),
                     execution: "client".to_string(),
                     tools: vec![json!({ "name": "shell", "type": "function" })],
+                    metadata: None,
                 },
             ],
             tools: vec![json!({
@@ -1400,6 +1430,7 @@ mod tests {
                     text: "return structured output".to_string(),
                 }],
                 phase: None,
+                metadata: None,
             }],
             tools: Vec::new(),
             tool_choice: "auto".to_string(),
