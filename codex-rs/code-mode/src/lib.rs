@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "v8-runtime"), allow(dead_code))]
 
+mod cell_actor;
 mod runtime;
 mod service;
 

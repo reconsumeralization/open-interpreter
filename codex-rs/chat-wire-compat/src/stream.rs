@@ -234,7 +234,7 @@ async fn process_chat_sse(
                         if tx_event
                             .send(Ok(ResponseEvent::OutputItemAdded(
                                 ResponseItem::Reasoning {
-                                    id: state.reasoning_item_id.clone(),
+                                    id: Some(state.reasoning_item_id.clone()),
                                     summary: vec![],
                                     content: Some(vec![ReasoningItemContent::ReasoningText {
                                         text: String::new(),
@@ -449,7 +449,7 @@ async fn finalize_reasoning(
 
     tx_event
         .send(Ok(ResponseEvent::OutputItemDone(ResponseItem::Reasoning {
-            id: state.reasoning_item_id.clone(),
+            id: Some(state.reasoning_item_id.clone()),
             summary: vec![],
             content: Some(vec![ReasoningItemContent::ReasoningText {
                 text: std::mem::take(&mut state.reasoning_content),

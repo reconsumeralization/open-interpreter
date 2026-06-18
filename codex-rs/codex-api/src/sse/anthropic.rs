@@ -278,7 +278,7 @@ async fn process_anthropic_event(
                     if tx_event
                         .send(Ok(ResponseEvent::OutputItemAdded(
                             ResponseItem::Reasoning {
-                                id: format!("anthropic-thinking-{index}"),
+                                id: Some(format!("anthropic-thinking-{index}")),
                                 summary: vec![],
                                 content: Some(vec![ReasoningItemContent::ReasoningText {
                                     text: String::new(),
@@ -383,7 +383,7 @@ async fn process_anthropic_event(
                     text,
                     signature,
                 } => ResponseItem::Reasoning {
-                    id,
+                    id: Some(id),
                     summary: vec![],
                     content: Some(vec![ReasoningItemContent::ReasoningText { text }]),
                     encrypted_content: signature,
