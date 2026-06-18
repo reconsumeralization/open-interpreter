@@ -29,10 +29,10 @@ jobs:
           bash -n scripts/install/install-open-interpreter.sh
           shellcheck -s sh scripts/install/install.sh
           shellcheck -s sh scripts/install/install-open-interpreter.sh
-          grep -q 'open-interpreter-package' scripts/install/install-open-interpreter.sh
-          grep -q 'open-interpreter-package' scripts/install/install-open-interpreter.ps1
-          grep -q 'openinterpreter/openinterpreter' scripts/install/install-open-interpreter.sh
-          grep -q 'openinterpreter/openinterpreter' scripts/install/install-open-interpreter.ps1
+          grep -q 'open-interpreter-package' scripts/install/install.sh
+          grep -q 'open-interpreter-package' scripts/install/install.ps1
+          grep -q 'openinterpreter/openinterpreter' scripts/install/install.sh
+          grep -q 'openinterpreter/openinterpreter' scripts/install/install.ps1
 
       - name: Test packaging and installer scripts
         run: |

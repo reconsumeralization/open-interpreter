@@ -75,12 +75,6 @@ if (-not [string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_NONINTERACTIVE)) {
 }
 
 if (-not [string]::IsNullOrWhiteSpace($scriptDir)) {
-    $genericInstaller = Join-Path $scriptDir "install-codex.ps1"
-    if (Test-Path -LiteralPath $genericInstaller -PathType Leaf) {
-        & $genericInstaller @RemainingArgs
-        exit $LASTEXITCODE
-    }
-
     $siblingInstaller = Join-Path $scriptDir "install.ps1"
     if ($scriptName -ne "install.ps1" -and (Test-Path -LiteralPath $siblingInstaller -PathType Leaf)) {
         & $siblingInstaller @RemainingArgs
@@ -88,6 +82,6 @@ if (-not [string]::IsNullOrWhiteSpace($scriptDir)) {
     }
 }
 
-$installerText = Invoke-RestMethod -Uri "https://github.com/$env:CODEX_GITHUB_REPO/releases/latest/download/install-codex.ps1"
+$installerText = Invoke-RestMethod -Uri "https://www.openinterpreter.com/install.ps1"
 $installer = [scriptblock]::Create($installerText)
 & $installer @RemainingArgs

@@ -21,21 +21,17 @@ export CODEX_INSTALL_DIR="${OPEN_INTERPRETER_INSTALL_DIR:-${CODEX_INSTALL_DIR:-$
 export CODEX_RELEASE="${OPEN_INTERPRETER_RELEASE:-${CODEX_RELEASE:-latest}}"
 export CODEX_NON_INTERACTIVE="${OPEN_INTERPRETER_NONINTERACTIVE:-${CODEX_NON_INTERACTIVE:-false}}"
 
-if [ -n "$script_dir" ] && [ -f "$script_dir/install-codex.sh" ]; then
-  exec "$script_dir/install-codex.sh" "$@"
-fi
-
 if [ -n "$script_dir" ] && [ "$script_name" != "install.sh" ] && [ -f "$script_dir/install.sh" ]; then
   exec "$script_dir/install.sh" "$@"
 fi
 
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "https://github.com/$CODEX_GITHUB_REPO/releases/latest/download/install-codex.sh" | sh -s -- "$@"
+  curl -fsSL "https://www.openinterpreter.com/install" | sh -s -- "$@"
   exit $?
 fi
 
 if command -v wget >/dev/null 2>&1; then
-  wget -q -O - "https://github.com/$CODEX_GITHUB_REPO/releases/latest/download/install-codex.sh" | sh -s -- "$@"
+  wget -q -O - "https://www.openinterpreter.com/install" | sh -s -- "$@"
   exit $?
 fi
 

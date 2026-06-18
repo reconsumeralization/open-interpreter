@@ -241,13 +241,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The public install commands fetch install.sh / install.ps1 from the
-          # latest release; those wrappers in turn fetch the generic
-          # install-codex.sh / install-codex.ps1 engine.
-          cp scripts/install/install-open-interpreter.sh dist/install.sh
-          cp scripts/install/install-open-interpreter.ps1 dist/install.ps1
-          cp scripts/install/install.sh dist/install-codex.sh
-          cp scripts/install/install.ps1 dist/install-codex.ps1
+          # Publish the real Open Interpreter installers directly. The website
+          # /install routes serve the same scripts, so there is no secondary
+          # installer asset name to keep in sync.
+          cp scripts/install/install.sh dist/install.sh
+          cp scripts/install/install.ps1 dist/install.ps1
 
       - name: Create checksum manifest
         shell: bash
@@ -272,5 +270,3 @@ jobs:
             dist/codex-package_SHA256SUMS
             dist/install.sh
             dist/install.ps1
-            dist/install-codex.sh
-            dist/install-codex.ps1
