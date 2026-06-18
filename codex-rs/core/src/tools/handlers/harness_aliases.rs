@@ -1112,7 +1112,7 @@ async fn handle_ask_user_question(
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
     RequestUserInputHandler {
         available_modes: codex_tools::request_user_input_available_modes(
-            invocation.turn.features.get(),
+            invocation.turn.config.features.get(),
         ),
     }
     .handle(ToolInvocation {
@@ -2358,7 +2358,7 @@ mod tests {
         turn.environments.turn_environments[0] = TurnEnvironment::new(
             current.environment_id,
             current.environment,
-            workspace_root.clone(),
+            workspace_root.clone().into(),
             current.shell,
         );
         let file_system_sandbox_policy =

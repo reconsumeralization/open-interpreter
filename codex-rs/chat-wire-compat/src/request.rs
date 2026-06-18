@@ -912,7 +912,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::Reasoning {
-                    id: "reasoning-1".to_string(),
+                    id: Some("reasoning-1".to_string()),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "I need to inspect the directory.".to_string(),
@@ -929,6 +929,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("file.txt".to_string()),
                     metadata: None,
@@ -1107,7 +1108,7 @@ mod tests {
             instructions: String::new(),
             input: vec![
                 ResponseItem::Reasoning {
-                    id: "reasoning-1".to_string(),
+                    id: Some("reasoning-1".to_string()),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "Need to inspect files.".to_string(),
@@ -1194,7 +1195,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::Reasoning {
-                    id: "reasoning-1".to_string(),
+                    id: Some("reasoning-1".to_string()),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "Need to inspect both files.".to_string(),
@@ -1211,16 +1212,19 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("legacy".to_string()),
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "call-2".to_string(),
                     output: FunctionCallOutputPayload::from_text("data".to_string()),
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "call-3".to_string(),
                     output: FunctionCallOutputPayload::from_text("config".to_string()),
                     metadata: None,
@@ -1265,7 +1269,7 @@ mod tests {
             instructions: String::new(),
             input: vec![
                 ResponseItem::Reasoning {
-                    id: "reasoning-1".to_string(),
+                    id: Some("reasoning-1".to_string()),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "Need one more directory listing.".to_string(),
@@ -1308,11 +1312,13 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("file.txt".to_string()),
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "call-2".to_string(),
                     output: FunctionCallOutputPayload::from_text(".git".to_string()),
                     metadata: None,
@@ -1370,6 +1376,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::ToolSearchOutput {
+                    id: None,
                     call_id: Some("search-1".to_string()),
                     status: "completed".to_string(),
                     execution: "client".to_string(),

@@ -1871,6 +1871,7 @@ mod tests {
 
                     metadata: None,},
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "terminus-2-shell-0".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "root@host:/app# pwd\n/app\nroot@host:/app#\n".to_string(),

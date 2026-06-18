@@ -28,7 +28,8 @@ pub(crate) fn primary_cwd(invocation: &ToolInvocation) -> PathBuf {
         .turn
         .environments
         .primary()
-        .map(|environment| environment.cwd().as_path().to_path_buf())
+        .and_then(|environment| environment.cwd().to_abs_path().ok())
+        .map(codex_utils_absolute_path::AbsolutePathBuf::into_path_buf)
         .unwrap_or_else(|| {
             #[allow(deprecated)]
             invocation.turn.cwd.as_path().to_path_buf()

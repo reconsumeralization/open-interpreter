@@ -2012,6 +2012,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     "<system>Command executed successfully.</system>".to_string(),
@@ -2054,7 +2055,7 @@ mod tests {
     fn kimi_messages_attach_reasoning_content_to_tool_call_message() {
         let items = vec![
             ResponseItem::Reasoning {
-                id: "rs-1".to_string(),
+                id: Some("rs-1".to_string()),
                 summary: Vec::new(),
                 content: Some(vec![ReasoningItemContent::ReasoningText {
                     text: "I need to inspect the files.".to_string(),
@@ -2073,6 +2074,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text("ok".to_string()),
 
@@ -2114,7 +2116,7 @@ mod tests {
     fn kimi_messages_merge_late_assistant_text_with_pending_tool_calls() {
         let items = vec![
             ResponseItem::Reasoning {
-                id: "rs-1".to_string(),
+                id: Some("rs-1".to_string()),
                 summary: Vec::new(),
                 content: Some(vec![ReasoningItemContent::ReasoningText {
                     text: "I should inspect the runtime.".to_string(),
@@ -2143,6 +2145,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "Shell:1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     "<system>ERROR: Command failed with exit code: 1.</system>".to_string(),
@@ -2196,6 +2199,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_content_items(vec![
                     FunctionCallOutputContentItem::InputText {
@@ -2261,6 +2265,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text("a\u{c}b\nc".to_string()),
 
@@ -2295,6 +2300,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "WriteFile:6".to_string(),
                 output: FunctionCallOutputPayload::from_text("written".to_string()),
 
@@ -2344,6 +2350,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "Shell:7".to_string(),
                 output: FunctionCallOutputPayload {
                     body: codex_protocol::models::FunctionCallOutputBody::ContentItems(vec![
@@ -2413,6 +2420,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "Shell:7".to_string(),
                 output: FunctionCallOutputPayload {
                     body: codex_protocol::models::FunctionCallOutputBody::Text(
@@ -2467,6 +2475,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "ReadMediaFile:1".to_string(),
                 output: FunctionCallOutputPayload {
                     body: codex_protocol::models::FunctionCallOutputBody::ContentItems(vec![
@@ -2530,6 +2539,7 @@ mod tests {
     fn kimi_messages_skip_orphaned_tool_output() {
         let items = vec![
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "WriteFile:6".to_string(),
                 output: FunctionCallOutputPayload::from_text("written".to_string()),
 

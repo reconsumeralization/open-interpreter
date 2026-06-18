@@ -541,7 +541,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::Reasoning {
-                    id: "reasoning".to_string(),
+                    id: Some("reasoning".to_string()),
                     summary: vec![],
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "I should inspect the clock.".to_string(),
@@ -560,6 +560,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "call-date".to_string(),
                     output: FunctionCallOutputPayload::from_text("Tue Apr 29".to_string()),
 

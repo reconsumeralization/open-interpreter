@@ -242,11 +242,11 @@ async fn run_compact_task_inner_impl(
         let prompt = Prompt {
             input: turn_input,
             base_instructions: sess.get_base_instructions().await,
-            personality: turn_context.personality,
             cwd: turn_context
                 .environments
                 .primary()
-                .map(|environment| environment.cwd().to_path_buf()),
+                .and_then(|environment| environment.cwd().to_abs_path().ok())
+                .map(codex_utils_absolute_path::AbsolutePathBuf::into_path_buf),
             ..Default::default()
         };
         let attempt_result = drain_to_completed(

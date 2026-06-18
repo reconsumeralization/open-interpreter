@@ -2581,6 +2581,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "toolu_1".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "(Bash completed with no output)".to_string(),
@@ -2598,6 +2599,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "toolu_2".to_string(),
                     output: FunctionCallOutputPayload::from_text("1\tREAD_OK".to_string()),
 
@@ -2610,7 +2612,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "base instructions".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -2759,12 +2760,14 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "toolu_python".to_string(),
                     output: FunctionCallOutputPayload::from_text("Python 3.13.7\n".to_string()),
 
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "toolu_clone".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "Cloning into '/app/pyknotid'...\n\n".to_string(),
@@ -2779,7 +2782,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "base instructions".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -2847,7 +2849,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "base instructions".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -2906,7 +2907,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -2973,7 +2973,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         }
@@ -3051,7 +3050,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3097,7 +3095,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3138,7 +3135,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3198,6 +3194,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "toolu_bash".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "\nTodoWrite done\n\n   ".to_string(),
@@ -3212,7 +3209,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "base instructions".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3278,7 +3274,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3341,6 +3336,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
@@ -3365,6 +3361,7 @@ mod tests {
                 metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
@@ -3381,7 +3378,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3435,6 +3431,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
@@ -3457,6 +3454,7 @@ mod tests {
                 metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
@@ -3473,7 +3471,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3532,6 +3529,7 @@ mod tests {
                 metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: format!("grep_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("MATCH_{index}")),
 
@@ -3546,7 +3544,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3620,6 +3617,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
@@ -3654,6 +3652,7 @@ mod tests {
                 metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
@@ -3670,7 +3669,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3720,6 +3718,7 @@ mod tests {
                 metadata: None,
             },
             ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text(
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
@@ -3742,6 +3741,7 @@ mod tests {
                 metadata: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
+                id: None,
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!(
                     "{index}\tCHECKPOINT_{index:02}"
@@ -3758,7 +3758,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -3823,7 +3822,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4093,6 +4091,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "toolu_1".to_string(),
                     output: FunctionCallOutputPayload::from_text(
                         "(Bash completed with no output)".to_string(),
@@ -4127,7 +4126,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4189,7 +4187,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4269,7 +4266,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4355,7 +4351,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4399,7 +4394,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4443,7 +4437,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4487,7 +4480,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4531,7 +4523,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4591,7 +4582,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };
@@ -4645,7 +4635,6 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "ignored".to_string(),
             },
-            personality: None,
             output_schema: None,
             output_schema_strict: true,
         };

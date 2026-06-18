@@ -352,6 +352,7 @@ mod tests {
                     metadata: None,
                 },
                 ResponseItem::FunctionCallOutput {
+                    id: None,
                     call_id: "Glob:0".to_string(),
                     output: FunctionCallOutputPayload::from_text("module.py".to_string()),
 

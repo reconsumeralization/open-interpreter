@@ -8,6 +8,7 @@ use super::*;
 use crate::app_event::KimiCodeLoginOutcome;
 use crate::config_update::format_config_error;
 use crate::external_agent_config_migration_flow::ExternalAgentConfigMigrationFlowOutcome;
+use codex_app_server_protocol::RequestId;
 #[cfg(target_os = "windows")]
 use codex_config::types::WindowsSandboxModeToml;
 use codex_login::kimi_code;
