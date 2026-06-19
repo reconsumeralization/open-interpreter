@@ -2,8 +2,8 @@
 #
 # To release, bump the workspace version in codex-rs/Cargo.toml, then:
 # ```
-# git tag -a rust-v0.0.15 -m "Release 0.0.15"
-# git push origin rust-v0.0.15
+# git tag -a rust-v0.0.16 -m "Release 0.0.16"
+# git push origin rust-v0.0.16
 # ```
 #
 # Builds run on GitHub-hosted runners and publish the standalone package
@@ -88,7 +88,7 @@ jobs:
           require "json"
 
           all = [
-            {"runner"=>"macos-15", "target"=>"aarch64-apple-darwin"},
+            {"runner"=>"macos-15-xlarge", "target"=>"aarch64-apple-darwin"},
             {"runner"=>"macos-15-xlarge", "target"=>"x86_64-apple-darwin"},
             {"runner"=>"ubuntu-24.04", "target"=>"x86_64-unknown-linux-musl"},
             {"runner"=>"ubuntu-24.04-arm", "target"=>"aarch64-unknown-linux-musl"},
@@ -122,17 +122,16 @@ jobs:
       run:
         working-directory: codex-rs
     env:
-      # Compiler cache, matching cargo-ci. GitHub-hosted macOS runners cannot
-      # cold-build this workspace inside the 6-hour job limit; sccache makes
-      # re-runs warm (a timed-out first run still populates the cache).
+      # Compiler cache, matching cargo-ci for Linux release builds.
       #
       # Windows release builds do not use RUSTC_WRAPPER=sccache because the
       # hosted runner's sccache server can drop the compile connection during
       # long linker-plugin-lto builds.
       #
-      # arm64 macOS runners cross-targeting x86_64 do not use sccache because
-      # ring/cc-rs can produce mixed-architecture archives under sccache.
-      USE_SCCACHE: ${{ (!startsWith(matrix.runner, 'windows') && !(matrix.runner == 'macos-15-xlarge' && matrix.target == 'x86_64-apple-darwin')) && 'true' || 'false' }}
+      # macOS release builds run on xlarge runners without sccache. The arm64
+      # runner cross-targeting x86_64 can produce mixed-architecture archives
+      # under sccache, and the standard arm64 runner can stall in release builds.
+      USE_SCCACHE: ${{ startsWith(matrix.runner, 'ubuntu') && 'true' || 'false' }}
       SCCACHE_GHA_ENABLED: "true"
       SCCACHE_CACHE_SIZE: 10G
       # Cargo's libgit2 transport hangs fetching git dependencies with nested
