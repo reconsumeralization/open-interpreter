@@ -2,8 +2,8 @@
 #
 # To release, bump the workspace version in codex-rs/Cargo.toml, then:
 # ```
-# git tag -a rust-v0.0.12 -m "Release 0.0.12"
-# git push origin rust-v0.0.12
+# git tag -a rust-v0.0.13 -m "Release 0.0.13"
+# git push origin rust-v0.0.13
 # ```
 #
 # Builds run on GitHub-hosted runners and publish the standalone package
