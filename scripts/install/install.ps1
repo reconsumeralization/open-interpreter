@@ -626,8 +626,10 @@ function Test-PackageContentsAreComplete {
         return $false
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($metadata.managedCodex) -and
-        -not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $metadata.managedCodex)) {
+    $managedCodexProperty = $metadata.PSObject.Properties["managedCodex"]
+    $managedCodex = if ($null -eq $managedCodexProperty) { $null } else { $managedCodexProperty.Value }
+    if (-not [string]::IsNullOrWhiteSpace($managedCodex) -and
+        -not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $managedCodex)) {
         return $false
     }
 
