@@ -143,34 +143,6 @@ release_metadata_url() {
   printf 'https://api.github.com/repos/%s/releases/tags/%s%s\n' "$GITHUB_REPO" "$RELEASE_TAG_PREFIX" "$resolved_version"
 }
 
-resolve_release() {
-  normalized_version="$(normalize_version "$RELEASE")"
-  validate_version "$normalized_version"
-
-  if [ "$normalized_version" = "latest" ]; then
-    requested_release="latest"
-    metadata_url="https://api.github.com/repos/openai/codex/releases/latest"
-  else
-    resolved_version="$normalized_version"
-    requested_release="$resolved_version"
-    metadata_url="$(release_metadata_url "$resolved_version")"
-  fi
-
-  if ! release_json="$(download_text "$metadata_url")"; then
-    echo "Could not fetch GitHub release metadata for Codex $requested_release. GitHub API may be unavailable or rate limited." >&2
-    exit 1
-  fi
-
-  if [ "$normalized_version" = "latest" ]; then
-    resolved_version="$(printf '%s\n' "$release_json" | sed -n 's/.*"tag_name":[[:space:]]*"rust-v\([^"]*\)".*/\1/p' | head -n 1)"
-    if [ -z "$resolved_version" ]; then
-      echo "Failed to resolve the latest Codex release version." >&2
-      exit 1
-    fi
-    validate_version "$resolved_version"
-  fi
-}
-
 release_asset_digest_or_empty() {
   asset="$1"
 
@@ -930,6 +902,10 @@ else
 fi
 
 resolved_version="$(resolve_version)"
+if ! release_json="$(download_text "$(release_metadata_url "$resolved_version")")"; then
+  echo "Could not fetch GitHub release metadata for $PRODUCT_NAME $resolved_version. GitHub API may be unavailable or rate limited." >&2
+  exit 1
+fi
 package_asset="$PACKAGE_ASSET_STEM-$vendor_target.tar.gz"
 checksum_asset="codex-package_SHA256SUMS"
 if release_asset_exists "$package_asset" &&
@@ -937,7 +913,7 @@ if release_asset_exists "$package_asset" &&
   install_layout="package"
   asset="$package_asset"
 elif [ "$PACKAGE_ASSET_STEM" = "codex-package" ] &&
-  release_asset_exists "codex-npm-$npm_tag-$resolved_version.tgz" "$resolved_version"; then
+  release_asset_exists "codex-npm-$npm_tag-$resolved_version.tgz"; then
   install_layout="legacy-platform-npm"
   asset="codex-npm-$npm_tag-$resolved_version.tgz"
 else

@@ -97,8 +97,7 @@ function Find-ReleaseAssetMetadata {
         [object]$ReleaseMetadata
     )
 
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$ReleaseTagPrefix$ResolvedVersion"
-    $asset = $release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
+    $asset = $ReleaseMetadata.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
     if ($null -eq $asset) {
         return $null
     }
@@ -112,20 +111,6 @@ function Find-ReleaseAssetMetadata {
         Url = $asset.browser_download_url
         Sha256 = $digestMatch.Groups[1].Value.ToLowerInvariant()
     }
-}
-
-function Get-ReleaseAssetMetadata {
-    param(
-        [string]$AssetName,
-        [string]$ResolvedVersion
-    )
-
-    $metadata = Find-ReleaseAssetMetadata -AssetName $AssetName -ResolvedVersion $ResolvedVersion
-    if ($null -eq $metadata) {
-        throw "Could not find release asset $AssetName for $ProductName $ResolvedVersion."
-    }
-
-    return $metadata
 }
 
 function Test-ArchiveDigest {
@@ -235,16 +220,14 @@ function Resolve-Release {
     $normalizedVersion = Normalize-Version -RawVersion $Release
     Assert-ValidReleaseVersion -Version $normalizedVersion
 
-    if ($normalizedVersion -eq "latest") {
-        $requestedRelease = "latest"
-        $metadataUri = "https://api.github.com/repos/openai/codex/releases/latest"
-    } else {
+    if ($normalizedVersion -ne "latest") {
         $resolvedVersion = $normalizedVersion
-        $requestedRelease = $resolvedVersion
-        $metadataUri = "https://api.github.com/repos/openai/codex/releases/tags/rust-v$resolvedVersion"
-    }
-
-    if ([string]::IsNullOrWhiteSpace($ReleaseTagPrefix)) {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$ReleaseTagPrefix$resolvedVersion"
+        return [PSCustomObject]@{
+            Version = $resolvedVersion
+            Metadata = $release
+        }
+    } elseif ([string]::IsNullOrWhiteSpace($ReleaseTagPrefix)) {
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
     } else {
         $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=100"
@@ -263,7 +246,10 @@ function Resolve-Release {
         exit 1
     }
     Assert-ValidReleaseVersion -Version $resolvedVersion
-    return $resolvedVersion
+    return [PSCustomObject]@{
+        Version = $resolvedVersion
+        Metadata = $release
+    }
 }
 
 function Get-VersionFromBinary {
