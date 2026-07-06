@@ -24,6 +24,7 @@ use codex_app_server_protocol::AskForApproval;
 use codex_app_server_protocol::AuthMode;
 use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::ConfigBatchWriteParams;
+use codex_app_server_protocol::ConfigRequirementsReadResponse;
 use codex_app_server_protocol::ConfigWriteResponse;
 use codex_app_server_protocol::ExternalAgentConfigDetectParams;
 use codex_app_server_protocol::ExternalAgentConfigDetectResponse;
@@ -39,6 +40,7 @@ use codex_app_server_protocol::MemoryResetResponse;
 use codex_app_server_protocol::Model as ApiModel;
 use codex_app_server_protocol::ModelListParams;
 use codex_app_server_protocol::ModelListResponse;
+use codex_app_server_protocol::NewThreadModelDefaults;
 use codex_app_server_protocol::RateLimitSnapshot;
 use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::ReviewDelivery;
@@ -120,6 +122,7 @@ use codex_protocol::openai_models::ModelServiceTier;
 use codex_protocol::openai_models::ModelUpgrade;
 use codex_protocol::openai_models::ReasoningEffortPreset;
 use codex_utils_absolute_path::AbsolutePathBuf;
+use codex_utils_path_uri::PathUri;
 use color_eyre::eyre::ContextCompat;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::WrapErr;
@@ -177,6 +180,7 @@ pub(crate) struct AppServerSession {
     thread_settings_update_supported: bool,
     default_model: Option<String>,
     available_models: Vec<ModelPreset>,
+    managed_new_thread_defaults: Option<NewThreadModelDefaults>,
     external_agent_config_import_completion_pending: AtomicBool,
 }
 
@@ -221,6 +225,7 @@ impl AppServerSession {
             thread_settings_update_supported: true,
             default_model: None,
             available_models: Vec::new(),
+            managed_new_thread_defaults: None,
             external_agent_config_import_completion_pending: AtomicBool::new(false),
         }
     }
@@ -259,6 +264,21 @@ impl AppServerSession {
     pub(crate) async fn bootstrap(&mut self, config: &Config) -> Result<AppServerBootstrap> {
         let started_at = Instant::now();
         let account = self.read_account().await?;
+        let requirements_request_id = self.next_request_id();
+        let requirements: ConfigRequirementsReadResponse = self
+            .client
+            .request_typed(ClientRequest::ConfigRequirementsRead {
+                request_id: requirements_request_id,
+                params: None,
+            })
+            .await
+            .map_err(|err| {
+                bootstrap_request_error("configRequirements/read failed during TUI bootstrap", err)
+            })?;
+        self.managed_new_thread_defaults = requirements
+            .requirements
+            .and_then(|requirements| requirements.models)
+            .and_then(|models| models.new_thread);
         let model_request_id = self.next_request_id();
         let models: ModelListResponse = self
             .client
@@ -311,16 +331,19 @@ impl AppServerSession {
                 false,
             ),
             Some(Account::Chatgpt { email, plan_type }) => {
-                let feedback_audience = if email.ends_with("@openai.com") {
+                let feedback_audience = if email
+                    .as_deref()
+                    .is_some_and(|email| email.ends_with("@openai.com"))
+                {
                     FeedbackAudience::OpenAiEmployee
                 } else {
                     FeedbackAudience::External
                 };
                 (
-                    Some(email.clone()),
+                    email.clone(),
                     Some(TelemetryAuthMode::Chatgpt),
                     Some(StatusAccountDisplay::ChatGpt {
-                        email: Some(email),
+                        email,
                         plan: Some(plan_type_display_name(plan_type)),
                     }),
                     Some(plan_type),
@@ -345,6 +368,10 @@ impl AppServerSession {
             has_chatgpt_account,
             available_models,
         })
+    }
+
+    pub(crate) fn managed_new_thread_defaults(&self) -> Option<&NewThreadModelDefaults> {
+        self.managed_new_thread_defaults.as_ref()
     }
 
     /// Fetches the current account info without refreshing the auth token.
@@ -786,6 +813,7 @@ impl AppServerSession {
                     personality,
                     output_schema,
                     collaboration_mode,
+                    multi_agent_mode: None,
                 },
             })
             .await
@@ -1562,7 +1590,7 @@ async fn thread_session_state_from_thread_start_response(
         response.active_permission_profile.clone().map(Into::into),
         response.cwd.clone(),
         response.runtime_workspace_roots.clone(),
-        response.instruction_sources.clone(),
+        response.instruction_source_path_uris(),
         response.reasoning_effort.clone(),
         config,
     )
@@ -1603,7 +1631,7 @@ async fn thread_session_state_from_thread_resume_response(
         response.active_permission_profile.clone().map(Into::into),
         response.cwd.clone(),
         response.runtime_workspace_roots.clone(),
-        response.instruction_sources.clone(),
+        response.instruction_source_path_uris(),
         response.reasoning_effort.clone(),
         config,
     )
@@ -1635,7 +1663,7 @@ async fn thread_session_state_from_thread_fork_response(
         response.active_permission_profile.clone().map(Into::into),
         response.cwd.clone(),
         response.runtime_workspace_roots.clone(),
-        response.instruction_sources.clone(),
+        response.instruction_source_path_uris(),
         response.reasoning_effort.clone(),
         config,
     )
@@ -1674,7 +1702,7 @@ async fn thread_session_state_from_thread_response(
     active_permission_profile: Option<ActivePermissionProfile>,
     cwd: AbsolutePathBuf,
     runtime_workspace_roots: Vec<AbsolutePathBuf>,
-    instruction_source_paths: Vec<AbsolutePathBuf>,
+    instruction_source_paths: Vec<PathUri>,
     reasoning_effort: Option<codex_protocol::openai_models::ReasoningEffort>,
     config: &Config,
 ) -> Result<ThreadSessionState, String> {
@@ -1760,6 +1788,7 @@ mod tests {
     use codex_protocol::permissions::NetworkSandboxPolicy;
     use codex_utils_absolute_path::test_support::PathBufExt;
     use codex_utils_absolute_path::test_support::test_path_buf;
+    use codex_utils_path_uri::LegacyAppPathString;
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;
 
@@ -2315,11 +2344,13 @@ mod tests {
         let response = ThreadResumeResponse {
             thread: codex_app_server_protocol::Thread {
                 id: thread_id.to_string(),
+                extra: None,
                 session_id: ThreadId::new().to_string(),
                 forked_from_id: Some(forked_from_id.to_string()),
                 parent_thread_id: None,
                 preview: "hello".to_string(),
                 ephemeral: false,
+                history_mode: Default::default(),
                 model_provider: "openai".to_string(),
                 created_at: 1,
                 updated_at: 2,
@@ -2368,7 +2399,9 @@ mod tests {
                 test_path_buf("/tmp/project").abs(),
                 test_path_buf("/tmp/project/extra").abs(),
             ],
-            instruction_sources: vec![test_path_buf("/tmp/project/AGENTS.md").abs()],
+            instruction_sources: vec![LegacyAppPathString::from_abs_path(
+                &test_path_buf("/tmp/project/AGENTS.md").abs(),
+            )],
             approval_policy: codex_app_server_protocol::AskForApproval::Never,
             approvals_reviewer: codex_app_server_protocol::ApprovalsReviewer::User,
             sandbox: read_only_profile
@@ -2377,6 +2410,7 @@ mod tests {
                 .into(),
             active_permission_profile: None,
             reasoning_effort: None,
+            multi_agent_mode: Default::default(),
             initial_turns_page: None,
         };
 
@@ -2394,7 +2428,7 @@ mod tests {
         );
         assert_eq!(
             started.session.instruction_source_paths,
-            response.instruction_sources
+            response.instruction_source_path_uris()
         );
         assert_eq!(started.session.permission_profile, read_only_profile);
         assert_eq!(started.turns.len(), 1);

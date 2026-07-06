@@ -10,8 +10,7 @@
 use codex_app_server_client::AppServerRequestHandle;
 use codex_app_server_protocol::AccountLoginCompletedNotification;
 use codex_app_server_protocol::AccountUpdatedNotification;
-#[cfg(test)]
-use codex_app_server_protocol::AuthMode as AppServerAuthMode;
+use codex_app_server_protocol::AuthMode as ApiAuthMode;
 use codex_app_server_protocol::CancelLoginAccountParams;
 use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::LoginAccountParams;
@@ -950,7 +949,16 @@ impl AuthModeWidget {
     pub(crate) fn on_account_updated(&mut self, notification: AccountUpdatedNotification) {
         self.login_status = notification
             .auth_mode
-            .map(LoginStatus::AuthMode)
+            .map(|auth_mode| {
+                LoginStatus::AuthMode(match auth_mode {
+                    ApiAuthMode::ApiKey => AuthMode::ApiKey,
+                    ApiAuthMode::Chatgpt => AuthMode::Chatgpt,
+                    ApiAuthMode::ChatgptAuthTokens => AuthMode::ChatgptAuthTokens,
+                    ApiAuthMode::AgentIdentity => AuthMode::AgentIdentity,
+                    ApiAuthMode::PersonalAccessToken => AuthMode::PersonalAccessToken,
+                    ApiAuthMode::BedrockApiKey => AuthMode::BedrockApiKey,
+                })
+            })
             .unwrap_or(LoginStatus::NotAuthenticated);
     }
 }
@@ -1079,6 +1087,7 @@ mod tests {
                 AuthCredentialsStoreMode::File,
                 AuthKeyringBackendKind::default(),
                 "https://chatgpt.com/backend-api/".to_string(),
+                /*auth_route_config*/ None,
             )
             .await,
             feedback: codex_feedback::CodexFeedback::new(),
@@ -1094,6 +1103,7 @@ mod tests {
             client_name: "test".to_string(),
             client_version: "test".to_string(),
             experimental_api: true,
+            mcp_server_openai_form_elicitation: false,
             opt_out_notification_methods: Vec::new(),
             channel_capacity: DEFAULT_IN_PROCESS_CHANNEL_CAPACITY,
         })
@@ -1148,10 +1158,7 @@ mod tests {
 
     #[tokio::test]
     async fn existing_non_oauth_chatgpt_login_counts_as_signed_in() {
-        for auth_mode in [
-            AppServerAuthMode::ChatgptAuthTokens,
-            AppServerAuthMode::PersonalAccessToken,
-        ] {
+        for auth_mode in [AuthMode::ChatgptAuthTokens, AuthMode::PersonalAccessToken] {
             let (mut widget, _tmp) = widget_forced_chatgpt().await;
             widget.login_status = LoginStatus::AuthMode(auth_mode);
 

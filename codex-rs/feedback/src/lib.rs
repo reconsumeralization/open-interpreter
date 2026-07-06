@@ -4,6 +4,7 @@ use std::collections::btree_map::Entry;
 use std::fs;
 use std::io::Write;
 use std::io::{self};
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -844,6 +845,10 @@ mod tests {
             b"Connectivity diagnostics\n\n- Proxy environment variables are set and may affect connectivity.\n  - HTTPS_PROXY = https://example.com:443".to_vec()
         );
         assert_eq!(attachments_with_diagnostics[3].buffer, b"rollout".to_vec());
+        assert_eq!(
+            attachments_with_diagnostics[3].content_type.as_deref(),
+            Some("text/plain")
+        );
         assert_eq!(
             OsStr::new(attachments_with_diagnostics[3].filename.as_str()),
             OsStr::new(extra_filename.as_str())

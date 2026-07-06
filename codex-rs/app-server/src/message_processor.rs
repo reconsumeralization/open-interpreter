@@ -7,6 +7,7 @@ use std::sync::atomic::AtomicBool;
 use crate::attestation::app_server_attestation_provider;
 use crate::config_manager::ConfigManager;
 use crate::connection_rpc_gate::ConnectionRpcGate;
+use crate::current_time::app_server_time_provider;
 use crate::error_code::invalid_request;
 use crate::extensions::ThreadExtensionDependencies;
 use crate::extensions::app_server_extension_event_sink;
@@ -49,7 +50,6 @@ use crate::transport::AppServerTransport;
 use crate::transport::RemoteControlHandle;
 use codex_analytics::AnalyticsEventsClient;
 use codex_analytics::AppServerRpcTransport;
-use codex_app_server_protocol::AuthMode as LoginAuthMode;
 use codex_app_server_protocol::ChatgptAuthTokensRefreshParams;
 use codex_app_server_protocol::ChatgptAuthTokensRefreshReason;
 use codex_app_server_protocol::ChatgptAuthTokensRefreshResponse;
@@ -79,6 +79,7 @@ use codex_login::auth::ExternalAuthRefreshContext;
 use codex_login::auth::ExternalAuthRefreshReason;
 use codex_login::auth::ExternalAuthTokens;
 use codex_protocol::ThreadId;
+use codex_protocol::auth::AuthMode as LoginAuthMode;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::W3cTraceContext;
 use codex_rollout::StateDbHandle;
@@ -223,6 +224,7 @@ pub(crate) struct InitializedConnectionSessionState {
     pub(crate) app_server_client_name: String,
     pub(crate) client_version: String,
     pub(crate) request_attestation: bool,
+    pub(crate) supports_openai_form_elicitation: bool,
 }
 
 impl Default for ConnectionSessionState {
@@ -274,6 +276,11 @@ impl ConnectionSessionState {
             .is_some_and(|session| session.request_attestation)
     }
 
+    pub(crate) fn supports_openai_form_elicitation(&self) -> bool {
+        self.initialized
+            .get()
+            .is_some_and(|session| session.supports_openai_form_elicitation)
+    }
     pub(crate) fn initialize(&self, session: InitializedConnectionSessionState) -> Result<(), ()> {
         self.initialized.set(session).map_err(|_| ())
     }
@@ -366,9 +373,13 @@ impl MessageProcessor {
                 )),
                 Some(analytics_events_client.clone()),
                 Arc::clone(&thread_store),
-                state_db.clone(),
+                codex_core::local_agent_graph_store_from_state_db(state_db.as_ref()),
                 installation_id,
                 Some(app_server_attestation_provider(
+                    outgoing.clone(),
+                    thread_state_manager.clone(),
+                )),
+                Some(app_server_time_provider(
                     outgoing.clone(),
                     thread_state_manager.clone(),
                 )),
@@ -884,6 +895,7 @@ impl MessageProcessor {
         let serialization_scope = codex_request.serialization_scope();
         let app_server_client_name = session.app_server_client_name().map(str::to_string);
         let client_version = session.client_version().map(str::to_string);
+        let supports_openai_form_elicitation = session.supports_openai_form_elicitation();
         let error_request_id = connection_request_id.clone();
         let rpc_gate = Arc::clone(&session.rpc_gate);
         let processor = Arc::clone(self);
@@ -899,6 +911,7 @@ impl MessageProcessor {
                         request_context,
                         app_server_client_name,
                         client_version,
+                        supports_openai_form_elicitation,
                     )
                     .await;
                 if let Err(error) = result {
@@ -928,6 +941,7 @@ impl MessageProcessor {
         request_context: RequestContext,
         app_server_client_name: Option<String>,
         client_version: Option<String>,
+        supports_openai_form_elicitation: bool,
     ) -> Result<(), JSONRPCErrorError> {
         let connection_id = connection_request_id.connection_id;
         let request_id = ConnectionRequestId {
@@ -1023,6 +1037,9 @@ impl MessageProcessor {
             ClientRequest::EnvironmentAdd { params, .. } => {
                 self.environment_processor.environment_add(params).await
             }
+            ClientRequest::EnvironmentInfo { params, .. } => {
+                self.environment_processor.environment_info(params).await
+            }
             ClientRequest::FsReadFile { params, .. } => self
                 .fs_processor
                 .read_file(params)
@@ -1080,6 +1097,7 @@ impl MessageProcessor {
                         params,
                         app_server_client_name.clone(),
                         client_version.clone(),
+                        supports_openai_form_elicitation,
                         request_context,
                     )
                     .await
@@ -1096,6 +1114,8 @@ impl MessageProcessor {
                         params,
                         app_server_client_name.clone(),
                         client_version.clone(),
+                        /*supports_openai_form_elicitation*/
+                        supports_openai_form_elicitation,
                     )
                     .await
             }
@@ -1106,6 +1126,8 @@ impl MessageProcessor {
                         params,
                         app_server_client_name.clone(),
                         client_version.clone(),
+                        /*supports_openai_form_elicitation*/
+                        supports_openai_form_elicitation,
                     )
                     .await
             }
@@ -1186,7 +1208,7 @@ impl MessageProcessor {
             }
             ClientRequest::ThreadRollback { params, .. } => {
                 self.thread_processor
-                    .thread_rollback(&request_id, params)
+                    .thread_rollback(&request_id, params, app_server_client_name.as_deref())
                     .await
             }
             ClientRequest::ThreadList { params, .. } => {
@@ -1204,8 +1226,8 @@ impl MessageProcessor {
             ClientRequest::ThreadTurnsList { params, .. } => {
                 self.thread_processor.thread_turns_list(params).await
             }
-            ClientRequest::ThreadTurnsItemsList { params, .. } => {
-                self.thread_processor.thread_turns_items_list(params).await
+            ClientRequest::ThreadItemsList { params, .. } => {
+                self.thread_processor.thread_items_list(params).await
             }
             ClientRequest::ThreadShellCommand { params, .. } => {
                 self.thread_processor
@@ -1329,6 +1351,8 @@ impl MessageProcessor {
                         params,
                         app_server_client_name.clone(),
                         client_version.clone(),
+                        /*supports_openai_form_elicitation*/
+                        supports_openai_form_elicitation,
                     )
                     .await
             }
@@ -1429,6 +1453,9 @@ impl MessageProcessor {
             }
             ClientRequest::GetAccountTokenUsage { .. } => {
                 self.account_processor.get_account_token_usage().await
+            }
+            ClientRequest::GetWorkspaceMessages { .. } => {
+                self.account_processor.get_workspace_messages().await
             }
             ClientRequest::SendAddCreditsNudgeEmail { params, .. } => {
                 self.account_processor

@@ -41,6 +41,7 @@ use crate::unified_exec::NoopSpawnLifecycle;
 use crate::unified_exec::UnifiedExecError;
 use crate::unified_exec::UnifiedExecProcess;
 use crate::unified_exec::UnifiedExecProcessManager;
+use codex_network_proxy::ManagedNetworkSandboxContext;
 use codex_network_proxy::NetworkProxy;
 use codex_protocol::error::CodexErr;
 use codex_protocol::error::SandboxErr;
@@ -53,6 +54,7 @@ use codex_tools::UnifiedExecShellMode;
 use codex_utils_path_uri::PathUri;
 use futures::future::BoxFuture;
 use std::collections::HashMap;
+use std::io;
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 
@@ -118,6 +120,7 @@ fn build_unified_exec_sandbox_command(
     command: &[String],
     cwd: &PathUri,
     env: &HashMap<String, String>,
+    managed_network: Option<ManagedNetworkSandboxContext>,
     additional_permissions: Option<AdditionalPermissionProfile>,
 ) -> Result<SandboxCommand, ToolError> {
     let (program, args) = command
@@ -128,6 +131,7 @@ fn build_unified_exec_sandbox_command(
         args: args.to_vec(),
         cwd: cwd.clone(),
         env: env.clone(),
+        managed_network,
         additional_permissions,
     })
 }
@@ -285,6 +289,7 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
                 tty: Some(req.tty),
             },
             command: req.hook_command.clone(),
+            environment_id: req.turn_environment.environment_id.clone(),
         })
     }
 
@@ -321,11 +326,27 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
             req.network.as_ref(),
             launch_sandbox_permissions,
         );
-        let mut env = exec_env_for_sandbox_permissions(&req.env, launch_sandbox_permissions);
-        if let Some(network) = managed_network {
-            network.apply_to_env(&mut env);
-        }
+        let env = exec_env_for_sandbox_permissions(&req.env, launch_sandbox_permissions);
+        let (env, managed_network_context) = match managed_network {
+            Some(network) => {
+                let prepared = network
+                    .prepare_for_optional_environment(
+                        env,
+                        Some(&req.turn_environment.environment_id),
+                    )
+                    .map_err(|err| {
+                        ToolError::Codex(CodexErr::Io(io::Error::other(format!(
+                            "failed to prepare network proxy for environment `{}`: {err}",
+                            req.turn_environment.environment_id
+                        ))))
+                    })?;
+                (prepared.env, Some(prepared.sandbox_context))
+            }
+            None => (env, None),
+        };
         let explicit_env_overrides = req.explicit_env_overrides.clone();
+        #[cfg(unix)]
+        let mut env = env;
         #[cfg(unix)]
         let runtime_path_prepends = {
             let mut runtime_path_prepends = RuntimePathPrepends::default();
@@ -375,6 +396,7 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
                 &command,
                 &req.cwd,
                 &env,
+                managed_network_context.clone(),
                 req.additional_permissions.clone(),
             )
             .map_err(|error| match error {
@@ -388,7 +410,12 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
                 req.capture_policy,
             );
             let mut exec_env = attempt
-                .env_for(command, options, managed_network)
+                .env_for(
+                    command,
+                    options,
+                    managed_network,
+                    Some(&req.turn_environment.environment_id),
+                )
                 .map_err(ToolError::Codex)?;
             exec_env.exec_server_env_config = req.exec_server_env_config.clone();
             match zsh_fork_backend::maybe_prepare_unified_exec(
@@ -409,7 +436,7 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
                     }
                     return self
                         .manager
-                        .open_session_with_exec_env(
+                        .open_session_with_prepared_exec_env(
                             req.process_id,
                             &prepared.exec_request,
                             req.tty,
@@ -438,6 +465,7 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
             &command,
             &req.cwd,
             &env,
+            managed_network_context,
             req.additional_permissions.clone(),
         )
         .map_err(|error| match error {
@@ -457,21 +485,17 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
         self.manager
             .open_session_with_exec_env(
                 req.process_id,
-                &exec_env,
+                command,
+                options,
+                attempt,
+                managed_network,
+                /*environment_id*/ Some(&req.turn_environment.environment_id),
+                req.exec_server_env_config.clone(),
                 req.tty,
                 Box::new(NoopSpawnLifecycle),
                 req.turn_environment.environment.as_ref(),
             )
             .await
-            .map_err(|err| match err {
-                UnifiedExecError::SandboxDenied { output, .. } => {
-                    ToolError::Codex(CodexErr::Sandbox(SandboxErr::Denied {
-                        output: Box::new(output),
-                        network_policy_decision: None,
-                    }))
-                }
-                other => ToolError::Rejected(other.to_string()),
-            })
     }
 }
 

@@ -143,10 +143,36 @@ release_metadata_url() {
   printf 'https://api.github.com/repos/%s/releases/tags/%s%s\n' "$GITHUB_REPO" "$RELEASE_TAG_PREFIX" "$resolved_version"
 }
 
+resolve_release() {
+  normalized_version="$(normalize_version "$RELEASE")"
+  validate_version "$normalized_version"
+
+  if [ "$normalized_version" = "latest" ]; then
+    requested_release="latest"
+    metadata_url="https://api.github.com/repos/openai/codex/releases/latest"
+  else
+    resolved_version="$normalized_version"
+    requested_release="$resolved_version"
+    metadata_url="$(release_metadata_url "$resolved_version")"
+  fi
+
+  if ! release_json="$(download_text "$metadata_url")"; then
+    echo "Could not fetch GitHub release metadata for Codex $requested_release. GitHub API may be unavailable or rate limited." >&2
+    exit 1
+  fi
+
+  if [ "$normalized_version" = "latest" ]; then
+    resolved_version="$(printf '%s\n' "$release_json" | sed -n 's/.*"tag_name":[[:space:]]*"rust-v\([^"]*\)".*/\1/p' | head -n 1)"
+    if [ -z "$resolved_version" ]; then
+      echo "Failed to resolve the latest Codex release version." >&2
+      exit 1
+    fi
+    validate_version "$resolved_version"
+  fi
+}
+
 release_asset_digest_or_empty() {
   asset="$1"
-  resolved_version="$2"
-  release_json="$(download_text "$(release_metadata_url "$resolved_version")")"
 
   digest="$(printf '%s\n' "$release_json" | awk -v asset="$asset" '
     /"name":[[:space:]]*"[^"]+"/ {
@@ -195,16 +221,14 @@ release_asset_digest_or_empty() {
 
 release_asset_exists() {
   asset="$1"
-  resolved_version="$2"
 
-  release_asset_digest_or_empty "$asset" "$resolved_version" >/dev/null 2>&1
+  release_asset_digest_or_empty "$asset" >/dev/null 2>&1
 }
 
 release_asset_digest() {
   asset="$1"
-  resolved_version="$2"
 
-  digest="$(release_asset_digest_or_empty "$asset" "$resolved_version" || true)"
+  digest="$(release_asset_digest_or_empty "$asset" || true)"
   if [ -z "$digest" ]; then
     echo "Could not find SHA-256 digest for release asset $asset." >&2
     exit 1
@@ -908,8 +932,8 @@ fi
 resolved_version="$(resolve_version)"
 package_asset="$PACKAGE_ASSET_STEM-$vendor_target.tar.gz"
 checksum_asset="codex-package_SHA256SUMS"
-if release_asset_exists "$package_asset" "$resolved_version" &&
-  release_asset_exists "$checksum_asset" "$resolved_version"; then
+if release_asset_exists "$package_asset" &&
+  release_asset_exists "$checksum_asset"; then
   install_layout="package"
   asset="$package_asset"
 elif [ "$PACKAGE_ASSET_STEM" = "codex-package" ] &&
@@ -960,12 +984,12 @@ if ! release_dir_is_complete "$release_dir" "$resolved_version" "$vendor_target"
 
   step "Downloading $PRODUCT_NAME"
   if [ "$install_layout" = "package" ]; then
-    checksum_digest="$(release_asset_digest "$checksum_asset" "$resolved_version")"
+    checksum_digest="$(release_asset_digest "$checksum_asset")"
     download_file "$checksum_url" "$checksum_path"
     verify_archive_digest "$checksum_path" "$checksum_digest"
     expected_digest="$(package_archive_digest "$asset" "$checksum_path")"
   else
-    expected_digest="$(release_asset_digest "$asset" "$resolved_version")"
+    expected_digest="$(release_asset_digest "$asset")"
   fi
   download_file "$download_url" "$archive_path"
   verify_archive_digest "$archive_path" "$expected_digest"

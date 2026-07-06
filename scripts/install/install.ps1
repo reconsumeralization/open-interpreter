@@ -94,7 +94,7 @@ function Assert-ValidReleaseVersion {
 function Find-ReleaseAssetMetadata {
     param(
         [string]$AssetName,
-        [string]$ResolvedVersion
+        [object]$ReleaseMetadata
     )
 
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$ReleaseTagPrefix$ResolvedVersion"
@@ -231,11 +231,17 @@ function Remove-StaleInstallArtifacts {
     }
 }
 
-function Resolve-Version {
+function Resolve-Release {
     $normalizedVersion = Normalize-Version -RawVersion $Release
     Assert-ValidReleaseVersion -Version $normalizedVersion
-    if ($normalizedVersion -ne "latest") {
-        return $normalizedVersion
+
+    if ($normalizedVersion -eq "latest") {
+        $requestedRelease = "latest"
+        $metadataUri = "https://api.github.com/repos/openai/codex/releases/latest"
+    } else {
+        $resolvedVersion = $normalizedVersion
+        $requestedRelease = $resolvedVersion
+        $metadataUri = "https://api.github.com/repos/openai/codex/releases/tags/rust-v$resolvedVersion"
     }
 
     if ([string]::IsNullOrWhiteSpace($ReleaseTagPrefix)) {
@@ -861,7 +867,9 @@ if (-not [string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_INSTALL_DIR)) {
 }
 
 $currentVersion = Get-CurrentInstalledVersion -StandaloneCurrentDir $currentDir
-$resolvedVersion = Resolve-Version
+$resolvedRelease = Resolve-Release
+$resolvedVersion = $resolvedRelease.Version
+$releaseMetadata = $resolvedRelease.Metadata
 $releaseName = "$resolvedVersion-$target"
 $releaseDir = Join-Path $releasesDir $releaseName
 
@@ -880,12 +888,12 @@ $oldStandaloneBackup = $null
 
 $packageAsset = "$PackageAssetStem-$target.tar.gz"
 $checksumAsset = "codex-package_SHA256SUMS"
-$packageMetadata = Find-ReleaseAssetMetadata -AssetName $packageAsset -ResolvedVersion $resolvedVersion
-$checksumMetadata = Find-ReleaseAssetMetadata -AssetName $checksumAsset -ResolvedVersion $resolvedVersion
+$packageMetadata = Find-ReleaseAssetMetadata -AssetName $packageAsset -ReleaseMetadata $releaseMetadata
+$checksumMetadata = Find-ReleaseAssetMetadata -AssetName $checksumAsset -ReleaseMetadata $releaseMetadata
 $installLayout = "Package"
 if (($null -eq $packageMetadata -or $null -eq $checksumMetadata) -and $PackageAssetStem -eq "codex-package") {
     $packageAsset = "codex-npm-$npmTag-$resolvedVersion.tgz"
-    $packageMetadata = Find-ReleaseAssetMetadata -AssetName $packageAsset -ResolvedVersion $resolvedVersion
+    $packageMetadata = Find-ReleaseAssetMetadata -AssetName $packageAsset -ReleaseMetadata $releaseMetadata
     if ($null -ne $packageMetadata) {
         $installLayout = "LegacyPlatformNpm"
     } else {

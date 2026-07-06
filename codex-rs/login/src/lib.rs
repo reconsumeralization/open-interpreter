@@ -4,6 +4,7 @@ pub mod kimi_code;
 pub mod token_data;
 
 mod device_code_auth;
+mod outbound_proxy;
 mod pkce;
 mod server;
 
@@ -18,6 +19,7 @@ pub use server::ServerOptions;
 pub use server::ShutdownHandle;
 pub use server::run_login_server;
 
+pub use auth::AgentIdentityAuthPolicy;
 pub use auth::AuthConfig;
 pub use auth::AuthDotJson;
 pub use auth::AuthKeyringBackendKind;

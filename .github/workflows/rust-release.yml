@@ -38,6 +38,9 @@ on:
 permissions:
   contents: write
 
+env:
+  CODEX_ZSH_RELEASE_TAG: codex-zsh-v0.1.0
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
