@@ -205,5 +205,5 @@ fn policy_candidates_for_path(path: &Path) -> Vec<PathBuf> {
 }
 
 pub(crate) fn normalize_model_path_text(text: &str) -> String {
-    text.replace("/private/private/tmp/", "/private/tmp/")
+    text.replace("/private/private/", "/private/")
 }

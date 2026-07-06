@@ -17,6 +17,9 @@
 > [!NOTE]
 > This is the new Rust version of Open Interpreter. Looking for the original Python project? It lives on as a community-maintained fork at [endolith/open-interpreter](https://github.com/endolith/open-interpreter).
 
+> [!TIP]
+> **New: GLM-5.2 with ZCode emulation.** Open Interpreter now includes a Rust-native `zcode` harness for GLM-5.2, designed to give GLM its best coding-agent workflow directly in your terminal.
+
 ### Installation
 
 macOS and Linux:
@@ -45,6 +48,7 @@ Use `/harness` to switch the active harness:
 native
 claude-code
 claude-code-bare
+zcode
 kimi-cli
 qwen-code
 deepseek-tui

@@ -117,8 +117,11 @@ def build_provider_entry(
     if not isinstance(base_url, str) or not base_url:
         raise SystemExit(f"missing api/base_url for provider {provider_id}")
 
+    env_key_overrides = overrides.get("env_key_overrides", {})
+    if not isinstance(env_key_overrides, dict):
+        env_key_overrides = {}
     env_keys = provider.get("env") or []
-    env_key = env_keys[0] if env_keys else None
+    env_key = env_key_overrides.get(provider_id) or (env_keys[0] if env_keys else None)
     sort_priorities = overrides.get("sort_priorities", {})
     if not isinstance(sort_priorities, dict):
         sort_priorities = {}

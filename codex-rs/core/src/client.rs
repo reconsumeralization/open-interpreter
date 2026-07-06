@@ -77,12 +77,14 @@ use codex_otel::current_span_w3c_trace_context;
 use codex_protocol::ThreadId;
 use codex_protocol::config_types::ReasoningSummary as ReasoningSummaryConfig;
 use codex_protocol::config_types::Verbosity as VerbosityConfig;
+use codex_protocol::models::ContentItem;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ReasoningEffort as ReasoningEffortConfig;
 use codex_protocol::protocol::InternalSessionSource;
 use codex_protocol::protocol::RealtimeConversationArchitecture;
 use codex_protocol::protocol::SessionSource;
+use codex_protocol::protocol::TokenUsage;
 use codex_protocol::protocol::W3cTraceContext;
 use codex_rollout_trace::CompactionTraceContext;
 use codex_rollout_trace::InferenceTraceAttempt;
@@ -96,6 +98,7 @@ use http::HeaderMap as ApiHeaderMap;
 use http::HeaderValue;
 use http::StatusCode as HttpStatusCode;
 use reqwest::StatusCode;
+use serde_json::Value;
 use std::time::Duration;
 use std::time::Instant;
 use tokio::sync::mpsc;
@@ -136,6 +139,13 @@ use crate::harness::routing::ClaudeCodeProfileRoute;
 use crate::harness::routing::MessagesHarnessRoute;
 use crate::harness::routing::StreamTransportRoute;
 use crate::harness::routing::resolve_stream_transport_route;
+use crate::harness::zcode::ZCODE_REFERER;
+use crate::harness::zcode::ZCODE_TITLE;
+use crate::harness::zcode::ZCODE_USER_AGENT;
+use crate::harness::zcode::ZCODE_VERSION;
+use crate::harness::zcode::build_compaction_request as build_zcode_compaction_request;
+use crate::harness::zcode::build_read_session_context_request as build_zcode_read_session_context_request;
+use crate::harness::zcode::build_request as build_zcode_request;
 use crate::responses_metadata::CodexResponsesMetadata;
 use crate::responses_metadata::subagent_header_value;
 use crate::util::emit_feedback_auth_recovery_tags;
@@ -1535,10 +1545,15 @@ impl ModelClientSession {
         model_info: &ModelInfo,
         session_telemetry: &SessionTelemetry,
         effort: Option<ReasoningEffortConfig>,
+        responses_metadata: &CodexResponsesMetadata,
     ) -> Result<ResponseStream> {
         match route {
             MessagesHarnessRoute::ClaudeCode => {
                 self.stream_claude_code_api(prompt, model_info, session_telemetry, effort)
+                    .await
+            }
+            MessagesHarnessRoute::ZCode => {
+                self.stream_zcode_api(prompt, model_info, session_telemetry, responses_metadata)
                     .await
             }
         }
@@ -2092,6 +2107,211 @@ impl ModelClientSession {
         true
     }
 
+    #[instrument(
+        name = "model_client.stream_zcode_api",
+        level = "info",
+        skip_all,
+        fields(
+            model = %model_info.slug,
+            wire_api = %self.client.state.provider.info().wire_api,
+            transport = "anthropic_http",
+            http.method = "POST",
+            api.path = "v1/messages"
+        )
+    )]
+    async fn stream_zcode_api(
+        &self,
+        prompt: &Prompt,
+        model_info: &ModelInfo,
+        session_telemetry: &SessionTelemetry,
+        responses_metadata: &CodexResponsesMetadata,
+    ) -> Result<ResponseStream> {
+        let auth_manager = self.client.state.provider.auth_manager();
+        let mut auth_recovery = auth_manager
+            .as_ref()
+            .map(AuthManager::unauthorized_recovery);
+        let mut pending_retry = PendingUnauthorizedRetry::default();
+        loop {
+            let auth = self.client.state.provider.auth().await;
+            let auth_mode = auth.as_ref().map(CodexAuth::auth_mode);
+            let provider_info = self.client.state.provider.info();
+            let api_key = provider_info.api_key().and_then(|api_key| {
+                api_key
+                    .or_else(|| {
+                        auth.as_ref()
+                            .and_then(CodexAuth::api_key)
+                            .map(str::to_string)
+                    })
+                    .or(provider_info.experimental_bearer_token.clone())
+                    .ok_or_else(|| {
+                        CodexErr::InvalidRequest(
+                            "zcode harness requires an API key for the selected provider"
+                                .to_string(),
+                        )
+                    })
+            })?;
+            let api_provider = self.client.state.provider.api_provider().await?;
+            let auth_provider = CoreAuthProvider {
+                token: Some(api_key),
+                account_id: None,
+                is_fedramp_account: false,
+                token_header_name: Some("x-api-key"),
+                use_bearer_prefix: false,
+            };
+            let request_auth_context = AuthRequestTelemetryContext::new(
+                auth_mode.or(Some(AuthMode::ApiKey)),
+                &auth_provider,
+                pending_retry,
+            );
+            let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
+                session_telemetry,
+                request_auth_context,
+                RequestRouteTelemetry::for_endpoint(ANTHROPIC_MESSAGES_ENDPOINT),
+                self.client.state.auth_env_telemetry.clone(),
+            );
+            let guided_prompt = prompt_with_harness_guidance(
+                prompt,
+                &self.client.state.harness,
+                self.client.state.harness_guidance,
+            );
+            let client = ApiAnthropicMessagesClient::new(
+                ReqwestTransport::new(build_reqwest_client()),
+                api_provider,
+                Arc::new(auth_provider),
+            )
+            .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
+            if responses_metadata.is_compaction_request() {
+                let request =
+                    build_zcode_compaction_request(&guided_prompt, model_info).map_err(|err| {
+                        CodexErr::InvalidRequest(format!("invalid zcode compact request: {err}"))
+                    })?;
+                match client.request_value(request, zcode_headers()).await {
+                    Ok(value) => return Ok(zcode_unary_response_stream(value)),
+                    Err(ApiError::Transport(
+                        unauthorized_transport @ TransportError::Http { status, .. },
+                    )) if status == StatusCode::UNAUTHORIZED => {
+                        pending_retry = PendingUnauthorizedRetry::from_recovery(
+                            handle_unauthorized(
+                                unauthorized_transport,
+                                &mut auth_recovery,
+                                session_telemetry,
+                            )
+                            .await?,
+                        );
+                    }
+                    Err(err) => return Err(map_api_error(err)),
+                }
+                continue;
+            }
+            let request = build_zcode_request(
+                &guided_prompt,
+                model_info,
+                Some(&self.client.state.session_source),
+            )
+            .map_err(|err| CodexErr::InvalidRequest(format!("invalid zcode request: {err}")))?;
+            match client.stream_request(request, zcode_headers()).await {
+                Ok(stream) => {
+                    let (stream, _) = map_response_stream(
+                        stream,
+                        session_telemetry.clone(),
+                        InferenceTraceAttempt::disabled(),
+                    );
+                    return Ok(stream);
+                }
+                Err(ApiError::Transport(
+                    unauthorized_transport @ TransportError::Http { status, .. },
+                )) if status == StatusCode::UNAUTHORIZED => {
+                    pending_retry = PendingUnauthorizedRetry::from_recovery(
+                        handle_unauthorized(
+                            unauthorized_transport,
+                            &mut auth_recovery,
+                            session_telemetry,
+                        )
+                        .await?,
+                    );
+                }
+                Err(err) => return Err(map_api_error(err)),
+            }
+        }
+    }
+
+    pub(crate) async fn zcode_read_session_context(
+        &self,
+        prompt: String,
+        max_tokens: u32,
+        model_info: &ModelInfo,
+        session_telemetry: &SessionTelemetry,
+    ) -> Result<String> {
+        let auth_manager = self.client.state.provider.auth_manager();
+        let mut auth_recovery = auth_manager
+            .as_ref()
+            .map(AuthManager::unauthorized_recovery);
+        let mut pending_retry = PendingUnauthorizedRetry::default();
+        loop {
+            let auth = self.client.state.provider.auth().await;
+            let auth_mode = auth.as_ref().map(CodexAuth::auth_mode);
+            let provider_info = self.client.state.provider.info();
+            let api_key = provider_info.api_key().and_then(|api_key| {
+                api_key
+                    .or_else(|| {
+                        auth.as_ref()
+                            .and_then(CodexAuth::api_key)
+                            .map(str::to_string)
+                    })
+                    .or(provider_info.experimental_bearer_token.clone())
+                    .ok_or_else(|| {
+                        CodexErr::InvalidRequest(
+                            "zcode harness requires an API key for the selected provider"
+                                .to_string(),
+                        )
+                    })
+            })?;
+            let api_provider = self.client.state.provider.api_provider().await?;
+            let auth_provider = CoreAuthProvider {
+                token: Some(api_key),
+                account_id: None,
+                is_fedramp_account: false,
+                token_header_name: Some("x-api-key"),
+                use_bearer_prefix: false,
+            };
+            let request_auth_context = AuthRequestTelemetryContext::new(
+                auth_mode.or(Some(AuthMode::ApiKey)),
+                &auth_provider,
+                pending_retry,
+            );
+            let (request_telemetry, _) = Self::build_streaming_telemetry(
+                session_telemetry,
+                request_auth_context,
+                RequestRouteTelemetry::for_endpoint(ANTHROPIC_MESSAGES_ENDPOINT),
+                self.client.state.auth_env_telemetry.clone(),
+            );
+            let request =
+                build_zcode_read_session_context_request(model_info, prompt.clone(), max_tokens);
+            let client = ApiAnthropicMessagesClient::new(
+                ReqwestTransport::new(build_reqwest_client()),
+                api_provider,
+                Arc::new(auth_provider),
+            )
+            .with_telemetry(Some(request_telemetry), None);
+            match client.request_value(request, zcode_headers()).await {
+                Ok(value) => return Ok(extract_anthropic_text_response(&value)),
+                Err(ApiError::Transport(
+                    unauthorized_transport @ TransportError::Http { status, .. },
+                )) if status == StatusCode::UNAUTHORIZED => {
+                    pending_retry = PendingUnauthorizedRetry::from_recovery(
+                        handle_unauthorized(
+                            unauthorized_transport,
+                            &mut auth_recovery,
+                            session_telemetry,
+                        )
+                        .await?,
+                    );
+                }
+                Err(err) => return Err(map_api_error(err)),
+            }
+        }
+    }
+
     /// Streams a turn via the Responses API over WebSocket transport.
     #[allow(clippy::too_many_arguments)]
     #[instrument(
@@ -2404,6 +2624,7 @@ impl ModelClientSession {
                     model_info,
                     session_telemetry,
                     effort,
+                    responses_metadata,
                 ))
                 .await
             }
@@ -2492,6 +2713,24 @@ fn claude_code_headers(beta_header: &'static str) -> ApiHeaderMap {
     extra_headers
 }
 
+fn zcode_headers() -> ApiHeaderMap {
+    let mut extra_headers = ApiHeaderMap::new();
+    extra_headers.insert(
+        "anthropic-version",
+        HeaderValue::from_static(ANTHROPIC_API_VERSION),
+    );
+    extra_headers.insert("user-agent", HeaderValue::from_static(ZCODE_USER_AGENT));
+    extra_headers.insert("x-zcode-agent", HeaderValue::from_static("glm"));
+    extra_headers.insert(
+        "x-zcode-app-version",
+        HeaderValue::from_static(ZCODE_VERSION),
+    );
+    extra_headers.insert("x-title", HeaderValue::from_static(ZCODE_TITLE));
+    extra_headers.insert("accept-language", HeaderValue::from_static("*"));
+    extra_headers.insert("http-referer", HeaderValue::from_static(ZCODE_REFERER));
+    extra_headers
+}
+
 /// Stamp a ResponsesWsRequest with the current time.
 ///
 /// Meant to be called just before sending the request over the socket, to capture realistic
@@ -2544,6 +2783,72 @@ fn add_responses_lite_header(headers: &mut ApiHeaderMap, use_responses_lite: boo
 
 const RESPONSE_STREAM_CHANNEL_CAPACITY: usize = 1600;
 const STREAM_DROPPED_REASON: &str = "response stream dropped before provider terminal event";
+
+fn extract_anthropic_text_response(value: &Value) -> String {
+    value
+        .get("content")
+        .and_then(Value::as_array)
+        .map(|content| {
+            content
+                .iter()
+                .filter_map(|item| item.get("text").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("")
+        })
+        .unwrap_or_default()
+}
+
+fn zcode_unary_response_stream(value: Value) -> ResponseStream {
+    let response_id = value
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("zcode-compact")
+        .to_string();
+    let text = extract_anthropic_text_response(&value);
+    let token_usage = value.get("usage").map(zcode_token_usage);
+    let item = ResponseItem::Message {
+        id: Some(response_id.clone()),
+        role: "assistant".to_string(),
+        content: vec![ContentItem::OutputText { text }],
+        phase: None,
+        metadata: None,
+    };
+    let (tx_event, rx_event) =
+        mpsc::channel::<Result<ResponseEvent>>(RESPONSE_STREAM_CHANNEL_CAPACITY);
+    let _ = tx_event.try_send(Ok(ResponseEvent::OutputItemDone(item)));
+    let _ = tx_event.try_send(Ok(ResponseEvent::Completed {
+        response_id,
+        token_usage,
+        end_turn: Some(true),
+    }));
+    ResponseStream {
+        rx_event,
+        consumer_dropped: CancellationToken::new(),
+    }
+}
+
+fn zcode_token_usage(value: &Value) -> TokenUsage {
+    let input_tokens = value
+        .get("input_tokens")
+        .and_then(Value::as_i64)
+        .unwrap_or_default();
+    let output_tokens = value
+        .get("output_tokens")
+        .and_then(Value::as_i64)
+        .unwrap_or_default();
+    let cached_input_tokens = value
+        .get("cache_read_input_tokens")
+        .or_else(|| value.get("cached_input_tokens"))
+        .and_then(Value::as_i64)
+        .unwrap_or_default();
+    TokenUsage {
+        input_tokens,
+        cached_input_tokens,
+        output_tokens,
+        reasoning_output_tokens: 0,
+        total_tokens: input_tokens + cached_input_tokens + output_tokens,
+    }
+}
 
 fn map_response_stream(
     api_stream: codex_api::ResponseStream,

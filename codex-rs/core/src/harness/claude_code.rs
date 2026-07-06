@@ -164,6 +164,7 @@ pub(crate) fn build_request_for_profile(
         messages,
         system,
         tools,
+        tool_choice: None,
         thinking,
         // The `clear_thinking_20251015` context edit is only valid when thinking
         // is enabled or adaptive; Anthropic rejects the request otherwise (e.g.
@@ -348,6 +349,7 @@ pub(crate) fn build_title_request_for_profile(
         messages,
         system,
         tools,
+        tool_choice: None,
         thinking: None,
         context_management: None,
         output_config,

@@ -114,6 +114,7 @@ use codex_utils_stream_parser::strip_citations;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
+use futures::stream::FuturesUnordered;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
 use tracing::error;
@@ -1863,9 +1864,49 @@ async fn handle_assistant_item_done_in_plan_mode(
     false
 }
 
+enum InFlightTools {
+    Ordered(FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>>),
+    Unordered(FuturesUnordered<BoxFuture<'static, CodexResult<ResponseInputItem>>>),
+}
+
+enum InFlightToolOrdering {
+    Model,
+    Completion,
+}
+
+impl InFlightTools {
+    fn new(ordering: InFlightToolOrdering) -> Self {
+        match ordering {
+            InFlightToolOrdering::Model => Self::Ordered(FuturesOrdered::new()),
+            InFlightToolOrdering::Completion => Self::Unordered(FuturesUnordered::new()),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Ordered(in_flight) => in_flight.is_empty(),
+            Self::Unordered(in_flight) => in_flight.is_empty(),
+        }
+    }
+
+    fn push(&mut self, future: BoxFuture<'static, CodexResult<ResponseInputItem>>) {
+        match self {
+            Self::Ordered(in_flight) => in_flight.push_back(future),
+            Self::Unordered(in_flight) => in_flight.push(future),
+        }
+    }
+
+    async fn next(&mut self) -> Option<CodexResult<ResponseInputItem>> {
+        match self {
+            Self::Ordered(in_flight) => in_flight.next().await,
+            Self::Unordered(in_flight) => in_flight.next().await,
+        }
+    }
+}
+
 #[instrument(level = "trace", skip_all)]
 async fn drain_in_flight(
-    in_flight: &mut FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>>,
+    in_flight: &mut InFlightTools,
     sess: Arc<Session>,
     turn_context: Arc<TurnContext>,
 ) -> CodexResult<()> {
@@ -1937,8 +1978,17 @@ async fn try_run_sampling_request(
         .instrument(trace_span!("stream_request"))
         .or_cancel(&cancellation_token)
         .await??;
-    let mut in_flight: FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>> =
-        FuturesOrdered::new();
+    let in_flight_ordering = if turn_context
+        .config
+        .harness
+        .as_deref()
+        .is_some_and(|harness| harness == "zcode")
+    {
+        InFlightToolOrdering::Completion
+    } else {
+        InFlightToolOrdering::Model
+    };
+    let mut in_flight = InFlightTools::new(in_flight_ordering);
     let mut needs_follow_up = false;
     let mut last_agent_message: Option<String> = None;
     let mut active_item: Option<TurnItem> = None;
@@ -2078,7 +2128,7 @@ async fn try_run_sampling_request(
                         Err(err) => break Err(err),
                     };
                 if let Some(tool_future) = output_result.tool_future {
-                    in_flight.push_back(tool_future);
+                    in_flight.push(tool_future);
                 }
                 if let Some(agent_message) = output_result.last_agent_message {
                     last_agent_message = Some(agent_message);

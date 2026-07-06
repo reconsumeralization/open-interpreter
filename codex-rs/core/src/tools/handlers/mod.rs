@@ -63,6 +63,7 @@ pub(crate) use harness_aliases::HARNESS_NO_TRUNCATE_PREFIX;
 pub use harness_aliases::HarnessAliasHandler;
 pub(crate) use harness_aliases::deepseek_tui_checklist_markdown;
 pub(crate) use harness_aliases::take_claude_code_bare_completed_task_notification;
+pub(crate) use harness_aliases::zcode_todo_reminder_text;
 pub use list_available_plugins_to_install::ListAvailablePluginsToInstallHandler;
 pub use mcp::McpHandler;
 pub use mcp_resource::ListMcpResourceTemplatesHandler;

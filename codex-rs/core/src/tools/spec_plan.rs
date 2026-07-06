@@ -666,6 +666,15 @@ fn add_harness_alias_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mu
         planned_tools.add_dispatch_only(HarnessAliasHandler::OpenCodeTask);
         planned_tools.add_dispatch_only(HarnessAliasHandler::OpenCodeTodoWrite);
     }
+    if matches!(harness, Harness::ZCode) {
+        planned_tools.add_dispatch_only(HarnessAliasHandler::Agent);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeTodoRead);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeTodoWrite);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeEnterPlanMode);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeExitPlanMode);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeReadSessionContext);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeSkill);
+    }
 }
 
 fn standalone_web_search_enabled(turn_context: &TurnContext) -> bool {

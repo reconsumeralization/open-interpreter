@@ -112,7 +112,7 @@ Common generated providers include:
 | `moonshotai` | Moonshot AI | `chat` | `MOONSHOT_API_KEY` | 16 |
 | `moonshotai-cn` | Moonshot AI (China) | `chat` | `MOONSHOT_API_KEY` | 7 |
 | `zhipuai` | Zhipu AI | `chat` | `ZHIPU_API_KEY` | 12 |
-| `zai` | Z.AI | `chat` | `ZHIPU_API_KEY` | 13 |
+| `zai` | Z.AI | `chat` | `ZAI_API_KEY` | 14 |
 | `siliconflow` | SiliconFlow | `chat` | `SILICONFLOW_API_KEY` | 76 |
 | `siliconflow-cn` | SiliconFlow (China) | `chat` | `SILICONFLOW_CN_API_KEY` | 77 |
 | `alibaba` | Alibaba | `chat` | `DASHSCOPE_API_KEY` | 43 |
@@ -199,7 +199,7 @@ Common generated providers include:
 | `xiaomi-token-plan-ams` | Xiaomi Token Plan (Europe) | `chat` | `XIAOMI_API_KEY` | 5 |
 | `xiaomi-token-plan-sgp` | Xiaomi Token Plan (Singapore) | `chat` | `XIAOMI_API_KEY` | 4 |
 | `xpersona` | Xpersona | `chat` | `XPERSONA_API_KEY` | 2 |
-| `zai-coding-plan` | Z.AI Coding Plan | `chat` | `ZHIPU_API_KEY` | 6 |
+| `zai-coding-plan` | Z.AI Coding Plan | `chat` | `ZAI_API_KEY` | 6 |
 | `zenmux` | ZenMux | `chat` | `ZENMUX_API_KEY` | 110 |
 | `zhipuai-coding-plan` | Zhipu AI Coding Plan | `chat` | `ZHIPU_API_KEY` | 7 |
 
@@ -242,6 +242,6 @@ python3 scripts/write_model_compatibility_catalog.py
 ```
 
 Live sources require their documented provider auth environment variables. For
-example, Moonshot requires `MOONSHOT_API_KEY` or `KIMI_API_KEY`, and Groq
-requires `GROQ_API_KEY`. Missing auth is a generator failure, not a reason to
-silently keep stale data.
+example, Moonshot requires `MOONSHOT_API_KEY` or `KIMI_API_KEY`, Z.AI requires
+`ZAI_API_KEY` or `ZHIPU_API_KEY`, and Groq requires `GROQ_API_KEY`. Missing
+auth is a generator failure, not a reason to silently keep stale data.

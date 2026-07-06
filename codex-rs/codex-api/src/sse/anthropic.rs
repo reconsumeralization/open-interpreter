@@ -48,6 +48,8 @@ struct AnthropicStreamState {
     cache_read_input_tokens: i64,
     output_tokens: i64,
     pending_blocks: BTreeMap<i64, PendingBlock>,
+    completed_blocks: BTreeMap<i64, ResponseItem>,
+    next_completed_block_index: i64,
 }
 
 #[derive(Debug)]
@@ -219,6 +221,9 @@ async fn process_anthropic_event(
     match event.kind.as_str() {
         "message_start" => {
             if let Some(message) = event.message {
+                state.pending_blocks.clear();
+                state.completed_blocks.clear();
+                state.next_completed_block_index = 0;
                 state.message_id = Some(message.id.clone());
                 state.server_model = message.model.clone();
                 update_usage(state, message.usage.as_ref());
@@ -402,11 +407,8 @@ async fn process_anthropic_event(
                     metadata: None,
                 },
             };
-            if tx_event
-                .send(Ok(ResponseEvent::OutputItemDone(item)))
-                .await
-                .is_err()
-            {
+            state.completed_blocks.insert(index, item);
+            if flush_completed_blocks(state, tx_event).await? {
                 return Ok(true);
             }
         }
@@ -440,6 +442,26 @@ async fn process_anthropic_event(
         }
     }
 
+    Ok(false)
+}
+
+async fn flush_completed_blocks(
+    state: &mut AnthropicStreamState,
+    tx_event: &mpsc::Sender<Result<ResponseEvent, ApiError>>,
+) -> Result<bool, ApiError> {
+    while let Some(item) = state
+        .completed_blocks
+        .remove(&state.next_completed_block_index)
+    {
+        state.next_completed_block_index += 1;
+        if tx_event
+            .send(Ok(ResponseEvent::OutputItemDone(item)))
+            .await
+            .is_err()
+        {
+            return Ok(true);
+        }
+    }
     Ok(false)
 }
 
@@ -708,6 +730,50 @@ mod tests {
             events[2].as_ref().expect("completed"),
             ResponseEvent::Completed { response_id, token_usage, .. }
             if response_id == "msg_3" && token_usage.is_none()
+        ));
+    }
+
+    #[tokio::test]
+    async fn emits_completed_tool_blocks_in_content_index_order() {
+        let events = collect_events(&[
+            "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_4\"}}\n\n",
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"Checking.\"}}\n\n",
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_first\",\"name\":\"Bash\"}}\n\n",
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\\\"first\\\"}\"}}\n\n",
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":2,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_second\",\"name\":\"Bash\"}}\n\n",
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\\\"second\\\"}\"}}\n\n",
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":2}\n\n",
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n",
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+        ])
+        .await;
+
+        let done_items = events
+            .iter()
+            .filter_map(|event| match event.as_ref().expect("event") {
+                ResponseEvent::OutputItemDone(item) => Some(item),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(done_items.len(), 3);
+        assert!(matches!(
+            done_items[0],
+            ResponseItem::Message { content, .. }
+                if content == &vec![ContentItem::OutputText {
+                    text: "Checking.".to_string(),
+                }]
+        ));
+        assert!(matches!(
+            done_items[1],
+            ResponseItem::FunctionCall { call_id, arguments, .. }
+                if call_id == "toolu_first" && arguments == "{\"command\":\"first\"}"
+        ));
+        assert!(matches!(
+            done_items[2],
+            ResponseItem::FunctionCall { call_id, arguments, .. }
+                if call_id == "toolu_second" && arguments == "{\"command\":\"second\"}"
         ));
     }
 

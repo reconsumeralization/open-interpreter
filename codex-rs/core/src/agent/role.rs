@@ -318,6 +318,14 @@ mod built_in {
                     }
                 ),
                 (
+                    "Explore".to_string(),
+                    AgentRoleConfig {
+                        description: Some("Read-only search agent for broad ZCode exploration.".to_string()),
+                        config_file: None,
+                        nickname_candidates: None,
+                    }
+                ),
+                (
                     "explorer".to_string(),
                     AgentRoleConfig {
                         description: Some(r#"Use `explorer` for specific codebase questions.

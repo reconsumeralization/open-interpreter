@@ -142,22 +142,24 @@ impl<T: HttpTransport> ChatCompletionsCompatClient<T> {
                 .await;
             let response = match response_result {
                 Ok(response) => response,
-                Err(error)
+                Err(error) => {
                     if let Some(retry_body) =
-                        openrouter_affordability_retry_body(is_openrouter, &body, &error) =>
-                {
-                    self.execute_with(
-                        Method::POST,
-                        "chat/completions",
-                        extra_headers,
-                        Some(retry_body),
-                        move |request| {
-                            request.compression = request_compression;
-                        },
-                    )
-                    .await?
+                        openrouter_affordability_retry_body(is_openrouter, &body, &error)
+                    {
+                        self.execute_with(
+                            Method::POST,
+                            "chat/completions",
+                            extra_headers,
+                            Some(retry_body),
+                            move |request| {
+                                request.compression = request_compression;
+                            },
+                        )
+                        .await?
+                    } else {
+                        return Err(error);
+                    }
                 }
-                Err(error) => return Err(error),
             };
             let sse = synthetic_sse_from_chat_completion_response(&response.body)?;
             let bytes = stream::once(async move { Ok(Bytes::from(sse)) });
@@ -186,26 +188,28 @@ impl<T: HttpTransport> ChatCompletionsCompatClient<T> {
             .await;
         let stream_response = match stream_result {
             Ok(response) => response,
-            Err(error)
+            Err(error) => {
                 if let Some(retry_body) =
-                    openrouter_affordability_retry_body(is_openrouter, &body, &error) =>
-            {
-                self.stream_with(
-                    Method::POST,
-                    "chat/completions",
-                    extra_headers,
-                    Some(retry_body),
-                    move |request| {
-                        request.headers.insert(
-                            http::header::ACCEPT,
-                            HeaderValue::from_static("text/event-stream"),
-                        );
-                        request.compression = request_compression;
-                    },
-                )
-                .await?
+                    openrouter_affordability_retry_body(is_openrouter, &body, &error)
+                {
+                    self.stream_with(
+                        Method::POST,
+                        "chat/completions",
+                        extra_headers,
+                        Some(retry_body),
+                        move |request| {
+                            request.headers.insert(
+                                http::header::ACCEPT,
+                                HeaderValue::from_static("text/event-stream"),
+                            );
+                            request.compression = request_compression;
+                        },
+                    )
+                    .await?
+                } else {
+                    return Err(error);
+                }
             }
-            Err(error) => return Err(error),
         };
 
         Ok(spawn_chat_stream(

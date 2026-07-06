@@ -432,6 +432,18 @@ pub(crate) async fn handle_output_item_done(
             record_completed_response_item(ctx.sess.as_ref(), ctx.turn_context.as_ref(), &item)
                 .await;
 
+            if ctx
+                .turn_context
+                .config
+                .harness
+                .as_deref()
+                .is_some_and(|harness| harness == "zcode")
+                && call.tool_name.namespace.is_none()
+                && call.tool_name.name == "ExitPlanMode"
+            {
+                return Ok(output);
+            }
+
             let cancellation_token = ctx.cancellation_token.child_token();
             let tool_future: InFlightFuture<'static> = Box::pin(
                 ctx.tool_runtime

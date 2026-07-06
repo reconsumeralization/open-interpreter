@@ -461,3 +461,30 @@ fn exec_command_tool_output_formats_truncated_response() {
         other => panic!("expected FunctionCallOutput, got {other:?}"),
     }
 }
+
+#[test]
+fn exec_command_code_mode_result_preserves_large_output_with_large_limit() {
+    let payload = ToolPayload::Function {
+        arguments: "{}".to_string(),
+    };
+    let raw_output = (0..900)
+        .map(|index| format!("ZCODE_LARGE_STDERR_{index:04}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let result = ExecCommandToolOutput {
+        event_call_id: "call-42".to_string(),
+        chunk_id: String::new(),
+        wall_time: std::time::Duration::from_millis(1250),
+        raw_output: raw_output.clone().into_bytes(),
+        truncation_policy: TruncationPolicy::Tokens(3_000),
+        max_output_tokens: Some(100_000),
+        process_id: None,
+        exit_code: Some(7),
+        original_token_count: Some(5_000),
+        hook_command: None,
+    }
+    .code_mode_result(&payload);
+
+    assert_eq!(result["output"], raw_output);
+    assert!(result.get("raw_output").is_none());
+}

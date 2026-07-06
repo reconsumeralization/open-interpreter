@@ -15,6 +15,7 @@ pub(crate) fn guidance_for_harness(harness: &Harness) -> Option<&'static str> {
         | Harness::QwenCode
         | Harness::SweAgent
         | Harness::Terminus2
+        | Harness::ZCode
         | Harness::Other(_) => None,
     }
 }
