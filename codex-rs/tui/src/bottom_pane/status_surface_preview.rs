@@ -64,6 +64,7 @@ impl StatusSurfacePreviewItem {
             StatusSurfacePreviewItem::SessionId => "550e8400-e29b-41d4",
             StatusSurfacePreviewItem::FastMode => "Fast on",
             StatusSurfacePreviewItem::RawOutput => "raw output",
+            StatusSurfacePreviewItem::WorkspaceHeadline => "Editing workspace",
             StatusSurfacePreviewItem::Model => "openai gpt-5.2-codex",
             StatusSurfacePreviewItem::ModelWithReasoning => "openai gpt-5.2-codex medium",
             StatusSurfacePreviewItem::Harness => "native",
