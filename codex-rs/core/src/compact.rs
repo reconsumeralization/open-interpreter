@@ -6,6 +6,7 @@ use std::time::Instant;
 use crate::Prompt;
 use crate::client::ModelClientSession;
 use crate::client_common::ResponseEvent;
+use crate::context::world_state::WorldState;
 use crate::harness::zcode;
 use crate::hook_runtime::PostCompactHookOutcome;
 use crate::hook_runtime::PreCompactHookOutcome;
@@ -367,7 +368,7 @@ async fn run_compact_task_inner_impl(
                     continue;
                 } else {
                     if should_advance_window_after_failed_compact(turn_context.as_ref()) {
-                        sess.advance_auto_compact_window_id().await;
+                        sess.advance_auto_compact_window().await;
                     }
                     sess.track_turn_codex_error(turn_context.as_ref(), &e);
                     let event = EventMsg::Error(e.to_error_event(/*message_prefix*/ None));
@@ -389,7 +390,7 @@ async fn run_compact_task_inner_impl(
         &user_messages,
         &summary_suffix,
     );
-    let window_id = sess.advance_auto_compact_window_id().await;
+    let (window_number, window_ids) = sess.advance_auto_compact_window().await;
 
     let (initial_context, world_state_baseline) = build_compaction_initial_context(
         sess.as_ref(),
@@ -687,7 +688,7 @@ fn build_harness_compacted_history(
 }
 
 fn zcode_retained_compacted_user_messages(history_items: &[ResponseItem]) -> Vec<ResponseItem> {
-    let mut selected_messages: Vec<(String, Option<ResponseItemMetadata>)> =
+    let mut selected_messages: Vec<(String, Option<InternalChatMessageMetadataPassthrough>)> =
         zcode_retained_read_tool_reminders(history_items)
             .into_iter()
             .map(|message| (message, None))
@@ -700,7 +701,7 @@ fn zcode_retained_compacted_user_messages(history_items: &[ResponseItem]) -> Vec
         let ResponseItem::Message {
             role,
             content,
-            metadata,
+            internal_chat_message_metadata_passthrough: metadata,
             ..
         } = item
         else {
@@ -735,7 +736,7 @@ fn zcode_retained_compacted_user_messages(history_items: &[ResponseItem]) -> Vec
             role: "user".to_string(),
             content: vec![ContentItem::InputText { text: message }],
             phase: None,
-            metadata,
+            internal_chat_message_metadata_passthrough: metadata,
         })
         .collect()
 }

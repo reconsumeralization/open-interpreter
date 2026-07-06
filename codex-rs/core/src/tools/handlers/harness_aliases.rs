@@ -9,21 +9,18 @@ use std::time::Instant;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use codex_protocol::AgentPath;
 use codex_protocol::ThreadId;
 use codex_protocol::models::BaseInstructions;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::FunctionCallOutputContentItem;
 use codex_protocol::models::MessagePhase;
 use codex_protocol::models::ResponseItem;
-use codex_protocol::models::ResponseItemMetadata;
 use codex_protocol::protocol::AgentStatus;
 use codex_protocol::protocol::EventMsg;
-use codex_protocol::protocol::InterAgentCommunication;
-use codex_protocol::protocol::Op;
 use codex_protocol::protocol::RolloutItem;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::SubAgentSource;
+use codex_protocol::user_input::UserInput;
 use codex_tools::AdditionalProperties;
 use codex_tools::JsonSchema;
 use codex_tools::ResponsesApiTool;
@@ -379,27 +376,16 @@ async fn handle_zcode_agent(
         Some(role_name),
         Some(task_name),
     )?;
-    let new_agent_path = spawn_source.get_agent_path().ok_or_else(|| {
-        FunctionCallError::RespondToModel(
-            "spawned agent is missing a canonical task name".to_string(),
-        )
-    })?;
-    let author = turn
-        .session_source
-        .get_agent_path()
-        .unwrap_or_else(AgentPath::root);
-    let mut communication =
-        InterAgentCommunication::new(author, new_agent_path, Vec::new(), args.prompt, true);
-    communication
-        .metadata
-        .get_or_insert_with(ResponseItemMetadata::default)
-        .source_call_id = Some(call_id);
     let started_at = Instant::now();
     let spawned = Box::pin(session.services.agent_control.spawn_agent_with_metadata(
         config,
-        Op::InterAgentCommunication { communication },
+        vec![UserInput::Text {
+            text: args.prompt,
+            text_elements: Vec::new(),
+        }],
         Some(spawn_source),
         SpawnAgentOptions {
+            fork_parent_spawn_call_id: Some(call_id),
             parent_thread_id: Some(parent_thread_id),
             environments: Some(turn.environments.to_selections()),
             ..Default::default()
@@ -933,7 +919,7 @@ pub(crate) fn take_claude_code_bare_completed_task_notification() -> Option<Resp
         role: "user".to_string(),
         content: vec![ContentItem::InputText { text }],
         phase: Some(MessagePhase::Commentary),
-        metadata: None,
+        internal_chat_message_metadata_passthrough: None,
     })
 }
 
@@ -2819,8 +2805,10 @@ fn zcode_agent_rollout_stats(
             RolloutItem::SessionMeta(_)
             | RolloutItem::ResponseItem(_)
             | RolloutItem::InterAgentCommunication(_)
+            | RolloutItem::InterAgentCommunicationMetadata { .. }
             | RolloutItem::Compacted(_)
             | RolloutItem::TurnContext(_)
+            | RolloutItem::WorldState(_)
             | RolloutItem::EventMsg(_) => {}
         }
     }
@@ -3979,9 +3967,11 @@ mod tests {
             &file_system_sandbox_policy,
             NetworkSandboxPolicy::Restricted,
         );
+        let turn = Arc::new(turn);
         ToolInvocation {
             session: session.into(),
-            turn: turn.into(),
+            turn: Arc::clone(&turn),
+            step_context: crate::session::step_context::StepContext::for_test(Arc::clone(&turn)),
             cancellation_token: CancellationToken::new(),
             tracker: Arc::new(Mutex::new(TurnDiffTracker::new())),
             call_id: "call-harness-alias".to_string(),
@@ -4363,7 +4353,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "call-write".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -4372,7 +4362,7 @@ mod tests {
                     "File written successfully. The file state is current in your context."
                         .to_string(),
                 ),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -4427,7 +4417,7 @@ mod tests {
                 },
             ],
             phase: None,
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         }];
 
         assert!(zcode_history_has_compacted_summary(&history));
@@ -4743,7 +4733,7 @@ mod tests {
                         .to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -4752,7 +4742,7 @@ mod tests {
                     text: "Create a note about ZCode session context".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -4760,7 +4750,7 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"content":"done","file_path":"notes.txt"}"#.to_string(),
                 call_id: "call-write".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -4771,7 +4761,7 @@ mod tests {
                     ),
                     success: Some(true),
                 },
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         let input = ZCodeReadSessionContextArgs {
@@ -4830,7 +4820,7 @@ mod tests {
                 namespace: None,
                 arguments: "{}".to_string(),
                 call_id: "call-bash".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }),
             RolloutItem::ResponseItem(ResponseItem::FunctionCall {
                 id: None,
@@ -4838,7 +4828,7 @@ mod tests {
                 namespace: None,
                 arguments: "{}".to_string(),
                 call_id: "call-read".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }),
             RolloutItem::EventMsg(EventMsg::TurnComplete(
                 codex_protocol::protocol::TurnCompleteEvent {
@@ -4878,7 +4868,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "previous-todo".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -4895,7 +4885,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "current-todo".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 

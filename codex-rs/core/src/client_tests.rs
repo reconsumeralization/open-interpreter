@@ -147,7 +147,8 @@ async fn compact_uses_bearer_after_agent_identity_session_fallback() -> anyhow::
         /*enable_request_compression*/ false,
         /*include_timing_metrics*/ false,
         /*beta_features_header*/ None,
-        /*item_ids_enabled*/ false,
+        /*harness*/ codex_tools::Harness::default(),
+        /*harness_guidance*/ false,
         /*attestation_provider*/ None,
     );
     let prompt = Prompt {

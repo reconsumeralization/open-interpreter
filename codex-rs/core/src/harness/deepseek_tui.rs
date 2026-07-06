@@ -748,7 +748,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,},
+                    internal_chat_message_metadata_passthrough: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "user".to_string(),
@@ -757,7 +757,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,},
+                    internal_chat_message_metadata_passthrough: None,},
             ],
             ..Prompt::default()
         };
@@ -792,7 +792,7 @@ mod tests {
                 ],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             ..Prompt::default()
         };
@@ -842,7 +842,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(workspace.path().to_path_buf()),
             ..Prompt::default()

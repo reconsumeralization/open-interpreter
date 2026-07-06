@@ -1,7 +1,5 @@
-use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 
-use futures::FutureExt;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
@@ -23,20 +21,12 @@ pub(super) fn spawn_notification<H: CellHost>(
     call_id: String,
     text: String,
     cancellation_token: CancellationToken,
-    task_failure_handler: Option<TaskFailureHandler>,
+    _task_failure_handler: Option<TaskFailureHandler>,
 ) {
     tasks.spawn(async move {
-        let callback =
-            AssertUnwindSafe(async move { host.notify(call_id, text, cancellation_token).await })
-                .catch_unwind()
-                .await;
-        match callback {
-            Ok(Ok(())) => {}
-            Ok(Err(err)) => warn!("failed to deliver code mode notification: {err}"),
-            Err(_) => report_task_failure(
-                task_failure_handler.as_ref(),
-                "code mode notification task panicked".to_string(),
-            ),
+        match host.notify(call_id, text, cancellation_token).await {
+            Ok(()) => {}
+            Err(err) => warn!("failed to deliver code mode notification: {err}"),
         }
     });
 }
@@ -47,32 +37,15 @@ pub(super) fn spawn_tool<H: CellHost>(
     invocation: CellToolCall,
     runtime_tx: std::sync::mpsc::Sender<RuntimeCommand>,
     cancellation_token: CancellationToken,
-    task_failure_handler: Option<TaskFailureHandler>,
+    _task_failure_handler: Option<TaskFailureHandler>,
 ) {
     tasks.spawn(async move {
         let id = invocation.id.clone();
-        let callback =
-            AssertUnwindSafe(async move { host.invoke_tool(invocation, cancellation_token).await })
-                .catch_unwind()
-                .await;
-        let (command, failure_reason) = match callback {
-            Ok(Ok(result)) => (RuntimeCommand::ToolResponse { id, result }, None),
-            Ok(Err(error_text)) => (RuntimeCommand::ToolError { id, error_text }, None),
-            Err(_) => {
-                let failure_reason = "code mode tool task panicked".to_string();
-                (
-                    RuntimeCommand::ToolError {
-                        id,
-                        error_text: failure_reason.clone(),
-                    },
-                    Some(failure_reason),
-                )
-            }
+        let command = match host.invoke_tool(invocation, cancellation_token).await {
+            Ok(result) => RuntimeCommand::ToolResponse { id, result },
+            Err(error_text) => RuntimeCommand::ToolError { id, error_text },
         };
         let _ = runtime_tx.send(command);
-        if let Some(failure_reason) = failure_reason {
-            report_task_failure(task_failure_handler.as_ref(), failure_reason);
-        }
     });
 }
 

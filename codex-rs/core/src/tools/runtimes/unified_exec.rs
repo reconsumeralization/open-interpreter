@@ -479,7 +479,12 @@ impl<'a> ToolRuntime<UnifiedExecRequest, UnifiedExecProcess> for UnifiedExecRunt
             req.capture_policy,
         );
         let mut exec_env = attempt
-            .env_for(command, options, managed_network)
+            .env_for(
+                command.clone(),
+                options.clone(),
+                managed_network,
+                Some(&req.turn_environment.environment_id),
+            )
             .map_err(ToolError::Codex)?;
         exec_env.exec_server_env_config = req.exec_server_env_config.clone();
         self.manager

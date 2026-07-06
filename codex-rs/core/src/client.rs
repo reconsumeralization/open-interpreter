@@ -30,6 +30,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
+use codex_api::AgentIdentityTelemetry;
 use codex_api::AnthropicMessageRequest;
 use codex_api::AnthropicMessagesClient as ApiAnthropicMessagesClient;
 use codex_api::ApiError;
@@ -63,7 +64,6 @@ use codex_api::auth_header_telemetry;
 use codex_api::build_session_headers;
 use codex_api::create_text_param_for_request;
 use codex_api::response_create_client_metadata;
-use codex_app_server_protocol::AuthMode;
 use codex_chat_wire_compat::ChatCompletionsCompatClient;
 use codex_chat_wire_compat::ToolKinds;
 use codex_login::AuthManager;
@@ -71,6 +71,8 @@ use codex_login::CodexAuth;
 use codex_login::RefreshTokenError;
 use codex_login::UnauthorizedRecovery;
 use codex_login::default_client::build_reqwest_client;
+use codex_model_provider::AgentIdentitySessionFallback;
+use codex_model_provider::ProviderAuthScope;
 use codex_otel::SessionTelemetry;
 use codex_otel::current_span_w3c_trace_context;
 use codex_protocol::auth::AuthMode;
@@ -933,7 +935,7 @@ impl ModelClient {
     }
 
     fn prepare_response_items_for_request(&self, input: &mut [ResponseItem], store: bool) {
-        if self.state.item_ids_enabled || store {
+        if store {
             return;
         }
 
@@ -984,6 +986,10 @@ impl ModelClient {
             api_auth: resolved_auth.auth,
             agent_identity_telemetry: resolved_auth.agent_identity_telemetry,
         })
+    }
+
+    pub(crate) async fn prewarm_auth(&self) -> Result<()> {
+        self.current_client_setup().await.map(|_| ())
     }
 
     fn stream_transport_route(&self) -> Result<StreamTransportRoute> {
@@ -1549,6 +1555,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 client_setup.auth.as_ref().map(CodexAuth::auth_mode),
                 client_setup.api_auth.as_ref(),
+                client_setup.agent_identity_telemetry.clone(),
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -1592,6 +1599,7 @@ impl ModelClientSession {
                         stream,
                         session_telemetry.clone(),
                         inference_trace_attempt,
+                        Arc::clone(&self.client.state.provider),
                     );
                     return Ok(stream);
                 }
@@ -1610,6 +1618,7 @@ impl ModelClientSession {
                             unauthorized_transport,
                             &mut auth_recovery,
                             session_telemetry,
+                            &self.client.state.provider,
                         )
                         .await?,
                     );
@@ -1618,7 +1627,7 @@ impl ModelClientSession {
                 Err(err) => {
                     let response_debug_context =
                         extract_response_debug_context_from_api_error(&err);
-                    let err = map_api_error(err);
+                    let err = self.client.state.provider.map_api_error(err);
                     inference_trace_attempt.record_failed(
                         &err,
                         response_debug_context.request_id.as_deref(),
@@ -1671,6 +1680,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth.as_ref().map(CodexAuth::auth_mode),
                 api_auth.as_ref(),
+                None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -1714,7 +1724,7 @@ impl ModelClientSession {
                 {
                     Ok(mut title_stream) => {
                         while let Some(event) = title_stream.next().await {
-                            event.map_err(map_api_error)?;
+                            event.map_err(|err| self.client.state.provider.map_api_error(err))?;
                         }
                     }
                     Err(ApiError::Transport(
@@ -1725,12 +1735,13 @@ impl ModelClientSession {
                                 unauthorized_transport,
                                 &mut auth_recovery,
                                 session_telemetry,
+                                &self.client.state.provider,
                             )
                             .await?,
                         );
                         continue;
                     }
-                    Err(err) => return Err(map_api_error(err)),
+                    Err(err) => return Err(self.client.state.provider.map_api_error(err)),
                 }
             }
             match client
@@ -1742,6 +1753,7 @@ impl ModelClientSession {
                         stream,
                         session_telemetry.clone(),
                         InferenceTraceAttempt::disabled(),
+                        Arc::clone(&self.client.state.provider),
                     );
                     return Ok(apply_chat_harness_postprocess(stream, postprocess));
                 }
@@ -1753,11 +1765,12 @@ impl ModelClientSession {
                             unauthorized_transport,
                             &mut auth_recovery,
                             session_telemetry,
+                            &self.client.state.provider,
                         )
                         .await?,
                     );
                 }
-                Err(err) => return Err(map_api_error(err)),
+                Err(err) => return Err(self.client.state.provider.map_api_error(err)),
             }
         }
     }
@@ -1817,6 +1830,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth.as_ref().map(CodexAuth::auth_mode),
                 api_auth.as_ref(),
+                None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -1850,6 +1864,7 @@ impl ModelClientSession {
                         stream,
                         session_telemetry.clone(),
                         InferenceTraceAttempt::disabled(),
+                        Arc::clone(&self.client.state.provider),
                     );
                     return Ok(stream);
                 }
@@ -1861,11 +1876,12 @@ impl ModelClientSession {
                             unauthorized_transport,
                             &mut auth_recovery,
                             session_telemetry,
+                            &self.client.state.provider,
                         )
                         .await?,
                     );
                 }
-                Err(err) => return Err(map_api_error(err)),
+                Err(err) => return Err(self.client.state.provider.map_api_error(err)),
             }
         }
     }
@@ -1916,6 +1932,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 client_setup.auth.as_ref().map(CodexAuth::auth_mode),
                 client_setup.api_auth.as_ref(),
+                client_setup.agent_identity_telemetry.clone(),
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -1975,6 +1992,7 @@ impl ModelClientSession {
                         stream,
                         session_telemetry.clone(),
                         inference_trace_attempt,
+                        Arc::clone(&self.client.state.provider),
                     );
                     return Ok(stream);
                 }
@@ -1993,6 +2011,7 @@ impl ModelClientSession {
                             unauthorized_transport,
                             &mut auth_recovery,
                             session_telemetry,
+                            &self.client.state.provider,
                         )
                         .await?,
                     );
@@ -2000,7 +2019,7 @@ impl ModelClientSession {
                 Err(err) => {
                     let response_debug_context =
                         extract_response_debug_context_from_api_error(&err);
-                    let err = map_api_error(err);
+                    let err = self.client.state.provider.map_api_error(err);
                     inference_trace_attempt.record_failed(
                         &err,
                         response_debug_context.request_id.as_deref(),
@@ -2085,6 +2104,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth_mode.or(Some(AuthMode::ApiKey)),
                 &auth_provider,
+                None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -2141,9 +2161,9 @@ impl ModelClientSession {
                     let mut title_stream = client
                         .stream_request(title_request, title_headers)
                         .await
-                        .map_err(map_api_error)?;
+                        .map_err(|err| self.client.state.provider.map_api_error(err))?;
                     while let Some(event) = title_stream.next().await {
-                        event.map_err(map_api_error)?;
+                        event.map_err(|err| self.client.state.provider.map_api_error(err))?;
                     }
                 }
             }
@@ -2153,6 +2173,7 @@ impl ModelClientSession {
                         stream,
                         session_telemetry.clone(),
                         InferenceTraceAttempt::disabled(),
+                        Arc::clone(&self.client.state.provider),
                     );
                     return Ok(stream);
                 }
@@ -2164,11 +2185,12 @@ impl ModelClientSession {
                             unauthorized_transport,
                             &mut auth_recovery,
                             session_telemetry,
+                            &self.client.state.provider,
                         )
                         .await?,
                     );
                 }
-                Err(err) => return Err(map_api_error(err)),
+                Err(err) => return Err(self.client.state.provider.map_api_error(err)),
             }
         }
     }
@@ -2253,6 +2275,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth_mode.or(Some(AuthMode::ApiKey)),
                 &auth_provider,
+                None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -2287,11 +2310,12 @@ impl ModelClientSession {
                                 unauthorized_transport,
                                 &mut auth_recovery,
                                 session_telemetry,
+                                &self.client.state.provider,
                             )
                             .await?,
                         );
                     }
-                    Err(err) => return Err(map_api_error(err)),
+                    Err(err) => return Err(self.client.state.provider.map_api_error(err)),
                 }
                 continue;
             }
@@ -2307,6 +2331,7 @@ impl ModelClientSession {
                         stream,
                         session_telemetry.clone(),
                         InferenceTraceAttempt::disabled(),
+                        Arc::clone(&self.client.state.provider),
                     );
                     return Ok(stream);
                 }
@@ -2318,11 +2343,12 @@ impl ModelClientSession {
                             unauthorized_transport,
                             &mut auth_recovery,
                             session_telemetry,
+                            &self.client.state.provider,
                         )
                         .await?,
                     );
                 }
-                Err(err) => return Err(map_api_error(err)),
+                Err(err) => return Err(self.client.state.provider.map_api_error(err)),
             }
         }
     }
@@ -2369,6 +2395,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth_mode.or(Some(AuthMode::ApiKey)),
                 &auth_provider,
+                None,
                 pending_retry,
             );
             let (request_telemetry, _) = Self::build_streaming_telemetry(
@@ -2395,11 +2422,12 @@ impl ModelClientSession {
                             unauthorized_transport,
                             &mut auth_recovery,
                             session_telemetry,
+                            &self.client.state.provider,
                         )
                         .await?,
                     );
                 }
-                Err(err) => return Err(map_api_error(err)),
+                Err(err) => return Err(self.client.state.provider.map_api_error(err)),
             }
         }
     }
@@ -2540,7 +2568,7 @@ impl ModelClientSession {
                 )
                 .await
                 .map_err(|err| {
-                    let err = map_api_error(err);
+                    let err = self.client.state.provider.map_api_error(err);
                     inference_trace_attempt.record_failed(&err, None, /*output_items*/ &[]);
                     err
                 })?;
@@ -2928,7 +2956,7 @@ fn zcode_unary_response_stream(value: Value) -> ResponseStream {
         role: "assistant".to_string(),
         content: vec![ContentItem::OutputText { text }],
         phase: None,
-        metadata: None,
+        internal_chat_message_metadata_passthrough: None,
     };
     let (tx_event, rx_event) =
         mpsc::channel::<Result<ResponseEvent>>(RESPONSE_STREAM_CHANNEL_CAPACITY);

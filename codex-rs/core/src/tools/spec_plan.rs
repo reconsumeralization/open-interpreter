@@ -627,7 +627,7 @@ fn add_tool_sources(context: &CoreToolPlanContext<'_>, planned_tools: &mut Plann
 }
 
 fn add_harness_alias_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut PlannedTools) {
-    let harness = Harness::from_config_name(context.turn_context.config.harness.as_deref());
+    let harness = Harness::from_config_name(context.step_context.turn.config.harness.as_deref());
     if matches!(harness, Harness::Native) {
         return;
     }

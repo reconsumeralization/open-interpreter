@@ -379,7 +379,7 @@ pub(crate) async fn run_turn(
                         && token_status.active_context_tokens >= DEEPSEEK_TUI_CYCLE_TOKEN_LIMIT
                         && let Err(err) = run_auto_compact(
                             &sess,
-                            &turn_context,
+                            Arc::clone(&step_context),
                             &mut client_session,
                             InitialContextInjection::DoNotInject,
                             CompactionReason::ContextLimit,

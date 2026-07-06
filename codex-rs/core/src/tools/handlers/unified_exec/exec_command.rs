@@ -33,6 +33,7 @@ use codex_otel::TOOL_CALL_UNIFIED_EXEC_METRIC;
 use codex_sandboxing::SandboxManager;
 use codex_sandboxing::SandboxType;
 use codex_sandboxing::SandboxablePreference;
+use codex_shell_command::shell_detect::detect_shell_type;
 use codex_tools::Harness;
 use codex_tools::ToolName;
 use codex_tools::ToolSpec;

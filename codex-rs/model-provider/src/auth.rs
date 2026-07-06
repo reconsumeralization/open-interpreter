@@ -11,6 +11,8 @@ use codex_api::SharedAuthProvider;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_login::KIMI_CODE_PROVIDER_ID;
+use codex_login::auth::AgentIdentityAuth;
+use codex_login::auth::AgentIdentityAuthPolicy;
 use codex_login::kimi_code;
 use codex_login::kimi_code::KimiCodeAuthError;
 use codex_model_provider_info::ModelProviderInfo;
@@ -165,6 +167,57 @@ pub(crate) async fn resolve_provider_auth(
         Some(auth) => auth_provider_from_auth(auth),
         None => unauthenticated_auth_provider(),
     })
+}
+
+pub(crate) async fn resolve_provider_auth_for_scope(
+    auth_manager: Option<Arc<AuthManager>>,
+    auth: Option<&CodexAuth>,
+    provider: &ModelProviderInfo,
+    scope: ProviderAuthScope,
+) -> codex_protocol::error::Result<ResolvedProviderAuth> {
+    if matches!(auth, Some(CodexAuth::BedrockApiKey(_))) {
+        return Err(CodexErr::UnsupportedOperation(
+            BEDROCK_API_KEY_UNSUPPORTED_MESSAGE.to_string(),
+        ));
+    }
+
+    match bearer_auth_for_provider(provider) {
+        Ok(Some(auth)) => return Ok(ResolvedProviderAuth::new(Arc::new(auth))),
+        Ok(None) => {}
+        Err(err) => return Err(err),
+    }
+
+    if !scope.agent_identity_session_fallback.is_engaged() {
+        if let Some(CodexAuth::AgentIdentity(auth)) = auth {
+            return Ok(ResolvedProviderAuth::for_agent_identity(auth.clone()));
+        }
+
+        if let Some(auth_manager) = auth_manager.as_ref() {
+            match auth_manager
+                .agent_identity_auth(scope.agent_identity_policy, scope.session_source)
+                .await
+            {
+                Ok(Some(auth)) => return Ok(ResolvedProviderAuth::for_agent_identity(auth)),
+                Ok(None) => {}
+                Err(err) => {
+                    if scope.agent_identity_policy == AgentIdentityAuthPolicy::ChatGptAuth
+                        && scope.agent_identity_session_fallback.engage()
+                    {
+                        return resolve_provider_auth(auth, provider, /*codex_home*/ None)
+                            .await
+                            .map(ResolvedProviderAuth::new);
+                    }
+                    return Err(CodexErr::Fatal(format!(
+                        "Agent Identity authentication failed: {err}"
+                    )));
+                }
+            }
+        }
+    }
+
+    resolve_provider_auth(auth, provider, /*codex_home*/ None)
+        .await
+        .map(ResolvedProviderAuth::new)
 }
 
 /// Resolves the stored Kimi Code OAuth access token for the `kimi-for-coding`

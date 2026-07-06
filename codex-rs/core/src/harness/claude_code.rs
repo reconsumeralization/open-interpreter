@@ -270,7 +270,7 @@ pub(crate) fn build_claude_code_responses_shaped_request(
         model: model_info.slug.clone(),
         instructions: system_prompt,
         input: prompt.get_formatted_input().to_vec(),
-        tools,
+        tools: Some(tools),
         tool_choice: "auto".to_string(),
         parallel_tool_calls: prompt.parallel_tool_calls,
         reasoning: None,
@@ -404,7 +404,10 @@ fn anthropic_output_effort(effort: ReasoningEffortConfig) -> String {
     match effort {
         ReasoningEffortConfig::Minimal | ReasoningEffortConfig::Low => "low".to_string(),
         ReasoningEffortConfig::Medium => "medium".to_string(),
-        ReasoningEffortConfig::High | ReasoningEffortConfig::XHigh => "high".to_string(),
+        ReasoningEffortConfig::High
+        | ReasoningEffortConfig::XHigh
+        | ReasoningEffortConfig::Max
+        | ReasoningEffortConfig::Ultra => "high".to_string(),
         ReasoningEffortConfig::None => "none".to_string(),
         ReasoningEffortConfig::Custom(value) => value,
     }
@@ -686,6 +689,7 @@ fn build_messages(
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
+            | ResponseItem::AdditionalTools { .. }
             | ResponseItem::Other => {
                 flush_pending_tool_results(
                     &mut messages,
@@ -2570,7 +2574,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2580,7 +2584,7 @@ mod tests {
                         .to_string(),
                     call_id: "toolu_1".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
@@ -2589,7 +2593,7 @@ mod tests {
                         "(Bash completed with no output)".to_string(),
                     ),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2598,14 +2602,14 @@ mod tests {
                     arguments: "{\"file_path\":\"/tmp/input.txt\"}".to_string(),
                     call_id: "toolu_2".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "toolu_2".to_string(),
                     output: FunctionCallOutputPayload::from_text("1\tREAD_OK".to_string()),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -2741,7 +2745,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2750,7 +2754,7 @@ mod tests {
                     arguments: "{\"command\":\"git clone repo\"}".to_string(),
                     call_id: "toolu_clone".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2759,14 +2763,14 @@ mod tests {
                     arguments: "{\"command\":\"python3 --version\"}".to_string(),
                     call_id: "toolu_python".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "toolu_python".to_string(),
                     output: FunctionCallOutputPayload::from_text("Python 3.13.7\n".to_string()),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
@@ -2775,7 +2779,7 @@ mod tests {
                         "Cloning into '/app/pyknotid'...\n\n".to_string(),
                     ),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -2828,7 +2832,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -2842,7 +2846,7 @@ mod tests {
                     .to_string(),
                     call_id: "toolu_edit".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -2892,7 +2896,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,},
+                    internal_chat_message_metadata_passthrough: None,},
                 ResponseItem::Message {
                     id: None,
                     role: "user".to_string(),
@@ -2901,7 +2905,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,},
+                    internal_chat_message_metadata_passthrough: None,},
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -2956,7 +2960,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -2966,7 +2970,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -3044,7 +3048,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(temp_dir.path().to_path_buf()),
             tools: vec![],
@@ -3089,7 +3093,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![test_bash_tool()],
@@ -3129,7 +3133,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -3184,7 +3188,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -3193,7 +3197,7 @@ mod tests {
                     arguments: "{\"command\":\"echo \\\"TodoWrite done\\\"\"}".to_string(),
                     call_id: "toolu_bash".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
@@ -3202,7 +3206,7 @@ mod tests {
                         "\nTodoWrite done\n\n   ".to_string(),
                     ),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -3247,7 +3251,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3257,7 +3261,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3267,7 +3271,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -3326,7 +3330,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3335,7 +3339,7 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3344,7 +3348,7 @@ mod tests {
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         for index in 1..=CLAUDE_CODE_TODO_REMINDER_STALENESS_THRESHOLD {
@@ -3360,7 +3364,7 @@ mod tests {
                 .to_string(),
                 call_id: format!("read_{index}"),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3369,7 +3373,7 @@ mod tests {
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
         let prompt = Prompt {
@@ -3421,7 +3425,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3430,7 +3434,7 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3439,7 +3443,7 @@ mod tests {
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         for index in 1..CLAUDE_CODE_TODO_REMINDER_STALENESS_THRESHOLD {
@@ -3453,7 +3457,7 @@ mod tests {
                 .to_string(),
                 call_id: format!("read_{index}"),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3462,7 +3466,7 @@ mod tests {
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
         let prompt = Prompt {
@@ -3503,7 +3507,7 @@ mod tests {
             }],
             phase: None,
 
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         }];
         for index in 1..=CLAUDE_CODE_TODO_REMINDER_STALENESS_THRESHOLD {
             if index == 5 || index == 9 {
@@ -3515,7 +3519,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 });
             }
             input.push(ResponseItem::FunctionCall {
@@ -3528,14 +3532,14 @@ mod tests {
                 .to_string(),
                 call_id: format!("grep_{index}"),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: format!("grep_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("MATCH_{index}")),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
         let prompt = Prompt {
@@ -3607,7 +3611,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3616,7 +3620,7 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3625,7 +3629,7 @@ mod tests {
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         for index in 1..=7 {
@@ -3638,7 +3642,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 });
             }
             input.push(ResponseItem::FunctionCall {
@@ -3651,7 +3655,7 @@ mod tests {
                 .to_string(),
                 call_id: format!("read_{index}"),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3660,7 +3664,7 @@ mod tests {
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
         let prompt = Prompt {
@@ -3708,7 +3712,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -3717,7 +3721,7 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3726,7 +3730,7 @@ mod tests {
                     CLAUDE_TODO_WRITE_SUCCESS_MESSAGE.to_string(),
                 ),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         for index in 1..8 {
@@ -3740,7 +3744,7 @@ mod tests {
                 .to_string(),
                 call_id: format!("read_{index}"),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             input.push(ResponseItem::FunctionCallOutput {
                 id: None,
@@ -3749,7 +3753,7 @@ mod tests {
                     "{index}\tCHECKPOINT_{index:02}"
                 )),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
         let prompt = Prompt {
@@ -3793,7 +3797,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3805,7 +3809,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -3815,7 +3819,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -4080,7 +4084,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -4090,7 +4094,7 @@ mod tests {
                         .to_string(),
                     call_id: "toolu_1".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
@@ -4099,7 +4103,7 @@ mod tests {
                         "(Bash completed with no output)".to_string(),
                     ),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -4109,7 +4113,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -4119,7 +4123,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -4181,7 +4185,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4236,7 +4240,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Other,
                 ResponseItem::Message {
@@ -4249,7 +4253,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -4259,7 +4263,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(PathBuf::from("/tmp/workspace")),
@@ -4345,7 +4349,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4388,7 +4392,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4431,7 +4435,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4474,7 +4478,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4517,7 +4521,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![],
@@ -4571,7 +4575,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![
@@ -4607,6 +4611,8 @@ mod tests {
         // Tools are flat Responses-style function tools, limited to the bare set.
         let tool_names: Vec<&str> = request
             .tools
+            .as_ref()
+            .expect("tools")
             .iter()
             .map(|tool| {
                 assert_eq!(tool["type"], "function");
@@ -4629,7 +4635,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(PathBuf::from("/tmp/workspace")),
             tools: vec![test_bash_tool()],
@@ -4653,7 +4659,8 @@ mod tests {
         // The full profile renders the rich Claude Code agent system prompt.
         assert!(request.instructions.contains("Claude Code"));
         // Tools are flat Responses-style function tools and include Bash.
-        assert!(request.tools.iter().all(|tool| tool["type"] == "function"));
-        assert!(request.tools.iter().any(|tool| tool["name"] == "Bash"));
+        let tools = request.tools.as_ref().expect("tools");
+        assert!(tools.iter().all(|tool| tool["type"] == "function"));
+        assert!(tools.iter().any(|tool| tool["name"] == "Bash"));
     }
 }

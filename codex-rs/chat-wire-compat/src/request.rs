@@ -104,7 +104,8 @@ pub(crate) struct ChatFunctionCall {
 pub(crate) fn convert_request(
     request: &ResponsesApiRequest,
 ) -> Result<(ChatCompletionRequest, ToolKinds), ApiError> {
-    let (tools, tool_kinds, original_function_names) = convert_tools(&request.tools)?;
+    let (tools, tool_kinds, original_function_names) =
+        convert_tools(request.tools.as_deref().unwrap_or_default())?;
     let mut messages = Vec::new();
     if !request.instructions.trim().is_empty() {
         messages.push(ChatMessage {
@@ -298,6 +299,7 @@ pub(crate) fn convert_request(
             ResponseItem::WebSearchCall { .. }
             | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::AgentMessage { .. }
+            | ResponseItem::AdditionalTools { .. }
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
@@ -829,7 +831,7 @@ mod tests {
                     text: "hello".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             tools: vec![json!({
                 "type": "function",
@@ -874,7 +876,7 @@ mod tests {
                     text: "keep going".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             tools: Vec::new(),
             tool_choice: "auto".to_string(),
@@ -909,7 +911,7 @@ mod tests {
                         text: "list files".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Reasoning {
                     id: Some("reasoning-1".to_string()),
@@ -918,7 +920,7 @@ mod tests {
                         text: "I need to inspect the directory.".to_string(),
                     }]),
                     encrypted_content: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -926,13 +928,13 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls" }).to_string(),
                     call_id: "call-1".to_string(),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("file.txt".to_string()),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             tools: vec![json!({
@@ -978,7 +980,7 @@ mod tests {
                 namespace: Some("mcp__demo__".to_string()),
                 arguments: json!({ "order_id": "ord_123" }).to_string(),
                 call_id: "call-lookup".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             tools: vec![json!({
                 "type": "namespace",
@@ -1114,7 +1116,7 @@ mod tests {
                         text: "Need to inspect files.".to_string(),
                     }]),
                     encrypted_content: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1123,7 +1125,7 @@ mod tests {
                         text: String::new(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1131,7 +1133,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/file.txt" }).to_string(),
                     call_id: "call-1".to_string(),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             tools: vec![json!({
@@ -1175,7 +1177,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/legacy.py" }).to_string(),
                     call_id: "call-1".to_string(),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1183,7 +1185,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/data.csv" }).to_string(),
                     call_id: "call-2".to_string(),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1192,7 +1194,7 @@ mod tests {
                         text: String::new(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Reasoning {
                     id: Some("reasoning-1".to_string()),
@@ -1201,7 +1203,7 @@ mod tests {
                         text: "Need to inspect both files.".to_string(),
                     }]),
                     encrypted_content: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1209,25 +1211,25 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/config.ini" }).to_string(),
                     call_id: "call-3".to_string(),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("legacy".to_string()),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "call-2".to_string(),
                     output: FunctionCallOutputPayload::from_text("data".to_string()),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "call-3".to_string(),
                     output: FunctionCallOutputPayload::from_text("config".to_string()),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             tools: vec![json!({
@@ -1275,7 +1277,7 @@ mod tests {
                         text: "Need one more directory listing.".to_string(),
                     }]),
                     encrypted_content: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1284,7 +1286,7 @@ mod tests {
                         text: "I will inspect the directory.".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1292,7 +1294,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls" }).to_string(),
                     call_id: "call-1".to_string(),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1301,7 +1303,7 @@ mod tests {
                         text: " Then I will inspect hidden files.".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -1309,19 +1311,19 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls -a" }).to_string(),
                     call_id: "call-2".to_string(),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "call-1".to_string(),
                     output: FunctionCallOutputPayload::from_text("file.txt".to_string()),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "call-2".to_string(),
                     output: FunctionCallOutputPayload::from_text(".git".to_string()),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             tools: vec![json!({
@@ -1373,7 +1375,7 @@ mod tests {
                     status: Some("completed".to_string()),
                     execution: "client".to_string(),
                     arguments: json!({ "query": "search tools" }),
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::ToolSearchOutput {
                     id: None,
@@ -1381,7 +1383,7 @@ mod tests {
                     status: "completed".to_string(),
                     execution: "client".to_string(),
                     tools: vec![json!({ "name": "shell", "type": "function" })],
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             tools: vec![json!({
@@ -1437,7 +1439,7 @@ mod tests {
                     text: "return structured output".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             tools: Vec::new(),
             tool_choice: "auto".to_string(),

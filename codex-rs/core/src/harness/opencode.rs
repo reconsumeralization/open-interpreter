@@ -325,6 +325,7 @@ fn build_messages(
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
+            | ResponseItem::AdditionalTools { .. }
             | ResponseItem::Other => {}
         }
     }
@@ -799,7 +800,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("user".to_string()),
@@ -809,7 +810,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),

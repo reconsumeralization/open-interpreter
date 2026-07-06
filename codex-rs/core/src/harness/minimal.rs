@@ -226,6 +226,7 @@ fn build_messages(
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
+            | ResponseItem::AdditionalTools { .. }
             | ResponseItem::Other => {}
         }
     }
@@ -453,7 +454,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -493,7 +494,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("user".to_string()),
@@ -503,7 +504,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),
@@ -538,7 +539,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Reasoning {
                     id: Some("reasoning".to_string()),
@@ -548,7 +549,7 @@ mod tests {
                     }]),
                     encrypted_content: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -557,14 +558,14 @@ mod tests {
                     arguments: json!({"command": "date"}).to_string(),
                     call_id: "call-date".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "call-date".to_string(),
                     output: FunctionCallOutputPayload::from_text("Tue Apr 29".to_string()),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("user2".to_string()),
@@ -574,7 +575,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),
@@ -616,7 +617,7 @@ mod tests {
                 ],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()

@@ -262,7 +262,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -298,7 +298,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,},
+                    internal_chat_message_metadata_passthrough: None,},
                 ResponseItem::Message {
                     id: Some("user".to_string()),
                     role: "user".to_string(),
@@ -307,7 +307,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,},
+                    internal_chat_message_metadata_passthrough: None,},
             ],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -340,7 +340,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: None,
@@ -349,14 +349,14 @@ mod tests {
                     arguments: r#"{"pattern":"*.py"}"#.to_string(),
                     call_id: "Glob:0".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
                     call_id: "Glob:0".to_string(),
                     output: FunctionCallOutputPayload::from_text("module.py".to_string()),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             cwd: Some(std::env::temp_dir()),
@@ -400,7 +400,7 @@ mod tests {
                 ],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()

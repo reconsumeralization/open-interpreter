@@ -830,7 +830,7 @@ mod tests {
                     text: "hello".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             tools: Vec::new(),
             tool_choice: "auto".to_string(),

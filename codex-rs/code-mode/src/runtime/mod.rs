@@ -27,6 +27,7 @@ use codex_protocol::ToolName;
 use serde_json::Value as JsonValue;
 use tokio::sync::mpsc;
 
+#[cfg(feature = "v8-runtime")]
 use crate::TaskFailureHandler;
 
 const EXIT_SENTINEL: &str = "__codex_code_mode_exit__";

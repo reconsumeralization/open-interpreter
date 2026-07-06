@@ -115,7 +115,7 @@ pub(crate) fn build_request(
     session_source: Option<&SessionSource>,
 ) -> Result<AnthropicMessageRequest, serde_json::Error> {
     let is_explore = is_zcode_explore_session(session_source);
-    let messages = build_messages_for_session(&prompt.input, is_explore)?;
+    let messages = build_messages_for_session(&prompt.input, !is_explore)?;
     Ok(AnthropicMessageRequest {
         model: zcode_model_name(&model_info.slug),
         messages,
@@ -206,7 +206,7 @@ pub(crate) fn compacted_summary_item(summary_text: &str) -> ResponseItem {
             text: format_compacted_summary(summary_text),
         }],
         phase: None,
-        metadata: None,
+        internal_chat_message_metadata_passthrough: None,
     }
 }
 
@@ -560,6 +560,7 @@ fn build_messages_for_session(
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
+            | ResponseItem::AdditionalTools { .. }
             | ResponseItem::Other => flush_pending_tool_results(
                 &mut messages,
                 &mut pending_tool_results,
@@ -1479,7 +1480,7 @@ mod tests {
                     text: "hello".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             ..Prompt::default()
         };
@@ -1493,7 +1494,8 @@ mod tests {
         assert_eq!(request.max_tokens, 64_000);
         assert_eq!(request.stream, true);
         assert_eq!(request.system.len(), 3);
-        assert_eq!(request.messages.len(), 1);
+        assert_eq!(request.messages.len(), 2);
+        assert_eq!(request.messages[1].role, "system");
         assert_eq!(request.tools.len(), 14);
         assert_eq!(request.tool_choice, Some(json!({ "type": "auto" })));
     }
@@ -1553,7 +1555,7 @@ mod tests {
                         },
                     ],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: None,
@@ -1569,7 +1571,7 @@ mod tests {
                         .to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("user".to_string()),
@@ -1578,7 +1580,7 @@ mod tests {
                         text: "hello".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             ..Prompt::default()
@@ -1639,7 +1641,7 @@ mod tests {
                     .to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -1648,7 +1650,7 @@ mod tests {
                     text: "first prompt".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -1657,7 +1659,7 @@ mod tests {
                     text: "second prompt after failed provider turn".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -1692,7 +1694,7 @@ mod tests {
                         text: "first request".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("compact".to_string()),
@@ -1701,7 +1703,7 @@ mod tests {
                         text: crate::compact::SUMMARIZATION_PROMPT.to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             ..Prompt::default()
@@ -1753,7 +1755,7 @@ mod tests {
                         text: "first request".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("assistant-1".to_string()),
@@ -1762,7 +1764,7 @@ mod tests {
                         text: "Summary of Turn 5:\n\nZCODE_WEB_GAME_TURN_5_DONE".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("compact".to_string()),
@@ -1771,7 +1773,7 @@ mod tests {
                         text: crate::compact::SUMMARIZATION_PROMPT.to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             ..Prompt::default()
@@ -1833,7 +1835,7 @@ mod tests {
                     text: "<system-reminder>\ncontext\n</system-reminder>".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -1842,7 +1844,7 @@ mod tests {
                     text: "next prompt".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         let messages = build_messages(&items).expect("messages");
@@ -1879,13 +1881,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("{index}\tcontent")),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
         for index in 9..=10 {
@@ -1898,7 +1900,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
         for index in 9..=10 {
@@ -1906,7 +1908,7 @@ mod tests {
                 id: None,
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("{index}\tcontent")),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
 
@@ -1951,7 +1953,7 @@ mod tests {
                 text: "done".to_string(),
             }],
             phase: None,
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         });
         let messages = build_messages(&historical_items).expect("historical messages");
         assert_eq!(messages[messages.len() - 2].role, "system");
@@ -1995,13 +1997,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("todos updated".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         for index in 1..=10 {
@@ -2016,13 +2018,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("edit_{index}"),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: format!("edit_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("edit {index} done")),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
 
@@ -2086,13 +2088,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("todos updated".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         for index in 1..=20 {
@@ -2103,7 +2105,7 @@ mod tests {
                     text: format!("progress {index}"),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCall {
                 id: None,
@@ -2114,13 +2116,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("bash_{index}"),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: format!("bash_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("bash {index} done")),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
 
@@ -2177,7 +2179,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "read_large".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -2186,7 +2188,7 @@ mod tests {
                     "{}File content (61680 tokens) exceeds maximum allowed tokens (25000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
                     crate::tools::handlers::HARNESS_NO_TRUNCATE_PREFIX
                 )),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2232,13 +2234,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("todos updated".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -2247,7 +2249,7 @@ mod tests {
                     text: "Continue the work.".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         for index in 1..=9 {
@@ -2260,13 +2262,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: format!("read_{index}"),
                 output: FunctionCallOutputPayload::from_text(format!("{index}\tcontent")),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             });
         }
 
@@ -2316,13 +2318,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "agent_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "agent_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("Agent report.".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -2331,7 +2333,7 @@ mod tests {
                     text: "Continuing from the agent report.".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2364,13 +2366,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "agent_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "agent_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("Agent report.".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -2379,7 +2381,7 @@ mod tests {
                     text: "<subagent_notification>{}</subagent_notification>".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2421,13 +2423,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("todos updated".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -2436,7 +2438,7 @@ mod tests {
                     text: "Done.".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -2445,7 +2447,7 @@ mod tests {
                     text: "Continue.".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2489,13 +2491,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "todo_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("todos updated".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -2504,7 +2506,7 @@ mod tests {
                     text: "Done.".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: None,
@@ -2513,7 +2515,7 @@ mod tests {
                     text: "Continue.".to_string(),
                 }],
                 phase: None,
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: None,
@@ -2524,13 +2526,13 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "read_1".to_string(),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "read_1".to_string(),
                 output: FunctionCallOutputPayload::from_text("notes".to_string()),
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2565,7 +2567,7 @@ mod tests {
                 text: "Read done.".to_string(),
             }],
             phase: None,
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         });
         let messages = build_messages(&items).expect("messages with later assistant");
         assert!(!messages

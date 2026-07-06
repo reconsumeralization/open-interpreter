@@ -263,7 +263,7 @@ async fn process_anthropic_event(
                                 text: String::new(),
                             }],
                             phase: None,
-                            metadata: None,
+                            internal_chat_message_metadata_passthrough: None,
                         })))
                         .await
                         .is_err()
@@ -289,7 +289,7 @@ async fn process_anthropic_event(
                                     text: String::new(),
                                 }]),
                                 encrypted_content: None,
-                                metadata: None,
+                                internal_chat_message_metadata_passthrough: None,
                             },
                         )))
                         .await
@@ -381,7 +381,7 @@ async fn process_anthropic_event(
                     role: "assistant".to_string(),
                     content: vec![ContentItem::OutputText { text }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 PendingBlock::Thinking {
                     id,
@@ -392,7 +392,7 @@ async fn process_anthropic_event(
                     summary: vec![],
                     content: Some(vec![ReasoningItemContent::ReasoningText { text }]),
                     encrypted_content: signature,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 PendingBlock::ToolUse {
                     id,
@@ -404,7 +404,7 @@ async fn process_anthropic_event(
                     namespace: None,
                     arguments: normalize_tool_arguments(&input_json)?,
                     call_id: id,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             };
             state.completed_blocks.insert(index, item);

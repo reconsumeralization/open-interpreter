@@ -2470,7 +2470,6 @@ version = "0.0.17"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
- "app_test_support",
  "assert_cmd",
  "assert_matches",
  "clap",
@@ -2662,7 +2661,6 @@ dependencies = [
  "codex-code-mode-protocol",
  "codex-protocol",
  "deno_core_icudata",
- "futures",
  "pretty_assertions",
  "serde_json",
  "tokio",
@@ -2674,6 +2672,17 @@ dependencies = [
 [[package]]
 name = "codex-code-mode-host"
 version = "0.0.17"
+dependencies = [
+ "anyhow",
+ "codex-code-mode",
+ "codex-code-mode-protocol",
+ "codex-protocol",
+ "codex-utils-cargo-bin",
+ "pretty_assertions",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
 
 [[package]]
 name = "codex-code-mode-protocol"
@@ -2760,7 +2769,7 @@ dependencies = [
 
 [[package]]
 name = "codex-connectors-extension"
-version = "0.0.0"
+version = "0.0.17"
 dependencies = [
  "codex-connectors",
  "codex-core-plugins",
@@ -3107,7 +3116,7 @@ dependencies = [
 
 [[package]]
 name = "codex-exec-server-protocol"
-version = "0.0.0"
+version = "0.0.17"
 dependencies = [
  "base64 0.22.1",
  "codex-file-system",

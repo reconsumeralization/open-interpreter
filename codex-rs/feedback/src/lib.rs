@@ -4,7 +4,6 @@ use std::collections::btree_map::Entry;
 use std::fs;
 use std::io::Write;
 use std::io::{self};
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;

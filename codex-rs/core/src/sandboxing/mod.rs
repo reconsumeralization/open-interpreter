@@ -30,7 +30,7 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ExecOptions {
     pub(crate) expiration: ExecExpiration,
     pub(crate) capture_policy: ExecCapturePolicy,

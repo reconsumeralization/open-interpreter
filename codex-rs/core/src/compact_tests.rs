@@ -4,7 +4,7 @@ use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::WireApi;
 use codex_protocol::models::DEFAULT_IMAGE_DETAIL;
 use codex_protocol::models::FunctionCallOutputPayload;
-use codex_protocol::models::ResponseItemMetadata;
+use codex_protocol::models::InternalChatMessageMetadataPassthrough;
 use pretty_assertions::assert_eq;
 use std::sync::Arc;
 
@@ -51,7 +51,7 @@ fn function_call(name: &str, call_id: &str, arguments: serde_json::Value) -> Res
         namespace: None,
         arguments: arguments.to_string(),
         call_id: call_id.to_string(),
-        metadata: None,
+        internal_chat_message_metadata_passthrough: None,
     }
 }
 
@@ -60,7 +60,7 @@ fn function_call_output(call_id: &str, output: &str) -> ResponseItem {
         id: None,
         call_id: call_id.to_string(),
         output: FunctionCallOutputPayload::from_text(output.to_string()),
-        metadata: None,
+        internal_chat_message_metadata_passthrough: None,
     }
 }
 
@@ -449,7 +449,7 @@ async fn zcode_manual_compact_runs_after_assistant_work() {
                         text: "completed work".to_string(),
                     }],
                     phase: None,
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
         )

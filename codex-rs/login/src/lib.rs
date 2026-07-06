@@ -56,4 +56,5 @@ pub use auth::save_auth;
 pub use auth_env_telemetry::AuthEnvTelemetry;
 pub use auth_env_telemetry::collect_auth_env_telemetry;
 pub use kimi_code::KIMI_CODE_PROVIDER_ID;
+pub use outbound_proxy::AuthRouteConfig;
 pub use token_data::TokenData;

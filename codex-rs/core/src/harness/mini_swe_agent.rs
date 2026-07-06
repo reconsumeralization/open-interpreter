@@ -55,7 +55,7 @@ pub(crate) fn inject_no_tool_call_format_error(stream: ResponseStream) -> Respon
                                     text: MINI_SWE_AGENT_NO_TOOL_CALL_ERROR.to_string(),
                                 }],
                                 phase: None,
-                                metadata: None,
+                                internal_chat_message_metadata_passthrough: None,
                             })))
                             .await
                             .is_err()
@@ -91,6 +91,7 @@ pub(crate) fn inject_no_tool_call_format_error(stream: ResponseStream) -> Respon
                 | Ok(ResponseEvent::RateLimits(_))
                 | Ok(ResponseEvent::ModelsEtag(_))
                 | Ok(ResponseEvent::TurnModerationMetadata(_))
+                | Ok(ResponseEvent::SafetyBuffering(_))
                 | Ok(ResponseEvent::OutputItemDone(_))
                 | Err(_) => {}
             }
@@ -354,6 +355,7 @@ fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde_json::Erro
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
+            | ResponseItem::AdditionalTools { .. }
             | ResponseItem::Other => {}
         }
     }
@@ -642,7 +644,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             tools: vec![test_bash_tool()],
             ..Prompt::default()
@@ -679,7 +681,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
                     id: Some("assistant".to_string()),
@@ -689,7 +691,7 @@ mod tests {
                     }],
                     phase: None,
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
                     id: Some("call".to_string()),
@@ -698,7 +700,7 @@ mod tests {
                     arguments: "{\"command\":\"pwd\"}".to_string(),
                     call_id: "bash:0".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
                     id: None,
@@ -707,7 +709,7 @@ mod tests {
                         "{\n  \"returncode\": 0,\n  \"output\": \"/workspace\\n\"\n}".to_string(),
                     ),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             ],
             tools: vec![test_bash_tool()],
@@ -739,7 +741,7 @@ mod tests {
                 .to_string(),
             call_id: "bash:0".to_string(),
 
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         };
 
         assert!(is_terminal_submit_call(&item));
@@ -761,7 +763,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             })))
             .await
             .expect("send message");
@@ -819,7 +821,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             })))
             .await
             .expect("send message");
@@ -832,7 +834,7 @@ mod tests {
                     arguments: "{\"command\":\"pwd\"}".to_string(),
                     call_id: "bash:0".to_string(),
 
-                    metadata: None,
+                    internal_chat_message_metadata_passthrough: None,
                 },
             )))
             .await

@@ -111,7 +111,10 @@ fn apply_reasoning_effort(request: &mut Value, reasoning_effort: Option<Reasonin
             request_object.insert("reasoning_effort".to_string(), json!("medium"));
             request_object.insert("thinking".to_string(), json!({ "type": "enabled" }));
         }
-        ReasoningEffort::High | ReasoningEffort::XHigh => {
+        ReasoningEffort::High
+        | ReasoningEffort::XHigh
+        | ReasoningEffort::Max
+        | ReasoningEffort::Ultra => {
             request_object.insert("reasoning_effort".to_string(), json!("high"));
             request_object.insert("thinking".to_string(), json!({ "type": "enabled" }));
         }
@@ -466,6 +469,7 @@ pub(super) fn build_messages_with_options(
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
+            | ResponseItem::AdditionalTools { .. }
             | ResponseItem::Other => {}
         }
     }
@@ -1372,7 +1376,7 @@ mod tests {
             }],
             phase: None,
 
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         }];
 
         let messages = build_messages(&items)
@@ -1398,7 +1402,7 @@ mod tests {
             }],
             phase: None,
 
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         }];
 
         let messages =
@@ -1431,7 +1435,7 @@ mod tests {
             ],
             phase: None,
 
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         }];
 
         let messages = build_messages(&items)
@@ -1493,7 +1497,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: Some("user".to_string()),
@@ -1503,7 +1507,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
         let prompt = Prompt {
@@ -1540,7 +1544,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: Some("skills".to_string()),
@@ -1550,7 +1554,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: Some("user".to_string()),
@@ -1560,7 +1564,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -1589,7 +1593,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,},
+                internal_chat_message_metadata_passthrough: None,},
             ResponseItem::Message {
                 id: Some("user".to_string()),
                 role: "user".to_string(),
@@ -1598,7 +1602,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,},
+                internal_chat_message_metadata_passthrough: None,},
         ];
         let prompt = Prompt {
             input: items,
@@ -1627,7 +1631,7 @@ mod tests {
             }],
             phase: None,
 
-            metadata: None,
+            internal_chat_message_metadata_passthrough: None,
         }];
         let prompt = Prompt {
             input: items,
@@ -1698,7 +1702,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1734,7 +1738,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1765,7 +1769,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1802,7 +1806,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -1890,7 +1894,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             }],
             tools: vec![
                 ToolSpec::Function(ask_user_question),
@@ -1962,7 +1966,7 @@ mod tests {
                 arguments: r#"{"path":"/app/ars.R","content":"ok"}"#.to_string(),
                 call_id: "WriteFile:6".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: Some("assistant".to_string()),
@@ -1972,7 +1976,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -1999,7 +2003,7 @@ mod tests {
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: Some("chat-message-1".to_string()),
@@ -2009,7 +2013,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -2018,7 +2022,7 @@ mod tests {
                     "<system>Command executed successfully.</system>".to_string(),
                 ),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2062,7 +2066,7 @@ mod tests {
                 }]),
                 encrypted_content: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: Some("fc-1".to_string()),
@@ -2071,14 +2075,14 @@ mod tests {
                 arguments: r#"{"command":"ls"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text("ok".to_string()),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2123,7 +2127,7 @@ mod tests {
                 }]),
                 encrypted_content: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
                 id: Some("fc-1".to_string()),
@@ -2132,7 +2136,7 @@ mod tests {
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:1".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: Some("msg-1".to_string()),
@@ -2142,7 +2146,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -2151,7 +2155,7 @@ mod tests {
                     "<system>ERROR: Command failed with exit code: 1.</system>".to_string(),
                 ),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2196,7 +2200,7 @@ mod tests {
                 arguments: r#"{"command":"./a.out"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -2210,7 +2214,7 @@ mod tests {
                     },
                 ]),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2262,14 +2266,14 @@ mod tests {
                 arguments: r#"{"command":"printf"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "Shell:0".to_string(),
                 output: FunctionCallOutputPayload::from_text("a\u{c}b\nc".to_string()),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2297,14 +2301,14 @@ mod tests {
                 arguments: r#"{"path":"/app/ars.R","content":"ok"}"#.to_string(),
                 call_id: "WriteFile:6".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
                 call_id: "WriteFile:6".to_string(),
                 output: FunctionCallOutputPayload::from_text("written".to_string()),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2347,7 +2351,7 @@ mod tests {
                 arguments: r#"{"command":"false"}"#.to_string(),
                 call_id: "Shell:7".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -2365,7 +2369,7 @@ mod tests {
                     success: Some(false),
                 },
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2417,7 +2421,7 @@ mod tests {
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:7".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -2429,7 +2433,7 @@ mod tests {
                     success: Some(false),
                 },
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2472,7 +2476,7 @@ mod tests {
                 arguments: r#"{"path":"screenshot.png"}"#.to_string(),
                 call_id: "ReadMediaFile:1".to_string(),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
                 id: None,
@@ -2490,7 +2494,7 @@ mod tests {
                     success: Some(true),
                 },
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
@@ -2543,7 +2547,7 @@ mod tests {
                 call_id: "WriteFile:6".to_string(),
                 output: FunctionCallOutputPayload::from_text("written".to_string()),
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
                 id: Some("assistant".to_string()),
@@ -2553,7 +2557,7 @@ mod tests {
                 }],
                 phase: None,
 
-                metadata: None,
+                internal_chat_message_metadata_passthrough: None,
             },
         ];
 
