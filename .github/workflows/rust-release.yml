@@ -210,7 +210,7 @@ jobs:
           if [[ "$target" == "x86_64-pc-windows-msvc" ]]; then
             export LIBSQLITE3_FLAGS=SQLITE_DISABLE_INTRINSIC
           fi
-          build_args=(--bin codex)
+          build_args=(--bin codex --bin codex-code-mode-host)
           if [[ "$target" == *windows* ]]; then
             build_args+=(--bin codex-command-runner --bin codex-windows-sandbox-setup)
           fi
@@ -227,12 +227,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          binary="target/${{ matrix.target }}/release/codex"
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            strip -S "$binary"
-          else
-            strip --strip-debug --strip-unneeded "$binary"
-          fi
+          for binary in \
+            "target/${{ matrix.target }}/release/codex" \
+            "target/${{ matrix.target }}/release/codex-code-mode-host"
+          do
+            if [[ "${{ runner.os }}" == "macOS" ]]; then
+              strip -S "$binary"
+            else
+              strip --strip-debug --strip-unneeded "$binary"
+            fi
+          done
 
       - name: Build package archive
         shell: bash

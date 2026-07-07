@@ -629,6 +629,8 @@ function Test-PackageContentsAreComplete {
     $resourcesDir = if ([string]::IsNullOrWhiteSpace($metadata.resourcesDir)) { "codex-resources" } else { $metadata.resourcesDir }
 
     $expectedFiles = @(
+        "codex-package.json",
+        "bin\codex-code-mode-host.exe",
         "$pathDir\rg.exe",
         "$resourcesDir\codex-command-runner.exe",
         "$resourcesDir\codex-windows-sandbox-setup.exe"

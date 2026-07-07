@@ -780,6 +780,7 @@ release_dir_is_complete() {
     package)
       [ -f "$release_dir/codex-package.json" ] &&
         [ -x "$release_dir/$(package_entrypoint_relative_path "$release_dir")" ] &&
+        [ -x "$release_dir/bin/codex-code-mode-host" ] &&
         [ -x "$release_dir/codex-path/rg" ] ||
         return 1
       ;;

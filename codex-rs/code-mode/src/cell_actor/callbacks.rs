@@ -21,12 +21,23 @@ pub(super) fn spawn_notification<H: CellHost>(
     call_id: String,
     text: String,
     cancellation_token: CancellationToken,
-    _task_failure_handler: Option<TaskFailureHandler>,
+    task_failure_handler: Option<TaskFailureHandler>,
 ) {
     tasks.spawn(async move {
-        match host.notify(call_id, text, cancellation_token).await {
-            Ok(()) => {}
-            Err(err) => warn!("failed to deliver code mode notification: {err}"),
+        let task =
+            tokio::spawn(async move { host.notify(call_id, text, cancellation_token).await });
+        match task.await {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => warn!("failed to deliver code mode notification: {err}"),
+            Err(err) if err.is_panic() => report_task_failure(
+                task_failure_handler.as_ref(),
+                "code mode notification task panicked".to_string(),
+            ),
+            Err(err) if !err.is_cancelled() => report_task_failure(
+                task_failure_handler.as_ref(),
+                format!("code mode notification task failed: {err}"),
+            ),
+            Err(_) => {}
         }
     });
 }
@@ -37,13 +48,29 @@ pub(super) fn spawn_tool<H: CellHost>(
     invocation: CellToolCall,
     runtime_tx: std::sync::mpsc::Sender<RuntimeCommand>,
     cancellation_token: CancellationToken,
-    _task_failure_handler: Option<TaskFailureHandler>,
+    task_failure_handler: Option<TaskFailureHandler>,
 ) {
     tasks.spawn(async move {
         let id = invocation.id.clone();
-        let command = match host.invoke_tool(invocation, cancellation_token).await {
-            Ok(result) => RuntimeCommand::ToolResponse { id, result },
-            Err(error_text) => RuntimeCommand::ToolError { id, error_text },
+        let task =
+            tokio::spawn(async move { host.invoke_tool(invocation, cancellation_token).await });
+        let command = match task.await {
+            Ok(Ok(result)) => RuntimeCommand::ToolResponse { id, result },
+            Ok(Err(error_text)) => RuntimeCommand::ToolError { id, error_text },
+            Err(err) if err.is_panic() => {
+                let error_text = "code mode tool task panicked".to_string();
+                report_task_failure(task_failure_handler.as_ref(), error_text.clone());
+                RuntimeCommand::ToolError { id, error_text }
+            }
+            Err(err) if !err.is_cancelled() => {
+                let error_text = format!("code mode tool task failed: {err}");
+                report_task_failure(task_failure_handler.as_ref(), error_text.clone());
+                RuntimeCommand::ToolError { id, error_text }
+            }
+            Err(_) => RuntimeCommand::ToolError {
+                id,
+                error_text: "code mode tool task cancelled".to_string(),
+            },
         };
         let _ = runtime_tx.send(command);
     });

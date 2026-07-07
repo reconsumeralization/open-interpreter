@@ -11,7 +11,9 @@ mod value;
 
 use std::collections::HashMap;
 #[cfg(feature = "v8-runtime")]
-use std::sync::OnceLock;
+use std::panic::AssertUnwindSafe;
+#[cfg(feature = "v8-runtime")]
+use std::panic::catch_unwind;
 use std::sync::mpsc as std_mpsc;
 #[cfg(feature = "v8-runtime")]
 use std::thread;
@@ -29,6 +31,8 @@ use tokio::sync::mpsc;
 
 #[cfg(feature = "v8-runtime")]
 use crate::TaskFailureHandler;
+#[cfg(feature = "v8-runtime")]
+use crate::v8_init::ensure_v8_initialized;
 
 const EXIT_SENTINEL: &str = "__codex_code_mode_exit__";
 
@@ -124,7 +128,7 @@ pub(crate) fn spawn_runtime(
     ),
     String,
 > {
-    initialize_v8()?;
+    ensure_v8_initialized()?;
 
     let (command_tx, command_rx) = std_mpsc::channel();
     let (control_tx, control_rx) = std_mpsc::channel();
@@ -161,6 +165,22 @@ pub(crate) fn spawn_runtime(
 }
 
 #[cfg(feature = "v8-runtime")]
+fn spawn_supervised_runtime_thread(
+    event_tx: mpsc::UnboundedSender<RuntimeEvent>,
+    task_failure_handler: Option<TaskFailureHandler>,
+    runtime: impl FnOnce() + Send + 'static,
+) {
+    thread::spawn(move || {
+        if catch_unwind(AssertUnwindSafe(runtime)).is_err() {
+            if let Some(task_failure_handler) = task_failure_handler {
+                task_failure_handler("code-mode V8 runtime thread panicked".to_string());
+            }
+            let _ = event_tx.send(RuntimeEvent::ThreadPanicked);
+        }
+    });
+}
+
+#[cfg(feature = "v8-runtime")]
 #[derive(Clone)]
 struct RuntimeConfig {
     tool_call_id: String,
@@ -191,23 +211,6 @@ pub(super) enum CompletionState {
         stored_value_writes: HashMap<String, JsonValue>,
         error_text: Option<String>,
     },
-}
-
-#[cfg(feature = "v8-runtime")]
-fn initialize_v8() -> Result<(), String> {
-    static PLATFORM: OnceLock<Result<v8::SharedRef<v8::Platform>, String>> = OnceLock::new();
-
-    match PLATFORM.get_or_init(|| {
-        v8::icu::set_common_data_77(deno_core_icudata::ICU_DATA)
-            .map_err(|error_code| format!("failed to initialize ICU data: {error_code}"))?;
-        let platform = v8::new_default_platform(0, false).make_shared();
-        v8::V8::initialize_platform(platform.clone());
-        v8::V8::initialize();
-        Ok(platform)
-    }) {
-        Ok(_) => Ok(()),
-        Err(error_text) => Err(error_text.clone()),
-    }
 }
 
 #[cfg(feature = "v8-runtime")]
