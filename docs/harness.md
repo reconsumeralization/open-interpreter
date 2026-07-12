@@ -33,7 +33,7 @@ interpreter -c harness='"kimi-cli"' "solve this task"
 | `deepseek-tui` | `chat` | Chat harness | [DeepSeek TUI](https://github.com/DeepSeek-TUI/DeepSeek-TUI) / [CodeWhale](https://www.codewhale.ai/) |
 | `kimi-cli` | `chat` | Chat harness | [Kimi Code CLI](https://moonshotai.github.io/kimi-code/) / [GitHub](https://github.com/MoonshotAI/kimi-cli) |
 | `qwen-code` | `chat` | Chat harness | [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/cli/index) / [GitHub](https://github.com/QwenLM/qwen-code) |
-| `swe-agent` | `chat` | Chat harness | [SWE-agent](https://swe-agent.ai/) / [GitHub](https://github.com/SWE-agent/SWE-agent) |
+| `swe-agent` | `chat` | Chat harness | [SWE-agent](https://swe-agent.com/) / [GitHub](https://github.com/SWE-agent/SWE-agent) |
 | `minimal` | `chat` | Chat harness | Open Interpreter minimal chat-tool surface |
 | any other string | `chat` | Chat Completions compatibility | Custom marker; no built-in harness request builder |
 
