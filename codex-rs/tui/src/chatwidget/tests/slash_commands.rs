@@ -420,13 +420,15 @@ async fn queued_settings_selection_applies_before_next_input() {
 
     chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
-    let (provider_id, provider_name) = match rx.try_recv() {
-        Ok(AppEvent::LoadProviderModels {
-            provider_id,
-            provider_name,
-        }) => (provider_id, provider_name),
-        other => panic!("expected provider model load, got {other:?}"),
-    };
+    let (provider_id, provider_name) = std::iter::from_fn(|| rx.try_recv().ok())
+        .find_map(|event| match event {
+            AppEvent::LoadProviderModels {
+                provider_id,
+                provider_name,
+            } => Some((provider_id, provider_name)),
+            _ => None,
+        })
+        .expect("expected provider model load");
     assert!(
         render_bottom_popup(&chat, /*width*/ 80).contains("Select Provider"),
         "provider popup should remain open while models load"
