@@ -833,12 +833,12 @@ mod tests {
                 phase: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: vec![json!({
+            tools: Some(vec![json!({
                 "type": "function",
                 "name": "shell_command",
                 "description": "Run a shell command",
                 "parameters": { "type": "object" }
-            })],
+            })]),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -878,7 +878,7 @@ mod tests {
                 phase: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: Vec::new(),
+            tools: Some(Vec::new()),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -937,12 +937,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: vec![json!({
+            tools: Some(vec![json!({
                 "type": "function",
                 "name": "shell",
                 "description": "Run a command",
                 "parameters": { "type": "object" }
-            })],
+            })]),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -982,7 +982,7 @@ mod tests {
                 call_id: "call-lookup".to_string(),
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: vec![json!({
+            tools: Some(vec![json!({
                 "type": "namespace",
                 "name": "mcp__demo__",
                 "description": "Demo tools",
@@ -1001,7 +1001,7 @@ mod tests {
                         }
                     }
                 ]
-            })],
+            })]),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1136,12 +1136,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: vec![json!({
+            tools: Some(vec![json!({
                 "type": "function",
                 "name": "Read",
                 "description": "Read a file",
                 "parameters": { "type": "object" }
-            })],
+            })]),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1232,12 +1232,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: vec![json!({
+            tools: Some(vec![json!({
                 "type": "function",
                 "name": "Read",
                 "description": "Read a file",
                 "parameters": { "type": "object" }
-            })],
+            })]),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1326,12 +1326,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: vec![json!({
+            tools: Some(vec![json!({
                 "type": "function",
                 "name": "Bash",
                 "description": "Run a command",
                 "parameters": { "type": "object" }
-            })],
+            })]),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1386,10 +1386,10 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: vec![json!({
+            tools: Some(vec![json!({
                 "type": "tool_search",
                 "description": "Search available tools"
-            })],
+            })]),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1441,7 +1441,7 @@ mod tests {
                 phase: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: Vec::new(),
+            tools: Some(Vec::new()),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,

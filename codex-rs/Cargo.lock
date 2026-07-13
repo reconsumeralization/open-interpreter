@@ -2470,6 +2470,7 @@ version = "0.0.21"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
+ "app_test_support",
  "assert_cmd",
  "assert_matches",
  "clap",

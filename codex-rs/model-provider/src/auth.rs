@@ -319,6 +319,106 @@ mod tests {
 
     use super::*;
 
+    static NEXT_CODEX_HOME_ID: AtomicUsize = AtomicUsize::new(0);
+    const TEST_CHATGPT_ID_TOKEN: &str = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS9hdXRoIjp7ImNoYXRncHRfdXNlcl9pZCI6InVzZXItMTIzNDUiLCJ1c2VyX2lkIjoidXNlci0xMjM0NSIsImNoYXRncHRfcGxhbl90eXBlIjoicHJvIiwiY2hhdGdwdF9hY2NvdW50X2lkIjoiYWNjb3VudC0xMjMifX0.c2ln";
+
+    async fn agent_identity_auth(chatgpt_account_is_fedramp: bool) -> AgentIdentityAuth {
+        let key_material = generate_agent_key_material().expect("generate key material");
+        AgentIdentityAuth::from_record(
+            AgentIdentityAuthRecord {
+                agent_runtime_id: "agent-runtime-1".to_string(),
+                agent_private_key: key_material.private_key_pkcs8_base64,
+                account_id: "account-1".to_string(),
+                chatgpt_user_id: "user-1".to_string(),
+                email: Some("agent@example.com".to_string()),
+                plan_type: PlanType::Plus,
+                chatgpt_account_is_fedramp,
+                task_id: Some("task-run-1".to_string()),
+            },
+            "https://auth.openai.com/api/accounts",
+            /*auth_route_config*/ None,
+        )
+        .await
+        .expect("agent identity auth record should include task id")
+    }
+
+    fn provider_auth_scope(
+        policy: AgentIdentityAuthPolicy,
+        fallback: AgentIdentitySessionFallback,
+    ) -> ProviderAuthScope {
+        ProviderAuthScope {
+            agent_identity_policy: policy,
+            session_source: SessionSource::Cli,
+            agent_identity_session_fallback: fallback,
+        }
+    }
+
+    fn test_codex_home() -> PathBuf {
+        let id = NEXT_CODEX_HOME_ID.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "codex-model-provider-agent-identity-{pid}-{id}",
+            pid = std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).expect("create temp codex home");
+        path
+    }
+
+    fn write_chatgpt_auth_json(codex_home: &Path) {
+        let auth_json = json!({
+            "tokens": {
+                "id_token": TEST_CHATGPT_ID_TOKEN,
+                "access_token": "test-access-token",
+                "refresh_token": "test-refresh-token",
+                "account_id": "account-123"
+            },
+            "last_refresh": "2099-01-01T00:00:00Z"
+        });
+        std::fs::write(
+            codex_home.join("auth.json"),
+            serde_json::to_string_pretty(&auth_json).expect("serialize auth.json"),
+        )
+        .expect("write auth.json");
+    }
+
+    async fn chatgpt_auth_manager(
+        agent_identity_authapi_base_url: String,
+    ) -> (PathBuf, Arc<AuthManager>, CodexAuth) {
+        let codex_home = test_codex_home();
+        write_chatgpt_auth_json(&codex_home);
+        let auth_manager = AuthManager::shared(
+            codex_home.clone(),
+            /*enable_codex_api_key_env*/ false,
+            AuthCredentialsStoreMode::File,
+            /*forced_chatgpt_workspace_id*/ None,
+            /*chatgpt_base_url*/ None,
+            AuthKeyringBackendKind::default(),
+            /*auth_route_config*/ None,
+        )
+        .await;
+        let auth = auth_manager.auth().await.expect("auth should load");
+        let auth_manager = AuthManager::from_auth_for_testing_with_agent_identity_authapi_base_url(
+            auth.clone(),
+            agent_identity_authapi_base_url,
+        );
+        (codex_home, auth_manager, auth)
+    }
+
+    async fn mount_transient_agent_registration(
+        server: &MockServer,
+        status: u16,
+        registration_count: Arc<AtomicUsize>,
+    ) {
+        Mock::given(method("POST"))
+            .and(path("/v1/agent/register"))
+            .respond_with(move |_request: &wiremock::Request| {
+                registration_count.fetch_add(1, Ordering::SeqCst);
+                ResponseTemplate::new(status)
+            })
+            .mount(server)
+            .await;
+    }
+
     #[tokio::test]
     async fn unauthenticated_auth_provider_adds_no_headers() {
         let provider =
