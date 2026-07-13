@@ -157,7 +157,7 @@ impl CatalogRequestProcessor {
         &self,
         params: ModelListParams,
     ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
-        Self::list_models(
+        self.list_models(
             self.thread_manager.clone(),
             self.config.http_client_factory(),
             params,
@@ -194,6 +194,7 @@ impl CatalogRequestProcessor {
         let response = self
             .list_models(
                 self.thread_manager.clone(),
+                self.config.http_client_factory(),
                 ModelListParams {
                     cursor: None,
                     limit: None,
