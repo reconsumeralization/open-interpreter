@@ -6872,6 +6872,7 @@
         "enum": [
           "auto",
           "prompt",
+          "writes",
           "approve"
         ],
         "type": "string"
@@ -7091,6 +7092,13 @@
             "description": "[UNSTABLE] FOR OPENAI INTERNAL USE ONLY - DO NOT USE.\n\nChatGPT auth tokens are supplied by an external host app and are only stored in memory. Token refresh must be handled by the external host app.",
             "enum": [
               "chatgptAuthTokens"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "Backend auth supplied as request headers.",
+            "enum": [
+              "headers"
             ],
             "type": "string"
           },
@@ -11894,6 +11902,17 @@
           },
           {
             "properties": {
+              "appBrand": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/v2/LoginAppBrand"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
               "codexStreamlinedLogin": {
                 "type": "boolean"
               },
@@ -11903,6 +11922,9 @@
                 ],
                 "title": "Chatgptv2::LoginAccountParamsType",
                 "type": "string"
+              },
+              "useHostedLoginSuccessPage": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -11959,6 +11981,31 @@
               "type"
             ],
             "title": "ChatgptAuthTokensv2::LoginAccountParams",
+            "type": "object"
+          },
+          {
+            "description": "[UNSTABLE] Managed Amazon Bedrock login is experimental.",
+            "properties": {
+              "apiKey": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "amazonBedrock"
+                ],
+                "title": "AmazonBedrockv2::LoginAccountParamsType",
+                "type": "string"
+              }
+            },
+            "required": [
+              "apiKey",
+              "region",
+              "type"
+            ],
+            "title": "AmazonBedrockv2::LoginAccountParams",
             "type": "object"
           }
         ],
@@ -12053,9 +12100,32 @@
             ],
             "title": "ChatgptAuthTokensv2::LoginAccountResponse",
             "type": "object"
+          },
+          {
+            "properties": {
+              "type": {
+                "enum": [
+                  "amazonBedrock"
+                ],
+                "title": "AmazonBedrockv2::LoginAccountResponseType",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "AmazonBedrockv2::LoginAccountResponse",
+            "type": "object"
           }
         ],
         "title": "LoginAccountResponse"
+      },
+      "LoginAppBrand": {
+        "enum": [
+          "codex",
+          "chatgpt"
+        ],
+        "type": "string"
       },
       "LogoutAccountResponse": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -13741,6 +13811,15 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "scheduledTasks": {
+            "items": {
+              "$ref": "#/definitions/v2/ScheduledTaskSummary"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
           },
           "shareUrl": {
             "type": [
@@ -16734,6 +16813,143 @@
           }
         },
         "type": "object"
+      },
+      "ScheduledTaskSchedule": {
+        "oneOf": [
+          {
+            "properties": {
+              "days": {
+                "items": {
+                  "$ref": "#/definitions/v2/ScheduledTaskWeekday"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "intervalHours": {
+                "format": "uint32",
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              "type": {
+                "enum": [
+                  "hourly"
+                ],
+                "title": "HourlyScheduledTaskScheduleType",
+                "type": "string"
+              }
+            },
+            "required": [
+              "intervalHours",
+              "type"
+            ],
+            "title": "HourlyScheduledTaskSchedule",
+            "type": "object"
+          },
+          {
+            "properties": {
+              "time": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "daily"
+                ],
+                "title": "DailyScheduledTaskScheduleType",
+                "type": "string"
+              }
+            },
+            "required": [
+              "time",
+              "type"
+            ],
+            "title": "DailyScheduledTaskSchedule",
+            "type": "object"
+          },
+          {
+            "properties": {
+              "time": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "weekdays"
+                ],
+                "title": "WeekdaysScheduledTaskScheduleType",
+                "type": "string"
+              }
+            },
+            "required": [
+              "time",
+              "type"
+            ],
+            "title": "WeekdaysScheduledTaskSchedule",
+            "type": "object"
+          },
+          {
+            "properties": {
+              "days": {
+                "items": {
+                  "$ref": "#/definitions/v2/ScheduledTaskWeekday"
+                },
+                "type": "array"
+              },
+              "time": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "weekly"
+                ],
+                "title": "WeeklyScheduledTaskScheduleType",
+                "type": "string"
+              }
+            },
+            "required": [
+              "days",
+              "time",
+              "type"
+            ],
+            "title": "WeeklyScheduledTaskSchedule",
+            "type": "object"
+          }
+        ]
+      },
+      "ScheduledTaskSummary": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/definitions/v2/ScheduledTaskSchedule"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "prompt",
+          "schedule"
+        ],
+        "type": "object"
+      },
+      "ScheduledTaskWeekday": {
+        "enum": [
+          "MO",
+          "TU",
+          "WE",
+          "TH",
+          "FR",
+          "SA",
+          "SU"
+        ],
+        "type": "string"
       },
       "SelectedCapabilityRoot": {
         "description": "A user-selected root that can expose one or more runtime capabilities.",

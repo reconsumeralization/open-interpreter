@@ -482,17 +482,21 @@ impl InMemoryThreadStore {
     }
 
     async fn append_items(&self, params: AppendThreadItemsParams) -> ThreadStoreResult<()> {
-        let canonical_items = persisted_rollout_items(params.items.as_slice());
-        if canonical_items.is_empty() {
+        if params.items.is_empty() {
             return Ok(());
         }
         let mut state = self.state.lock().await;
+        let history_mode = history_mode_from_state(&state, params.thread_id);
+        let persisted_items = persisted_rollout_items(params.items.as_slice(), history_mode);
+        if persisted_items.is_empty() {
+            return Ok(());
+        }
         state.calls.append_items += 1;
         state
             .histories
             .entry(params.thread_id)
             .or_default()
-            .extend(canonical_items);
+            .extend(persisted_items);
         Ok(())
     }
 
@@ -769,7 +773,9 @@ fn stored_thread_from_state(
             .and_then(|metadata| metadata.model_provider.clone())
             .unwrap_or_else(|| "test".to_string()),
         model: metadata.and_then(|metadata| metadata.model.clone()),
-        reasoning_effort: metadata.and_then(|metadata| metadata.reasoning_effort.clone()),
+        reasoning_effort: metadata
+            .and_then(|metadata| metadata.reasoning_effort.clone())
+            .flatten(),
         created_at: metadata
             .and_then(|metadata| metadata.created_at)
             .unwrap_or_else(Utc::now),

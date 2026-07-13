@@ -7,6 +7,7 @@ use codex_app_server_protocol::ReasoningEffortOption;
 use codex_core::ThreadManager;
 use codex_core::build_models_manager;
 use codex_core::config::Config;
+use codex_http_client::HttpClientFactory;
 use codex_login::AuthManager;
 use codex_models_manager::manager::RefreshStrategy;
 use codex_protocol::openai_models::ModelInfo;
@@ -16,10 +17,11 @@ use codex_protocol::openai_models::ReasoningEffortPreset;
 pub async fn supported_models(
     thread_manager: Arc<ThreadManager>,
     include_hidden: bool,
+    http_client_factory: HttpClientFactory,
 ) -> Vec<Model> {
     models_from_presets(
         thread_manager
-            .list_models(RefreshStrategy::OnlineIfUncached)
+            .list_models(RefreshStrategy::OnlineIfUncached, http_client_factory)
             .await,
         include_hidden,
     )
@@ -30,6 +32,7 @@ pub async fn supported_models_for_provider(
     auth_manager: Arc<AuthManager>,
     provider_id: &str,
     include_hidden: bool,
+    http_client_factory: HttpClientFactory,
 ) -> Vec<Model> {
     let Some(provider) = config.model_providers.get(provider_id).cloned() else {
         return Vec::new();
@@ -47,7 +50,7 @@ pub async fn supported_models_for_provider(
     let models_manager = build_models_manager(&provider_config, auth_manager);
     models_from_presets(
         models_manager
-            .list_models(RefreshStrategy::OnlineIfUncached)
+            .list_models(RefreshStrategy::OnlineIfUncached, http_client_factory)
             .await,
         include_hidden,
     )

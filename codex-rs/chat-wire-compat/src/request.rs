@@ -3,6 +3,8 @@ use codex_api::OpenAiVerbosity;
 use codex_api::ResponsesApiRequest;
 use codex_api::TextControls;
 use codex_api::TextFormat;
+#[cfg(test)]
+use codex_protocol::ResponseItemId;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::FunctionCallOutputPayload;
 use codex_protocol::models::LocalShellAction;
@@ -190,11 +192,12 @@ pub(crate) fn convert_request(
                 action,
                 ..
             } => {
-                let call_id = call_id.clone().or_else(|| id.clone()).ok_or_else(|| {
-                    ApiError::InvalidRequest {
+                let call_id = call_id
+                    .clone()
+                    .or_else(|| id.clone().map(String::from))
+                    .ok_or_else(|| ApiError::InvalidRequest {
                         message: "local_shell history item missing call id".to_string(),
-                    }
-                })?;
+                    })?;
                 let arguments = match action {
                     LocalShellAction::Exec(exec) => json!({
                         "command": exec.command,
@@ -844,6 +847,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -884,6 +888,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -914,7 +919,7 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Reasoning {
-                    id: Some("reasoning-1".to_string()),
+                    id: Some(ResponseItemId::from_server("reasoning-1".to_string())),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "I need to inspect the directory.".to_string(),
@@ -948,6 +953,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -1007,6 +1013,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -1110,7 +1117,7 @@ mod tests {
             instructions: String::new(),
             input: vec![
                 ResponseItem::Reasoning {
-                    id: Some("reasoning-1".to_string()),
+                    id: Some(ResponseItemId::from_server("reasoning-1".to_string())),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "Need to inspect files.".to_string(),
@@ -1147,6 +1154,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -1197,7 +1205,7 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Reasoning {
-                    id: Some("reasoning-1".to_string()),
+                    id: Some(ResponseItemId::from_server("reasoning-1".to_string())),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "Need to inspect both files.".to_string(),
@@ -1243,6 +1251,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -1271,7 +1280,7 @@ mod tests {
             instructions: String::new(),
             input: vec![
                 ResponseItem::Reasoning {
-                    id: Some("reasoning-1".to_string()),
+                    id: Some(ResponseItemId::from_server("reasoning-1".to_string())),
                     summary: Vec::new(),
                     content: Some(vec![ReasoningItemContent::ReasoningText {
                         text: "Need one more directory listing.".to_string(),
@@ -1337,6 +1346,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -1395,6 +1405,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,
@@ -1447,6 +1458,7 @@ mod tests {
             reasoning: None,
             store: false,
             stream: true,
+            stream_options: None,
             include: Vec::new(),
             service_tier: None,
             prompt_cache_key: None,

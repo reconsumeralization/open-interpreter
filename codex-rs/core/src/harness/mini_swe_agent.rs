@@ -86,6 +86,7 @@ pub(crate) fn inject_no_tool_call_format_error(stream: ResponseStream) -> Respon
                 | Ok(ResponseEvent::OutputTextDelta(_))
                 | Ok(ResponseEvent::ToolCallInputDelta { .. })
                 | Ok(ResponseEvent::ReasoningSummaryDelta { .. })
+                | Ok(ResponseEvent::ReasoningSummaryDone { .. })
                 | Ok(ResponseEvent::ReasoningContentDelta { .. })
                 | Ok(ResponseEvent::ReasoningSummaryPartAdded { .. })
                 | Ok(ResponseEvent::RateLimits(_))
@@ -286,12 +287,15 @@ fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde_json::Erro
                 action,
                 ..
             } => {
-                let call_id = call_id.clone().or_else(|| id.clone()).ok_or_else(|| {
-                    serde_json::Error::io(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "local_shell history item missing call id",
-                    ))
-                })?;
+                let call_id = call_id
+                    .clone()
+                    .or_else(|| id.clone().map(String::from))
+                    .ok_or_else(|| {
+                        serde_json::Error::io(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "local_shell history item missing call id",
+                        ))
+                    })?;
                 let arguments = match action {
                     LocalShellAction::Exec(exec) => json!({
                         "command": exec.command,
@@ -637,7 +641,9 @@ mod tests {
     fn first_user_message_is_wrapped_with_mini_prompt() {
         let prompt = Prompt {
             input: vec![ResponseItem::Message {
-                id: Some("user".to_string()),
+                id: Some(codex_protocol::ResponseItemId::from_server(
+                    "user".to_string(),
+                )),
                 role: "user".to_string(),
                 content: vec![ContentItem::InputText {
                     text: "do the task".to_string(),
@@ -674,7 +680,9 @@ mod tests {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {
-                    id: Some("user".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "user".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: "do the task".to_string(),
@@ -684,7 +692,9 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
-                    id: Some("assistant".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "assistant".to_string(),
+                    )),
                     role: "assistant".to_string(),
                     content: vec![ContentItem::OutputText {
                         text: "I will run pwd.\n\n```bash\npwd\n```".to_string(),
@@ -694,7 +704,9 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
-                    id: Some("call".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "call".to_string(),
+                    )),
                     name: "bash".to_string(),
                     namespace: None,
                     arguments: "{\"command\":\"pwd\"}".to_string(),
@@ -734,7 +746,9 @@ mod tests {
     #[test]
     fn detects_terminal_submit_call() {
         let item = ResponseItem::FunctionCall {
-            id: Some("call".to_string()),
+            id: Some(codex_protocol::ResponseItemId::from_server(
+                "call".to_string(),
+            )),
             name: "bash".to_string(),
             namespace: None,
             arguments: "{\"command\":\" echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\n\"}"
@@ -756,7 +770,9 @@ mod tests {
             .expect("send created");
         tx_event
             .send(Ok(ResponseEvent::OutputItemDone(ResponseItem::Message {
-                id: Some("assistant".to_string()),
+                id: Some(codex_protocol::ResponseItemId::from_server(
+                    "assistant".to_string(),
+                )),
                 role: "assistant".to_string(),
                 content: vec![ContentItem::OutputText {
                     text: "I forgot the tool.".to_string(),
@@ -814,7 +830,9 @@ mod tests {
             .expect("send created");
         tx_event
             .send(Ok(ResponseEvent::OutputItemDone(ResponseItem::Message {
-                id: Some("assistant".to_string()),
+                id: Some(codex_protocol::ResponseItemId::from_server(
+                    "assistant".to_string(),
+                )),
                 role: "assistant".to_string(),
                 content: vec![ContentItem::OutputText {
                     text: "Running pwd.".to_string(),
@@ -828,7 +846,9 @@ mod tests {
         tx_event
             .send(Ok(ResponseEvent::OutputItemDone(
                 ResponseItem::FunctionCall {
-                    id: Some("call".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "call".to_string(),
+                    )),
                     name: "bash".to_string(),
                     namespace: None,
                     arguments: "{\"command\":\"pwd\"}".to_string(),

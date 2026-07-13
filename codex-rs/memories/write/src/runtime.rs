@@ -262,7 +262,10 @@ impl MemoryStartupContext {
             /*beta_features_header*/ None,
             codex_tools::Harness::Native,
             /*harness_guidance*/ true,
+            config.features.enabled(Feature::ItemIds),
+            /*concurrent_reasoning_summaries_enabled*/ false,
             /*attestation_provider*/ None,
+            config.http_client_factory(),
         );
 
         let mut client_session = model_client.new_session();

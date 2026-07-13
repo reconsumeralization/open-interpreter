@@ -5,6 +5,7 @@ use codex_api::ResponseEvent;
 use codex_api::ResponseStream;
 use codex_api::SseTelemetry;
 use codex_client::ByteStream;
+use codex_protocol::ResponseItemId;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ReasoningItemContent;
 use codex_protocol::models::ResponseItem;
@@ -91,8 +92,8 @@ struct PartialToolCall {
 #[derive(Debug)]
 struct StreamState {
     response_id: String,
-    message_item_id: String,
-    reasoning_item_id: String,
+    message_item_id: ResponseItemId,
+    reasoning_item_id: ResponseItemId,
     created_sent: bool,
     assistant_item_started: bool,
     assistant_text: String,
@@ -108,8 +109,8 @@ impl StreamState {
     fn new() -> Self {
         Self {
             response_id: "chatcmpl-compat".to_string(),
-            message_item_id: "chat-message-1".to_string(),
-            reasoning_item_id: "chat-reasoning-1".to_string(),
+            message_item_id: ResponseItemId::from_server("chat-message-1".to_string()),
+            reasoning_item_id: ResponseItemId::from_server("chat-reasoning-1".to_string()),
             created_sent: false,
             assistant_item_started: false,
             assistant_text: String::new(),

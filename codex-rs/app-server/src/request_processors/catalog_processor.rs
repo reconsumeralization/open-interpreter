@@ -157,9 +157,13 @@ impl CatalogRequestProcessor {
         &self,
         params: ModelListParams,
     ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
-        self.list_models(self.thread_manager.clone(), params)
-            .await
-            .map(|response| Some(response.into()))
+        Self::list_models(
+            self.thread_manager.clone(),
+            self.config.http_client_factory(),
+            params,
+        )
+        .await
+        .map(|response| Some(response.into()))
     }
 
     pub(crate) async fn interpreter_provider_list(
@@ -333,6 +337,7 @@ impl CatalogRequestProcessor {
     async fn list_models(
         &self,
         thread_manager: Arc<ThreadManager>,
+        http_client_factory: codex_http_client::HttpClientFactory,
         params: ModelListParams,
     ) -> Result<ModelListResponse, JSONRPCErrorError> {
         let ModelListParams {
@@ -349,10 +354,11 @@ impl CatalogRequestProcessor {
                     self.auth_manager.clone(),
                     provider_id.as_str(),
                     include_hidden,
+                    http_client_factory,
                 )
                 .await
             }
-            None => supported_models(thread_manager, include_hidden).await,
+            None => supported_models(thread_manager, include_hidden, http_client_factory).await,
         };
         let total = models.len();
 

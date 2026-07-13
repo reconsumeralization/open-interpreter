@@ -4,6 +4,7 @@ use crate::error::ApiError;
 use crate::telemetry::SseTelemetry;
 use codex_client::ByteStream;
 use codex_client::StreamResponse;
+use codex_protocol::ResponseItemId;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ReasoningItemContent;
 use codex_protocol::models::ResponseItem;
@@ -283,7 +284,9 @@ async fn process_anthropic_event(
                     if tx_event
                         .send(Ok(ResponseEvent::OutputItemAdded(
                             ResponseItem::Reasoning {
-                                id: Some(format!("anthropic-thinking-{index}")),
+                                id: Some(ResponseItemId::from_server(format!(
+                                    "anthropic-thinking-{index}"
+                                ))),
                                 summary: vec![],
                                 content: Some(vec![ReasoningItemContent::ReasoningText {
                                     text: String::new(),
@@ -388,7 +391,7 @@ async fn process_anthropic_event(
                     text,
                     signature,
                 } => ResponseItem::Reasoning {
-                    id: Some(id),
+                    id: Some(ResponseItemId::from_server(id)),
                     summary: vec![],
                     content: Some(vec![ReasoningItemContent::ReasoningText { text }]),
                     encrypted_content: signature,

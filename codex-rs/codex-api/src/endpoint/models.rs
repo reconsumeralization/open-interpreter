@@ -156,9 +156,15 @@ impl<T: HttpTransport> ModelsClient<T> {
         req.url = format!("{}{}client_version={client_version}", req.url, separator);
     }
 
+    pub fn request_url(provider: &Provider, client_version: &str) -> String {
+        let mut request = provider.build_request(Method::GET, Self::path(provider));
+        Self::append_client_version_query(&mut request, client_version);
+        request.url
+    }
+
     pub async fn list_models(
         &self,
-        client_version: &str,
+        request_url: String,
         extra_headers: HeaderMap,
     ) -> Result<(Vec<ModelInfo>, Option<String>), ApiError> {
         let resp = self
@@ -168,8 +174,8 @@ impl<T: HttpTransport> ModelsClient<T> {
                 Self::path(self.session.provider()),
                 extra_headers,
                 /*body*/ None,
-                |req| {
-                    Self::append_client_version_query(req, client_version);
+                move |req| {
+                    req.url.clone_from(&request_url);
                 },
             )
             .await?;
@@ -258,7 +264,7 @@ fn anthropic_model_info_from_capabilities(model: AnthropicModel) -> ModelInfo {
         comp_hash: None,
         base_instructions: String::new(),
         model_messages: None,
-        supports_reasoning_summaries: false,
+        supports_reasoning_summary_parameter: false,
         default_reasoning_summary: ReasoningSummary::Auto,
         support_verbosity: false,
         default_verbosity: None,
@@ -360,7 +366,7 @@ fn openai_compatible_model_info_from_id(model: OpenAiCompatibleModel) -> ModelIn
         comp_hash: None,
         base_instructions: String::new(),
         model_messages: None,
-        supports_reasoning_summaries: false,
+        supports_reasoning_summary_parameter: false,
         default_reasoning_summary: ReasoningSummary::Auto,
         support_verbosity: false,
         default_verbosity: None,
@@ -703,14 +709,12 @@ mod tests {
             etag: None,
         };
 
-        let client = ModelsClient::new(
-            transport.clone(),
-            provider("https://example.com/api/codex"),
-            Arc::new(DummyAuth),
-        );
+        let provider = provider("https://example.com/api/codex");
+        let request_url = ModelsClient::<CapturingTransport>::request_url(&provider, "0.99.0");
+        let client = ModelsClient::new(transport.clone(), provider, Arc::new(DummyAuth));
 
         let (models, _) = client
-            .list_models("0.99.0", HeaderMap::new())
+            .list_models(request_url, HeaderMap::new())
             .await
             .expect("request should succeed");
 
@@ -747,7 +751,13 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.99.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(
+                    client.session.provider(),
+                    "0.99.0",
+                ),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -795,7 +805,13 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.99.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(
+                    client.session.provider(),
+                    "0.99.0",
+                ),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
         assert_eq!(models.len(), 0);
@@ -823,7 +839,6 @@ mod tests {
                     "priority": 1,
                     "upgrade": null,
                     "base_instructions": "base instructions",
-                    "supports_reasoning_summaries": false,
                     "support_verbosity": false,
                     "default_verbosity": null,
                     "apply_patch_tool_type": null,
@@ -843,14 +858,12 @@ mod tests {
             etag: None,
         };
 
-        let client = ModelsClient::new(
-            transport,
-            provider("https://example.com/api/codex"),
-            Arc::new(DummyAuth),
-        );
+        let provider = provider("https://example.com/api/codex");
+        let request_url = ModelsClient::<CapturingTransport>::request_url(&provider, "0.99.0");
+        let client = ModelsClient::new(transport, provider, Arc::new(DummyAuth));
 
         let (models, _) = client
-            .list_models("0.99.0", HeaderMap::new())
+            .list_models(request_url, HeaderMap::new())
             .await
             .expect("request should succeed");
 
@@ -870,14 +883,12 @@ mod tests {
             etag: Some("\"abc\"".to_string()),
         };
 
-        let client = ModelsClient::new(
-            transport,
-            provider("https://example.com/api/codex"),
-            Arc::new(DummyAuth),
-        );
+        let provider = provider("https://example.com/api/codex");
+        let request_url = ModelsClient::<CapturingTransport>::request_url(&provider, "0.1.0");
+        let client = ModelsClient::new(transport, provider, Arc::new(DummyAuth));
 
         let (models, etag) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(request_url, HeaderMap::new())
             .await
             .expect("request should succeed");
 
@@ -912,7 +923,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -953,7 +967,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -997,7 +1014,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -1062,7 +1082,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -1100,7 +1123,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -1132,7 +1158,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -1165,7 +1194,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 
@@ -1252,7 +1284,10 @@ mod tests {
         );
 
         let (models, _) = client
-            .list_models("0.1.0", HeaderMap::new())
+            .list_models(
+                ModelsClient::<CapturingTransport>::request_url(client.session.provider(), "0.1.0"),
+                HeaderMap::new(),
+            )
             .await
             .expect("request should succeed");
 

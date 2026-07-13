@@ -276,6 +276,7 @@ pub(crate) fn build_claude_code_responses_shaped_request(
         reasoning: None,
         store: false,
         stream: true,
+        stream_options: None,
         include: Vec::new(),
         service_tier: None,
         prompt_cache_key,

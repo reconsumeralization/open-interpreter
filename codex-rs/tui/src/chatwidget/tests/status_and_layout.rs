@@ -1751,13 +1751,13 @@ async fn fast_status_indicator_requires_chatgpt_auth() {
 
 #[tokio::test]
 async fn fast_status_indicator_is_hidden_for_models_without_fast_support() {
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.3-codex")).await;
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     set_fast_mode_test_catalog(&mut chat);
-    assert!(!get_available_model(&chat, "gpt-5.3-codex").supports_fast_mode());
+    assert!(!get_available_model(&chat, "gpt-5.2").supports_fast_mode());
     chat.set_service_tier(Some(ServiceTier::Fast.request_value().to_string()));
     set_chatgpt_auth(&mut chat);
     set_fast_mode_test_catalog(&mut chat);
-    assert!(!get_available_model(&chat, "gpt-5.3-codex").supports_fast_mode());
+    assert!(!get_available_model(&chat, "gpt-5.2").supports_fast_mode());
 
     assert!(!chat.should_show_fast_status(chat.current_model(), chat.current_service_tier(),));
 }
@@ -2647,7 +2647,7 @@ async fn status_line_model_with_reasoning_includes_fast_for_fast_capable_models(
         ))
     );
 
-    chat.set_model("gpt-5.3-codex");
+    chat.set_model("gpt-5.2");
     chat.refresh_status_line();
 
     assert_eq!(
@@ -2666,9 +2666,9 @@ async fn terminal_title_model_updates_on_model_change_without_manual_refresh() {
 
     assert_eq!(chat.last_terminal_title, Some("gpt-5.4".to_string()));
 
-    chat.set_model("gpt-5.3-codex");
+    chat.set_model("gpt-5.2");
 
-    assert_eq!(chat.last_terminal_title, Some("gpt-5.3-codex".to_string()));
+    assert_eq!(chat.last_terminal_title, Some("gpt-5.2".to_string()));
 }
 
 #[tokio::test]
@@ -2688,7 +2688,7 @@ async fn status_line_and_terminal_title_reasoning_render_only_effort() {
 
 #[tokio::test]
 async fn status_line_reasoning_updates_on_mode_switch_without_manual_refresh() {
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.3-codex")).await;
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     chat.set_feature_enabled(Feature::CollaborationModes, /*enabled*/ true);
     chat.config.tui_status_line = Some(vec!["reasoning".to_string()]);
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
@@ -2704,7 +2704,7 @@ async fn status_line_reasoning_updates_on_mode_switch_without_manual_refresh() {
 
 #[tokio::test]
 async fn status_line_model_with_reasoning_updates_on_mode_switch_without_manual_refresh() {
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.3-codex")).await;
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     chat.set_feature_enabled(Feature::CollaborationModes, /*enabled*/ true);
     chat.config.tui_status_line = Some(vec!["model-with-reasoning".to_string()]);
     chat.set_reasoning_effort(Some(ReasoningEffortConfig::High));
@@ -2738,7 +2738,7 @@ async fn status_line_model_with_reasoning_plan_mode_footer_snapshot() {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.3-codex")).await;
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     chat.show_welcome_banner = false;
     chat.set_feature_enabled(Feature::CollaborationModes, /*enabled*/ true);
     chat.config.tui_status_line = Some(vec!["model-with-reasoning".to_string()]);
@@ -2765,7 +2765,7 @@ async fn renamed_thread_footer_title_snapshot() {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.3-codex")).await;
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     chat.show_welcome_banner = false;
     chat.config.tui_status_line = Some(vec![
         "model-with-reasoning".to_string(),
@@ -3169,7 +3169,7 @@ async fn runtime_metrics_websocket_timing_logs_and_final_separator_sums_totals()
     chat.on_task_started();
     chat.apply_runtime_metrics_delta(RuntimeMetricsSummary {
         responses_api_engine_iapi_ttft_ms: 120,
-        responses_api_engine_service_tbt_ms: 50,
+        responses_api_engine_service_tbt_ms: 50.0,
         ..RuntimeMetricsSummary::default()
     });
 

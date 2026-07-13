@@ -78,6 +78,7 @@ impl ElicitationReviewer for GuardianMcpElicitationReviewer {
 
 impl Session {
     pub(crate) async fn runtime_mcp_config(&self, config: &Config) -> McpConfig {
+        let originator = self.originator().await;
         let environments = self.services.turn_environments.snapshot().await;
         let selected_capability_roots = self
             .resolve_selected_capability_roots_for_step(&environments)
@@ -90,6 +91,7 @@ impl Session {
                 config,
                 &self.services.mcp_thread_init,
                 &self.services.thread_extension_data,
+                &originator,
                 &available_environment_ids,
             )
             .await
@@ -132,6 +134,7 @@ impl Session {
                 &turn_context.config,
                 &self.services.mcp_thread_init,
                 &self.services.thread_extension_data,
+                &turn_context.originator,
                 &available_environment_ids,
             )
             .await;
@@ -344,14 +347,6 @@ impl Session {
                 turn_context.cwd.to_path_buf()
             });
         let mcp_runtime_context = McpRuntimeContext::new(environment_manager, cwd);
-        let auth_statuses = compute_auth_statuses(
-            mcp_servers.iter(),
-            mcp_config.mcp_oauth_credentials_store_mode,
-            mcp_config.auth_keyring_backend_kind,
-            auth.as_ref(),
-            &mcp_runtime_context,
-        )
-        .await;
         let mcp_startup_cancellation_token = {
             let mut guard = self.services.mcp_startup_cancellation_token.lock().await;
             // The previous runtime owns the old token and may still be serving an in-flight step.
@@ -361,11 +356,13 @@ impl Session {
             cancellation_token
         };
         let current_runtime = self.services.latest_mcp_runtime();
+        let codex_apps_auth_manager =
+            codex_mcp::host_owned_codex_apps_enabled(&mcp_config, auth.as_ref())
+                .then(|| Arc::clone(&self.services.auth_manager));
         let refreshed_manager = McpConnectionManager::new(
             &mcp_servers,
             mcp_config.mcp_oauth_credentials_store_mode,
             mcp_config.auth_keyring_backend_kind,
-            auth_statuses,
             &turn_context.approval_policy,
             turn_context.sub_id.clone(),
             self.get_tx_event(),
@@ -374,7 +371,7 @@ impl Session {
             mcp_runtime_context.clone(),
             mcp_config.codex_home.clone(),
             self.services.mcp_manager.codex_apps_tools_cache(),
-            codex_apps_tools_cache_key(auth.as_ref()),
+            connector_runtime_context_key(auth.as_ref()),
             mcp_config.prefix_mcp_tool_names,
             mcp_config.client_elicitation_capability.clone(),
             self.services
@@ -382,6 +379,7 @@ impl Session {
                 .load(std::sync::atomic::Ordering::Relaxed),
             tool_plugin_provenance,
             auth.as_ref(),
+            codex_apps_auth_manager,
             elicitation_reviewer,
             Some(self.mcp_elicitation_lifecycle()),
             current_runtime.manager().elicitation_router(),
@@ -471,6 +469,7 @@ impl Session {
                 &refresh_config,
                 &self.services.mcp_thread_init,
                 &self.services.thread_extension_data,
+                &turn_context.originator,
                 &available_environment_ids,
             )
             .await;
@@ -539,6 +538,7 @@ impl Session {
                 refresh_config,
                 &self.services.mcp_thread_init,
                 &self.services.thread_extension_data,
+                &turn_context.originator,
                 &available_environment_ids,
             )
             .await;

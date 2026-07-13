@@ -1474,7 +1474,9 @@ mod tests {
     fn build_request_matches_captured_zcode_basics() {
         let prompt = Prompt {
             input: vec![ResponseItem::Message {
-                id: Some("user".to_string()),
+                id: Some(codex_protocol::ResponseItemId::from_server(
+                    "user".to_string(),
+                )),
                 role: "user".to_string(),
                 content: vec![ContentItem::InputText {
                     text: "hello".to_string(),
@@ -1574,7 +1576,9 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
-                    id: Some("user".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "user".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: "hello".to_string(),
@@ -1688,7 +1692,9 @@ mod tests {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {
-                    id: Some("user-1".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "user-1".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: "first request".to_string(),
@@ -1697,7 +1703,9 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
-                    id: Some("compact".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "compact".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: crate::compact::SUMMARIZATION_PROMPT.to_string(),
@@ -1749,7 +1757,9 @@ mod tests {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {
-                    id: Some("user-1".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "user-1".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: "first request".to_string(),
@@ -1758,7 +1768,9 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
-                    id: Some("assistant-1".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "assistant-1".to_string(),
+                    )),
                     role: "assistant".to_string(),
                     content: vec![ContentItem::OutputText {
                         text: "Summary of Turn 5:\n\nZCODE_WEB_GAME_TURN_5_DONE".to_string(),
@@ -1767,7 +1779,9 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
-                    id: Some("compact".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "compact".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: crate::compact::SUMMARIZATION_PROMPT.to_string(),

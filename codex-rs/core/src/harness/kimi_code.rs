@@ -255,7 +255,9 @@ mod tests {
     fn kimi_code_request_renders_kimi_code_builtin_skills() {
         let prompt = Prompt {
             input: vec![ResponseItem::Message {
-                id: Some("user".to_string()),
+                id: Some(codex_protocol::ResponseItemId::from_server(
+                    "user".to_string(),
+                )),
                 role: "user".to_string(),
                 content: vec![ContentItem::InputText {
                     text: "Run the QA pass".to_string(),
@@ -290,7 +292,9 @@ mod tests {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {
-                    id: Some("developer".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "developer".to_string(),
+                    )),
                     role: "developer".to_string(),
                     content: vec![ContentItem::InputText {
                         text: "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file.\n### Available skills\n- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)\n### How to use skills\n- Discovery: ...\n</skills_instructions>"
@@ -300,7 +304,9 @@ mod tests {
 
                     internal_chat_message_metadata_passthrough: None,},
                 ResponseItem::Message {
-                    id: Some("user".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "user".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: "hello".to_string(),
@@ -333,7 +339,9 @@ mod tests {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {
-                    id: Some("user".to_string()),
+                    id: Some(codex_protocol::ResponseItemId::from_server(
+                        "user".to_string(),
+                    )),
                     role: "user".to_string(),
                     content: vec![ContentItem::InputText {
                         text: "Find Python files".to_string(),
@@ -387,7 +395,9 @@ mod tests {
     fn kimi_code_request_preserves_image_content() {
         let prompt = Prompt {
             input: vec![ResponseItem::Message {
-                id: Some("user".to_string()),
+                id: Some(codex_protocol::ResponseItemId::from_server(
+                    "user".to_string(),
+                )),
                 role: "user".to_string(),
                 content: vec![
                     ContentItem::InputText {
