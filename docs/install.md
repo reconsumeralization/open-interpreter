@@ -30,7 +30,7 @@ interpreter --version
 | Item | Notes |
 | ---- | ----- |
 | macOS | Current release builds target modern macOS versions. |
-| Linux | Use a recent glibc-based distribution. |
+| Linux | Use a recent 64-bit distribution. Release archives use musl for broad compatibility. |
 | Windows | Use PowerShell for installation. WSL is also supported for Linux-style workflows. |
 | Git | Recommended for repository-aware sessions, diffs, and reviews. |
 
@@ -58,8 +58,9 @@ script:
 ```
 
 Do not rely on an ad hoc `cargo build` as a replacement for the release bundle.
-The public `interpreter` command is a launcher/router that expects sibling
-binaries such as the TUI and app-server binaries to exist next to it.
+The script builds and stages the same managed package layout used by the public
+installer, including the entrypoint, bundled resources, and platform helpers
+that install-context detection and self-updates rely on.
 
 ## Logs
 
