@@ -37,14 +37,14 @@ interpreter --version
 ## Updating
 
 Standalone installs can check for updates during normal interactive startup.
-You can also manage updates explicitly:
+You can also run the installer for the latest release explicitly:
 
 ```bash
-interpreter update status
-interpreter update now
-interpreter update off
-interpreter update on
+interpreter update
 ```
+
+Set `check_for_update_on_startup = false` in your configuration to disable
+automatic startup checks.
 
 Rerunning the public install command is also supported.
 
