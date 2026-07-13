@@ -432,7 +432,7 @@ async fn queued_settings_selection_applies_before_next_input() {
         "provider popup should remain open while models load"
     );
 
-    chat.open_model_popup_for_provider(provider_id.clone(), provider_name.clone(), vec![preset]);
+    chat.open_model_popup_for_provider(provider_id.clone(), provider_name, vec![preset]);
     let popup = render_bottom_popup(&chat, /*width*/ 80);
     assert!(
         popup.contains("Select Model for"),
