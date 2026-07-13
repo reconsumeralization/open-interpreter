@@ -89,7 +89,11 @@ impl ChatWidget {
                             });
                         }
                     })],
-                    dismiss_on_select: true,
+                    // Keep the provider picker open while its model catalog is
+                    // loaded asynchronously. This also keeps queued follow-up
+                    // input suppressed until the nested model/harness flow is
+                    // actually complete.
+                    dismiss_on_select: false,
                     search_value,
                     ..Default::default()
                 }

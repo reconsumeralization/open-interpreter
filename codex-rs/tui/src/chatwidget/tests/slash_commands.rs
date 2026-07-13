@@ -404,7 +404,7 @@ async fn queued_settings_selection_applies_before_next_input() {
     let mut preset = get_available_model(&chat, "gpt-5.4");
     preset.supported_reasoning_efforts.truncate(1);
     let selected_effort = preset.supported_reasoning_efforts[0].effort.clone();
-    chat.model_catalog = std::sync::Arc::new(ModelCatalog::new(vec![preset]));
+    chat.model_catalog = std::sync::Arc::new(ModelCatalog::new(vec![preset.clone()]));
     handle_turn_started(&mut chat, "turn-1");
 
     queue_composer_text_with_tab(&mut chat, "/model");
@@ -414,17 +414,71 @@ async fn queued_settings_selection_applies_before_next_input() {
 
     let popup = render_bottom_popup(&chat, /*width*/ 80);
     assert!(
-        popup.contains("Select Model and Effort"),
-        "expected model menu to open; popup:\n{popup}"
+        popup.contains("Select Provider"),
+        "expected provider menu to open; popup:\n{popup}"
     );
 
     chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
+    let (provider_id, provider_name) = match rx.try_recv() {
+        Ok(AppEvent::LoadProviderModels {
+            provider_id,
+            provider_name,
+        }) => (provider_id, provider_name),
+        other => panic!("expected provider model load, got {other:?}"),
+    };
+    assert!(
+        render_bottom_popup(&chat, /*width*/ 80).contains("Select Provider"),
+        "provider popup should remain open while models load"
+    );
+
+    chat.open_model_popup_for_provider(provider_id.clone(), provider_name.clone(), vec![preset]);
+    let popup = render_bottom_popup(&chat, /*width*/ 80);
+    assert!(
+        popup.contains("Select Model for"),
+        "expected provider model menu to open; popup:\n{popup}"
+    );
+
+    chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     while let Ok(event) = rx.try_recv() {
         match event {
-            AppEvent::OpenReasoningPopup { model } => chat.open_reasoning_popup(model),
-            AppEvent::UpdateModel(model) => chat.set_model(&model),
-            AppEvent::UpdateReasoningEffort(effort) => chat.set_reasoning_effort(effort),
+            AppEvent::OpenHarnessPopupForProvider {
+                provider_id,
+                provider_name,
+                model,
+                effort,
+            } => chat.open_harness_popup_for_provider(provider_id, provider_name, model, effort),
+            AppEvent::SettingsSelectionClosed => {
+                chat.app_event_tx.send(AppEvent::SettingsSelectionSettled);
+            }
+            AppEvent::SettingsSelectionSettled if chat.no_modal_or_popup_active() => {
+                chat.set_queue_autosend_suppressed(/*suppressed*/ false);
+                chat.maybe_send_next_queued_input();
+            }
+            _ => {}
+        }
+    }
+    let popup = render_bottom_popup(&chat, /*width*/ 80);
+    assert!(
+        popup.contains("Select Tool Harness"),
+        "expected harness menu to open; popup:\n{popup}"
+    );
+
+    chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    while let Ok(event) = rx.try_recv() {
+        match event {
+            AppEvent::PersistProviderModelSelection {
+                provider_id: selected_provider_id,
+                model,
+                effort,
+                harness,
+                ..
+            } => {
+                assert_eq!(selected_provider_id, provider_id);
+                chat.set_model(&model);
+                chat.set_reasoning_effort(effort);
+                chat.set_harness(harness);
+            }
             AppEvent::SettingsSelectionClosed => {
                 chat.app_event_tx.send(AppEvent::SettingsSelectionSettled);
             }

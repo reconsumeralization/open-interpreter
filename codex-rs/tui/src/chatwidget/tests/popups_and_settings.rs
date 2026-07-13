@@ -3080,12 +3080,21 @@ async fn memories_reset_confirmation_sends_event_on_confirm() {
 
 #[tokio::test]
 async fn model_selection_popup_snapshot() {
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     chat.thread_id = Some(ThreadId::new());
     chat.open_model_popup();
 
     let popup = render_bottom_popup(&chat, /*width*/ 80);
     assert_chatwidget_snapshot!("model_selection_popup", popup);
+
+    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
+    assert_matches!(rx.try_recv(), Ok(AppEvent::LoadProviderModels { .. }));
+
+    let loading_popup = render_bottom_popup(&chat, /*width*/ 80);
+    assert_chatwidget_snapshot!(
+        "model_selection_popup_loading_provider_models",
+        loading_popup
+    );
 }
 
 #[tokio::test]
