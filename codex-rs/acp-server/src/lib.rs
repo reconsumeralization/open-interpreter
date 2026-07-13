@@ -1195,8 +1195,8 @@ fn tool_call_from_item(
             format!("{server}/{tool}"),
             ToolKind::Other,
         )),
-        codex_app_server_protocol::ThreadItem::WebSearch { id, .. } => Some((
-            ToolCallId::new(id.clone()),
+        codex_app_server_protocol::ThreadItem::WebSearch(item) => Some((
+            ToolCallId::new(item.id.clone()),
             "Web search".to_string(),
             ToolKind::Fetch,
         )),

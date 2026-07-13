@@ -738,7 +738,6 @@ impl ChatWidget {
                 );
                 if self.is_session_configured() {
                     self.reasoning_buffer.clear();
-                    self.full_reasoning_buffer.clear();
                     self.reasoning_summary_parts.clear();
                     self.set_status_header(String::from(STATUS_HEADER_INTERPRETING));
                     self.submit_user_message(user_message);

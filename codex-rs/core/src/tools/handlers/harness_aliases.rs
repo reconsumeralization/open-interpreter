@@ -4834,6 +4834,8 @@ mod tests {
                 codex_protocol::protocol::TurnCompleteEvent {
                     turn_id: "turn-1".to_string(),
                     last_agent_message: Some("done".to_string()),
+                    error: None,
+                    started_at: None,
                     completed_at: None,
                     duration_ms: Some(12_345),
                     time_to_first_token_ms: None,
