@@ -1993,7 +1993,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-util",
- "tracing",
  "tracing-subscriber",
 ]
 
@@ -2037,7 +2036,6 @@ dependencies = [
  "codex-app-server-protocol",
  "codex-git-utils",
  "codex-login",
- "codex-model-provider",
  "codex-plugin",
  "codex-protocol",
  "codex-state",
@@ -2449,7 +2447,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "wiremock",
 ]
 
 [[package]]
@@ -3032,7 +3029,6 @@ dependencies = [
  "codex-login",
  "codex-model-provider-info",
  "codex-otel",
- "codex-product-info",
  "codex-protocol",
  "codex-utils-absolute-path",
  "codex-utils-cargo-bin",
@@ -3225,7 +3221,6 @@ dependencies = [
  "anyhow",
  "codex-login",
  "codex-protocol",
- "mime_guess",
  "pretty_assertions",
  "sentry",
  "tracing",
@@ -3747,7 +3742,6 @@ version = "0.0.22"
 dependencies = [
  "chrono",
  "codex-api",
- "codex-app-server-protocol",
  "codex-collaboration-mode-templates",
  "codex-http-client",
  "codex-login",
