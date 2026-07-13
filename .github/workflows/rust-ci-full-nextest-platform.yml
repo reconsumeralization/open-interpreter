@@ -71,6 +71,19 @@ jobs:
         with:
           persist-credentials: false
 
+      # The full workspace test archive, including V8, can exhaust the stock
+      # Linux hosted-runner disk before the final test binaries are linked.
+      # Remove preinstalled toolchains that this Rust job does not use.
+      - name: Free runner disk space
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/hostedtoolcache/CodeQL \
+            /usr/local/.ghcup /usr/share/swift /usr/local/share/boost \
+            /usr/local/lib/node_modules /usr/local/julia* /opt/microsoft
+          df -h /
+
       - uses: ./.github/actions/setup-ci
 
       - name: Install Linux build dependencies
