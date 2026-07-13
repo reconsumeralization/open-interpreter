@@ -2653,7 +2653,7 @@ async fn status_line_model_with_reasoning_includes_fast_for_fast_capable_models(
     assert_eq!(
         status_line_text(&chat),
         Some(format!(
-            "openai gpt-5.3-codex xhigh · Context 0% used · {test_cwd}"
+            "openai gpt-5.2 xhigh · Context 0% used · {test_cwd}"
         ))
     );
 }
