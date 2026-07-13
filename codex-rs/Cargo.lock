@@ -2118,7 +2118,6 @@ dependencies = [
  "codex-exec-server",
  "codex-extension-api",
  "codex-external-agent-migration",
- "codex-external-agent-sessions",
  "codex-features",
  "codex-feedback",
  "codex-file-search",
@@ -3180,26 +3179,18 @@ dependencies = [
 name = "codex-external-agent-migration"
 version = "0.0.22"
 dependencies = [
- "codex-hooks",
- "pretty_assertions",
- "serde_json",
- "serde_yaml",
- "tempfile",
- "toml 0.9.11+spec-1.1.0",
-]
-
-[[package]]
-name = "codex-external-agent-sessions"
-version = "0.0.22"
-dependencies = [
  "chrono",
  "codex-app-server-protocol",
+ "codex-hooks",
  "codex-protocol",
  "codex-utils-output-truncation",
+ "pretty_assertions",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2 0.10.9",
  "tempfile",
+ "toml 0.9.11+spec-1.1.0",
 ]
 
 [[package]]
