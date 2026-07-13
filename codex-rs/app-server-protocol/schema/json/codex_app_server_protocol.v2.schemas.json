@@ -7740,6 +7740,18 @@
         }
       ]
     },
+    "InternalChatMessageMetadataPassthrough": {
+      "description": "Internal Responses API passthrough metadata copied into underlying chat messages.\n\nResponses API strongly types this payload. Do not modify it without first getting API approval and making the corresponding Responses API change.",
+      "properties": {
+        "turn_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "InterpreterHarness": {
       "properties": {
         "description": {
@@ -19346,6 +19358,49 @@
         "responses",
         "chat",
         "messages"
+      ],
+      "type": "string"
+    },
+    "WorkspaceMessage": {
+      "properties": {
+        "archivedAt": {
+          "description": "Unix timestamp (in seconds) when the message was archived.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "description": "Unix timestamp (in seconds) when the message was created.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "messageBody": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "messageType": {
+          "$ref": "#/definitions/WorkspaceMessageType"
+        }
+      },
+      "required": [
+        "messageBody",
+        "messageId",
+        "messageType"
+      ],
+      "type": "object"
+    },
+    "WorkspaceMessageType": {
+      "enum": [
+        "headline",
+        "announcement",
+        "unknown"
       ],
       "type": "string"
     },

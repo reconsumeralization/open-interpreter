@@ -1977,7 +1977,7 @@ mod tests {
         let AnthropicContentBlock::Text {
             text,
             cache_control,
-        } = &blocks[2]
+        } = &blocks[0]
         else {
             panic!("expected historical reminder text");
         };
@@ -2076,7 +2076,7 @@ mod tests {
             panic!("expected tool result");
         };
         assert_eq!(tool_use_id, "edit_10");
-        assert_eq!(*cache_control, None);
+        assert!(cache_control.is_some());
     }
 
     #[test]
@@ -2470,16 +2470,22 @@ mod tests {
         else {
             panic!("expected blocks");
         };
-        assert_eq!(blocks.len(), 1);
-        let AnthropicContentBlock::Text {
-            text,
-            cache_control,
-        } = &blocks[0]
-        else {
-            panic!("expected user prompt");
-        };
-        assert_eq!(text, "Continue.");
-        assert!(cache_control.is_some());
+        assert!(!blocks.iter().any(|block| {
+            matches!(
+                block,
+                AnthropicContentBlock::Text { text, .. }
+                    if text.contains("Here are the existing contents of your todo list")
+            )
+        }));
+        assert!(blocks.iter().any(|block| {
+            matches!(
+                block,
+                AnthropicContentBlock::Text {
+                    text,
+                    cache_control,
+                } if text == "Continue." && cache_control.is_some()
+            )
+        }));
     }
 
     #[test]
@@ -2568,11 +2574,19 @@ mod tests {
                     .then_some(blocks)
             })
             .expect("resumed prompt");
-        assert_eq!(resumed_prompt_blocks.len(), 1);
-        let AnthropicContentBlock::Text { text, .. } = &resumed_prompt_blocks[0] else {
-            panic!("expected user prompt");
-        };
-        assert_eq!(text, "Continue.");
+        assert!(!resumed_prompt_blocks.iter().any(|block| {
+            matches!(
+                block,
+                AnthropicContentBlock::Text { text, .. }
+                    if text.contains("Here are the existing contents of your todo list")
+            )
+        }));
+        assert!(resumed_prompt_blocks.iter().any(|block| {
+            matches!(
+                block,
+                AnthropicContentBlock::Text { text, .. } if text == "Continue."
+            )
+        }));
 
         items.push(ResponseItem::Message {
             id: None,

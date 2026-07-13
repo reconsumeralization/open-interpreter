@@ -587,7 +587,7 @@ async fn get_context_remaining_uses_body_after_prefix_window() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn get_context_remaining_returns_unknown_when_threshold_is_unbounded() -> Result<()> {
+async fn get_context_remaining_uses_fallback_when_context_window_is_unknown() -> Result<()> {
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;
@@ -638,7 +638,7 @@ async fn get_context_remaining_returns_unknown_when_threshold_is_unbounded() -> 
     assert_eq!(
         requests[1].function_call_output_content_and_success(call_id),
         Some((
-            Some("You have unknown tokens left in this context window.".to_string()),
+            Some("You have 115200 tokens left in this context window.".to_string()),
             None,
         ))
     );

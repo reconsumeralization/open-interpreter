@@ -2587,18 +2587,30 @@ impl ModelClientSession {
                 Err(err) => return Err(self.client.state.provider.map_api_error(err)),
             }
 
-            let (mut ws_request, last_response_from_untraced_warmup) =
+            let (mut ws_request, previous_response_id_from_untraced_warmup) =
                 self.prepare_websocket_request(ws_payload, &request);
-            stamp_ws_stream_request_start_ms(&mut ws_request);
-            self.websocket_session.last_request = Some(request);
-            self.websocket_session.last_response_from_untraced_warmup =
-                last_response_from_untraced_warmup;
             let inference_trace_attempt = if warmup {
+                // Prewarm sends `generate=false`; it is connection setup, not a
+                // model inference attempt that should appear in rollout traces.
                 InferenceTraceAttempt::disabled()
             } else {
                 inference_trace.start_attempt()
             };
-            inference_trace_attempt.record_started(&ws_request);
+            stamp_ws_stream_request_start_ms(&mut ws_request);
+            let ResponsesWsRequest::ResponseCreate(ws_payload) = &mut ws_request;
+            let store = ws_payload.store;
+            self.client
+                .prepare_response_items_for_request(&mut ws_payload.input, store);
+            if previous_response_id_from_untraced_warmup {
+                // The transport can reuse an untraced warmup response id and omit the
+                // already-sent input, but rollout replay needs the logical model-visible
+                // request rather than the compressed websocket delta.
+                inference_trace_attempt.record_started(&request);
+            } else {
+                inference_trace_attempt.record_started(&ws_request);
+            }
+            self.websocket_session.last_request = Some(request);
+            self.websocket_session.last_response_from_untraced_warmup = warmup;
             let websocket_connection =
                 self.websocket_session.connection.as_ref().ok_or_else(|| {
                     self.client.state.provider.map_api_error(ApiError::Stream(
@@ -2613,8 +2625,14 @@ impl ModelClientSession {
                 )
                 .await
                 .map_err(|err| {
+                    let response_debug_context =
+                        extract_response_debug_context_from_api_error(&err);
                     let err = self.client.state.provider.map_api_error(err);
-                    inference_trace_attempt.record_failed(&err, None, /*output_items*/ &[]);
+                    inference_trace_attempt.record_failed(
+                        &err,
+                        response_debug_context.request_id.as_deref(),
+                        /*output_items*/ &[],
+                    );
                     err
                 })?;
             let (stream, last_request_rx) = map_response_stream(

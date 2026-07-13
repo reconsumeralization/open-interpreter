@@ -524,4 +524,6 @@ export type { WindowsSandboxSetupStartParams } from "./WindowsSandboxSetupStartP
 export type { WindowsSandboxSetupStartResponse } from "./WindowsSandboxSetupStartResponse";
 export type { WindowsWorldWritableWarningNotification } from "./WindowsWorldWritableWarningNotification";
 export type { WireApiDto } from "./WireApiDto";
+export type { WorkspaceMessage } from "./WorkspaceMessage";
+export type { WorkspaceMessageType } from "./WorkspaceMessageType";
 export type { WriteStatus } from "./WriteStatus";

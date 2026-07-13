@@ -4047,7 +4047,7 @@ mod tests {
                 .expect("read written nested file"),
             "assert(true);\n"
         );
-        assert!(output.contains("File written successfully."));
+        assert_eq!(output, "Wrote 14 bytes to tests/game-logic.test.js");
     }
 
     #[tokio::test]

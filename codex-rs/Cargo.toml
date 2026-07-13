@@ -551,8 +551,10 @@ lto = false
 strip = false
 
 [profile.ci-test]
-# Reduce binary size to reduce disk pressure.
-debug = "limited"
+# Nextest archives duplicate the compiled binaries while packing them. Keep CI
+# test binaries free of debug sections so hosted runners have room to archive
+# the full workspace, including the V8-backed code-mode host.
+debug = 0
 inherits = "test"
 opt-level = 0
 
