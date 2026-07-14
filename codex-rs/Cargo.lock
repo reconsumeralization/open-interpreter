@@ -1998,7 +1998,7 @@ dependencies = [
 
 [[package]]
 name = "codex-agent-extension"
-version = "0.0.0"
+version = "0.0.23"
 dependencies = [
  "anyhow",
  "codex-core",
