@@ -20,9 +20,7 @@ impl WindowsTtyInputNormalizer {
         for &byte in bytes {
             match byte {
                 b'\x08' => normalized.push(b'\x7f'),
-                b'\x03' => normalized.extend_from_slice(
-                    b"\x1b[17;29;0;1;8;1_\x1b[67;46;3;1;8;1_\x1b[67;46;3;0;8;1_\x1b[17;29;0;0;0;1_",
-                ),
+                b'\x03' => normalized.extend_from_slice(b"\x1b[67;0;3;1;8;1_\x1b[67;0;3;0;8;1_"),
                 b'\n' => {
                     if !self.previous_was_cr {
                         normalized.push(b'\r');
