@@ -895,11 +895,14 @@ mod tests {
     #[test]
     fn cap_attachment_buffer_keeps_tail_with_marker() {
         let data: Vec<u8> = (0..2048u16).map(|n| n as u8).collect();
-        let capped = cap_attachment_buffer(data.clone(), 512);
+        let capped = cap_attachment_buffer(data.clone(), /*max*/ 512);
         assert!(capped.len() <= 512);
         assert!(capped.starts_with(b"[codex-feedback] truncated"));
         assert!(capped.ends_with(&data[data.len() - 64..]));
-        assert_eq!(cap_attachment_buffer(vec![1, 2, 3], 512), vec![1, 2, 3]);
+        assert_eq!(
+            cap_attachment_buffer(vec![1, 2, 3], /*max*/ 512),
+            vec![1, 2, 3]
+        );
     }
 
     #[test]

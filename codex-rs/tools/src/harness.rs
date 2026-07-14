@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn from_config_name_parses_known_harnesses() {
-        assert_eq!(Harness::from_config_name(None), Harness::Native);
+        assert_eq!(Harness::from_config_name(/*name*/ None), Harness::Native);
         assert_eq!(
             Harness::from_config_name(Some("claude-code")),
             Harness::ClaudeCode
