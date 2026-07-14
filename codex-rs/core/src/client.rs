@@ -1857,6 +1857,7 @@ impl ModelClientSession {
         prompt: &Prompt,
         model_info: &ModelInfo,
         session_telemetry: &SessionTelemetry,
+        responses_metadata: &CodexResponsesMetadata,
     ) -> Result<ResponseStream> {
         let auth_manager = self.client.state.provider.auth_manager();
         let mut auth_recovery = auth_manager
@@ -1889,7 +1890,7 @@ impl ModelClientSession {
                 model_info,
                 Some(&self.client.state.session_source),
                 profile,
-                Some(self.client.prompt_cache_key()),
+                Some(self.client.prompt_cache_key(responses_metadata)),
             )
             .map_err(|err| {
                 CodexErr::InvalidRequest(format!("invalid claude-code chat request: {err}"))
@@ -2840,6 +2841,7 @@ impl ModelClientSession {
                     prompt,
                     model_info,
                     session_telemetry,
+                    responses_metadata,
                 ))
                 .await
             }
