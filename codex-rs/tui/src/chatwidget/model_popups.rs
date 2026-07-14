@@ -94,6 +94,7 @@ impl ChatWidget {
                     // input suppressed until the nested model/harness flow is
                     // actually complete.
                     dismiss_on_select: false,
+                    dismiss_parent_on_child_accept: true,
                     search_value,
                     ..Default::default()
                 }
@@ -846,6 +847,7 @@ impl ChatWidget {
                     is_default: preset.is_default,
                     actions,
                     dismiss_on_select: single_supported_effort.is_some(),
+                    dismiss_parent_on_child_accept: single_supported_effort.is_none(),
                     search_value: Some(format!(
                         "{} {} {}",
                         preset.model, preset.display_name, preset.description
