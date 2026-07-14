@@ -201,7 +201,15 @@ async fn codex_apps_file_params_omit_fields_absent_from_tool_schema() -> Result<
         });
     // Apps MCP stays in the local control-plane environment while the file
     // itself may live in the selected remote workspace.
-    let test = builder.build_with_remote_and_local_env(&server).await?;
+    let test = match builder.build_with_remote_and_local_env(&server).await {
+        Ok(test) => test,
+        Err(error) => {
+            // Clear expectation-bearing mocks so their drop check does not
+            // obscure the actual environment setup error.
+            server.reset().await;
+            return Err(error).context("build remote Apps file test environment");
+        }
+    };
     let mock = run_extract_turn(&test, &server).await?;
 
     let requests = mock.requests();

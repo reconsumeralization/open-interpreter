@@ -1215,13 +1215,16 @@ fn network_fetch_args(environment_id: &str) -> Value {
         "python3 -c \"import urllib.request; opener = urllib.request.build_opener(urllib.request.ProxyHandler()); print('OK:' + opener.open('http://{NETWORK_TEST_HOST}', timeout=2).read().decode(errors='replace'))\""
     );
     let mut args = network_exec_args(&command);
+    if environment_id == REMOTE_ENVIRONMENT_ID {
+        args["shell"] = json!("bash");
+    }
     args["environment_id"] = json!(environment_id);
     args
 }
 
 fn network_exec_args(command: &str) -> Value {
     json!({
-        "shell": "bash",
+        "shell": "/bin/sh",
         "cmd": command,
         "login": false,
         "yield_time_ms": 1_000,

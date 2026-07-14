@@ -2148,7 +2148,13 @@ async fn permission_request_hook_allow_bypasses_strict_auto_review() -> Result<(
 
     let requests = responses.requests();
     assert_eq!(requests.len(), 3);
-    requests[2].function_call_output(command_call_id);
+    assert!(
+        requests[2]
+            .function_call_output_text(command_call_id)
+            .is_some(),
+        "shell command output missing from final request: {}",
+        requests[2].body_json()
+    );
     assert!(
         test.fs()
             .read_file(&marker, /*sandbox*/ None)
