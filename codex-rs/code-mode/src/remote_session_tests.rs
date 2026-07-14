@@ -78,7 +78,7 @@ fn host_program_follows_the_managed_entrypoint_symlink() {
 
     assert_eq!(
         resolve_host_program(/*override_path*/ None, Ok(visible_entrypoint)),
-        package_host
+        package_host.canonicalize().expect("canonical package host")
     );
 
     std::fs::remove_dir_all(root).expect("remove test root");
