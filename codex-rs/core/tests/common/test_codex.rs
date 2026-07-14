@@ -824,8 +824,7 @@ impl TestCodex {
 
     /// Returns the host-local workspace used by the local test executor.
     pub fn local_environment_cwd(&self) -> AbsolutePathBuf {
-        AbsolutePathBuf::try_from(self.cwd_path())
-            .expect("test workspace path should be absolute")
+        AbsolutePathBuf::try_from(self.cwd_path()).expect("test workspace path should be absolute")
     }
 
     /// Selects the host-local executor with the host-local test workspace.

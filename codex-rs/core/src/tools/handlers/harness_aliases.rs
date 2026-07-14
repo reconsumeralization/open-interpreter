@@ -3954,6 +3954,7 @@ mod tests {
             current.environment_id,
             current.environment,
             workspace_root.clone().into(),
+            vec![workspace_root.clone().into()],
             current.shell,
         );
         let file_system_sandbox_policy =
