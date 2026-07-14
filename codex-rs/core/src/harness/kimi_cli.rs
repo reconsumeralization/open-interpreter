@@ -1528,7 +1528,8 @@ mod tests {
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
         };
-        let system_prompt = build_system_prompt(&prompt, None, "conversation-id");
+        let system_prompt =
+            build_system_prompt(&prompt, /*session_source*/ None, "conversation-id");
 
         let messages = build_messages(&items)
             .expect("build messages")
@@ -1633,7 +1634,11 @@ mod tests {
             ..Prompt::default()
         };
 
-        let system_prompt = build_system_prompt(&prompt, None, "kimi-session-skills-conversation");
+        let system_prompt = build_system_prompt(
+            &prompt,
+            /*session_source*/ None,
+            "kimi-session-skills-conversation",
+        );
 
         // The session's skills (which disk re-discovery cannot find under
         // <home>/skills/.system) render in Kimi's native skills shape.
@@ -1664,7 +1669,8 @@ mod tests {
             ..Prompt::default()
         };
 
-        let system_prompt = build_system_prompt(&prompt, None, "conversation-id");
+        let system_prompt =
+            build_system_prompt(&prompt, /*session_source*/ None, "conversation-id");
 
         assert!(system_prompt.contains("# Additional Developer Instructions"));
         assert!(system_prompt.contains("Prefer small patches."));
@@ -1681,7 +1687,8 @@ mod tests {
             ..Prompt::default()
         };
 
-        let system_prompt = build_system_prompt(&prompt, None, "conversation-id");
+        let system_prompt =
+            build_system_prompt(&prompt, /*session_source*/ None, "conversation-id");
 
         assert!(
             !system_prompt
@@ -1738,9 +1745,9 @@ mod tests {
         let (request, _) = build_request(
             &prompt,
             &test_model_info(),
-            None,
+            /*reasoning_effort*/ None,
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ false,
         )
         .expect("build request");
@@ -1778,7 +1785,7 @@ mod tests {
             &test_model_info(),
             Some(ReasoningEffort::High),
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ false,
         )
         .expect("build request");
@@ -1812,7 +1819,7 @@ mod tests {
             &model_info,
             Some(ReasoningEffort::High),
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ false,
         )
         .expect("build request");
@@ -1853,7 +1860,7 @@ mod tests {
             &thinking_toggle_model_info(),
             Some(ReasoningEffort::thinking_toggle_on()),
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ false,
         )
         .expect("build request");
@@ -1869,7 +1876,7 @@ mod tests {
             &thinking_toggle_model_info(),
             Some(ReasoningEffort::None),
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ false,
         )
         .expect("build request");
@@ -1886,9 +1893,9 @@ mod tests {
         let (request, _) = build_request(
             &thinking_toggle_prompt(),
             &thinking_toggle_model_info(),
-            None,
+            /*reasoning_effort*/ None,
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ false,
         )
         .expect("build request");
@@ -1907,7 +1914,11 @@ mod tests {
             description: "Ask the user a question.".to_string(),
             strict: false,
             defer_loading: None,
-            parameters: JsonSchema::object(std::collections::BTreeMap::new(), None, None),
+            parameters: JsonSchema::object(
+                std::collections::BTreeMap::new(),
+                /*required*/ None,
+                /*additional_properties*/ None,
+            ),
             output_schema: None,
         };
         let shell = ResponsesApiTool {
@@ -1915,7 +1926,11 @@ mod tests {
             description: "Run a shell command.".to_string(),
             strict: false,
             defer_loading: None,
-            parameters: JsonSchema::object(std::collections::BTreeMap::new(), None, None),
+            parameters: JsonSchema::object(
+                std::collections::BTreeMap::new(),
+                /*required*/ None,
+                /*additional_properties*/ None,
+            ),
             output_schema: None,
         };
         let prompt = Prompt {
@@ -1942,9 +1957,9 @@ mod tests {
         let (request, _) = build_request(
             &prompt,
             &test_model_info(),
-            None,
+            /*reasoning_effort*/ None,
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ true,
         )
         .expect("build request");
@@ -1976,9 +1991,9 @@ mod tests {
         let (interactive_request, _) = build_request(
             &prompt,
             &test_model_info(),
-            None,
+            /*reasoning_effort*/ None,
             "conversation-id",
-            None,
+            /*session_source*/ None,
             /*yolo_mode*/ false,
         )
         .expect("build request");
@@ -2701,7 +2716,7 @@ Body
         )
         .expect("write generic skill");
 
-        let skills = kimi_skill_roots(&work_dir, Some(home.clone()), None)
+        let skills = kimi_skill_roots(&work_dir, Some(home.clone()), /*kimi_source_dir*/ None)
             .into_iter()
             .flat_map(|root| discover_skills_in_root(&root.path, root.scope))
             .collect::<Vec<_>>();

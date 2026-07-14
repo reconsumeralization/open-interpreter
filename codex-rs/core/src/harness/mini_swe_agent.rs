@@ -603,7 +603,11 @@ mod tests {
             description: "bash".to_string(),
             strict: false,
             defer_loading: None,
-            parameters: codex_tools::JsonSchema::object(BTreeMap::new(), None, None),
+            parameters: codex_tools::JsonSchema::object(
+                BTreeMap::new(),
+                /*required*/ None,
+                /*additional_properties*/ None,
+            ),
             output_schema: None,
         })
     }

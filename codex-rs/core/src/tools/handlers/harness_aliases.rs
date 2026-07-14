@@ -353,7 +353,7 @@ async fn handle_zcode_agent(
         turn.as_ref(),
         &mut config,
         args.model.as_deref(),
-        None,
+        /*requested_reasoning_effort*/ None,
     )
     .await?;
     apply_role_to_config(&mut config, Some(role_name))
@@ -363,7 +363,7 @@ async fn handle_zcode_agent(
         &session,
         &mut config,
         turn.config.service_tier.as_deref(),
-        None,
+        /*requested_service_tier*/ None,
     )
     .await?;
     apply_spawn_agent_runtime_overrides(&mut config, turn.as_ref())?;
@@ -1065,7 +1065,7 @@ async fn handle_read(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, 
     let path = harness_fs::checked_read_path(&invocation, &args.path, "Read")?;
     if let Some(task_id) = claude_task_id_from_output_path(&path) {
         let output = poll_claude_task_output(&invocation, task_id).await?;
-        let (body, _, _, _) = numbered_read_lines(&output, 1, DEFAULT_READ_LIMIT);
+        let (body, _, _, _) = numbered_read_lines(&output, /*offset*/ 1, DEFAULT_READ_LIMIT);
         return Ok(boxed_tool_output(FunctionToolOutput::from_text(
             body,
             Some(true),
@@ -2444,8 +2444,8 @@ fn build_zcode_read_session_context_prompt(
                         "user",
                         &zcode_message_id(message_index),
                         &text,
-                        None,
-                        true,
+                        /*step_finished*/ None,
+                        /*separator*/ true,
                     );
                     message_index += 1;
                 }
@@ -2459,7 +2459,7 @@ fn build_zcode_read_session_context_prompt(
                         &zcode_message_id(message_index),
                         &text,
                         Some("stop"),
-                        true,
+                        /*separator*/ true,
                     );
                     message_index += 1;
                 }
@@ -2488,8 +2488,8 @@ fn build_zcode_read_session_context_prompt(
                         "assistant",
                         &zcode_message_id(message_index),
                         &text,
-                        None,
-                        true,
+                        /*step_finished*/ None,
+                        /*separator*/ true,
                     );
                     message_index += 1;
                     item_index += 1;
@@ -2508,8 +2508,8 @@ fn build_zcode_read_session_context_prompt(
         "assistant",
         &zcode_message_id(message_index),
         &text,
-        None,
-        false,
+        /*step_finished*/ None,
+        /*separator*/ false,
     );
 
     format!(
@@ -3717,7 +3717,11 @@ fn harness_alias_spec(name: &str) -> ToolSpec {
         description: format!("Open Interpreter harness compatibility alias for {name}."),
         strict: false,
         defer_loading: None,
-        parameters: JsonSchema::object(properties, None, Some(AdditionalProperties::from(true))),
+        parameters: JsonSchema::object(
+            properties,
+            /*required*/ None,
+            Some(AdditionalProperties::from(true)),
+        ),
         output_schema: None,
     })
 }
@@ -3769,7 +3773,7 @@ fn task_stop_spec() -> ToolSpec {
         description: "\n- Stops a running background task by its ID\n- Takes a task_id parameter identifying the task to stop\n- Returns a success or failure status\n- Use this tool when you need to terminate a long-running task\n".to_string(),
         strict: false,
         defer_loading: None,
-        parameters: JsonSchema::object(properties, None, Some(AdditionalProperties::from(false))),
+        parameters: JsonSchema::object(properties, /*required*/ None, Some(AdditionalProperties::from(false))),
         output_schema: None,
     })
 }
@@ -3932,7 +3936,7 @@ mod tests {
         tool_name: &str,
         args: serde_json::Value,
     ) -> ToolInvocation {
-        invocation_with_harness(workspace, tool_name, args, None).await
+        invocation_with_harness(workspace, tool_name, args, /*harness*/ None).await
     }
 
     async fn invocation_with_harness(
@@ -4230,7 +4234,7 @@ mod tests {
         let invocation = invocation(&workspace, "Bash", json!({})).await;
 
         let (output, success) =
-            zcode_bash_output(&invocation, "hello\n", None).expect("bash output");
+            zcode_bash_output(&invocation, "hello\n", /*exit_code*/ None).expect("bash output");
 
         assert_eq!(success, None);
         assert_eq!(output, "hello");
@@ -4496,7 +4500,7 @@ mod tests {
                 assert_eq!(output.success, Some(false));
                 let expected = format!(
                     "{HARNESS_NO_TRUNCATE_PREFIX}{}",
-                    zcode_read_token_budget_error_text(61_615)
+                    zcode_read_token_budget_error_text(/*token_count*/ 61_615)
                 );
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
             }
@@ -4849,7 +4853,7 @@ mod tests {
         ];
 
         assert_eq!(
-            zcode_agent_rollout_stats(&history, 99),
+            zcode_agent_rollout_stats(&history, /*fallback_duration_ms*/ 99),
             ZCodeAgentRolloutStats {
                 tool_uses: 2,
                 duration_ms: 12_345,

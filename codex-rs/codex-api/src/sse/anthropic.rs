@@ -544,7 +544,7 @@ mod tests {
             Box::pin(stream),
             tx,
             Duration::from_secs(5),
-            None,
+            /*telemetry*/ None,
         ));
         let mut events = Vec::new();
         while let Some(event) = rx.recv().await {
@@ -930,7 +930,11 @@ data: {"type":"message_stop"   }
             headers: HeaderMap::new(),
             bytes: Box::pin(stream::empty()),
         };
-        let response_stream = spawn_anthropic_response_stream(stream, Duration::from_secs(5), None);
+        let response_stream = spawn_anthropic_response_stream(
+            stream,
+            Duration::from_secs(5),
+            /*telemetry*/ None,
+        );
         assert_eq!(response_stream.rx_event.capacity(), 1600);
     }
 }

@@ -468,8 +468,12 @@ mod tests {
 
     #[test]
     fn thinking_toggle_model_sends_enabled_by_default() {
-        let (request, _) = build_request(&test_prompt(), &thinking_toggle_model_info(), None)
-            .expect("build request");
+        let (request, _) = build_request(
+            &test_prompt(),
+            &thinking_toggle_model_info(),
+            /*effort*/ None,
+        )
+        .expect("build request");
 
         assert_eq!(request.get("thinking"), Some(&json!({"type": "enabled"})));
     }
@@ -521,7 +525,8 @@ mod tests {
         };
 
         let (request, _) =
-            build_request(&prompt, &thinking_toggle_model_info(), None).expect("build request");
+            build_request(&prompt, &thinking_toggle_model_info(), /*effort*/ None)
+                .expect("build request");
         let messages = request
             .get("messages")
             .and_then(Value::as_array)
@@ -598,7 +603,8 @@ mod tests {
         };
 
         let (request, _) =
-            build_request(&prompt, &thinking_toggle_model_info(), None).expect("build request");
+            build_request(&prompt, &thinking_toggle_model_info(), /*effort*/ None)
+                .expect("build request");
         let messages = request
             .get("messages")
             .and_then(Value::as_array)
@@ -640,8 +646,12 @@ mod tests {
             ..Prompt::default()
         };
 
-        let (request, _) = build_request(&prompt, &vision_thinking_toggle_model_info(), None)
-            .expect("build request");
+        let (request, _) = build_request(
+            &prompt,
+            &vision_thinking_toggle_model_info(),
+            /*effort*/ None,
+        )
+        .expect("build request");
         let content = &request["messages"][1]["content"];
 
         assert_eq!(

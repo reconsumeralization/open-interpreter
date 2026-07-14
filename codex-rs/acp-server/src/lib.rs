@@ -660,7 +660,7 @@ impl AppServerAcpAgent {
         let stop_reason = self
             .drain_turn_events(session_id.clone(), thread_id, turn_id, cx)
             .await?;
-        self.set_active_turn(&session_id, None).await;
+        self.set_active_turn(&session_id, /*turn_id*/ None).await;
         Ok(PromptResponse::new(stop_reason))
     }
 

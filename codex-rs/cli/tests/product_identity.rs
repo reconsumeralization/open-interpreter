@@ -14,7 +14,7 @@ fn run(
     envs: &[(&str, &str)],
     removed: &[&str],
 ) -> anyhow::Result<(String, String)> {
-    run_in(bin, args, envs, removed, None)
+    run_in(bin, args, envs, removed, /*cwd*/ None)
 }
 
 fn run_in(

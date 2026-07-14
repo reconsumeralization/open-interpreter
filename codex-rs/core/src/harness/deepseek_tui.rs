@@ -421,8 +421,8 @@ fn project_context_pack_block(cwd: Option<&Path>) -> Option<String> {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("workspace");
-    let directory_structure = json_string_array(&entries, 2);
-    let key_source_files = json_string_array(&key_source_files, 2);
+    let directory_structure = json_string_array(&entries, /*indent*/ 2);
+    let key_source_files = json_string_array(&key_source_files, /*indent*/ 2);
     let readme = readme
         .as_ref()
         .map(|path| {
@@ -525,7 +525,7 @@ fn platform_name() -> &'static str {
 
 fn workspace_entries(cwd: &Path) -> Vec<String> {
     let mut entries = Vec::new();
-    collect_workspace_entries(cwd, cwd, 2, &mut entries);
+    collect_workspace_entries(cwd, cwd, /*depth*/ 2, &mut entries);
     entries.sort();
     entries
 }
@@ -587,7 +587,7 @@ fn write_generated_codewhale_project_instructions(cwd: &Path) {
 
 fn codewhale_project_tree(cwd: &Path) -> String {
     let mut lines = Vec::new();
-    collect_codewhale_tree(cwd, cwd, 2, 0, &mut lines);
+    collect_codewhale_tree(cwd, cwd, /*depth*/ 2, /*indent*/ 0, &mut lines);
     lines.join("\n")
 }
 

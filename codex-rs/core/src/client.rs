@@ -1725,7 +1725,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth.as_ref().map(CodexAuth::auth_mode),
                 api_auth.as_ref(),
-                None,
+                /*agent_identity_telemetry*/ None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -1875,7 +1875,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth.as_ref().map(CodexAuth::auth_mode),
                 api_auth.as_ref(),
-                None,
+                /*agent_identity_telemetry*/ None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -2012,7 +2012,7 @@ impl ModelClientSession {
                 model_info,
                 Some(&self.client.state.session_source),
                 profile,
-                None,
+                /*prompt_cache_key*/ None,
             )
             .map_err(|err| {
                 CodexErr::InvalidRequest(format!("invalid claude-code responses request: {err}"))
@@ -2149,7 +2149,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth_mode.or(Some(AuthMode::ApiKey)),
                 &auth_provider,
-                None,
+                /*agent_identity_telemetry*/ None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -2320,7 +2320,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth_mode.or(Some(AuthMode::ApiKey)),
                 &auth_provider,
-                None,
+                /*agent_identity_telemetry*/ None,
                 pending_retry,
             );
             let (request_telemetry, sse_telemetry) = Self::build_streaming_telemetry(
@@ -2440,7 +2440,7 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 auth_mode.or(Some(AuthMode::ApiKey)),
                 &auth_provider,
-                None,
+                /*agent_identity_telemetry*/ None,
                 pending_retry,
             );
             let (request_telemetry, _) = Self::build_streaming_telemetry(
@@ -2456,7 +2456,7 @@ impl ModelClientSession {
                 api_provider,
                 Arc::new(auth_provider),
             )
-            .with_telemetry(Some(request_telemetry), None);
+            .with_telemetry(Some(request_telemetry), /*sse*/ None);
             match client.request_value(request, zcode_headers()).await {
                 Ok(value) => return Ok(extract_anthropic_text_response(&value)),
                 Err(ApiError::Transport(

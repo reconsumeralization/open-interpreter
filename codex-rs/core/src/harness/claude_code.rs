@@ -2499,7 +2499,11 @@ mod tests {
             description: "bash".to_string(),
             strict: false,
             defer_loading: None,
-            parameters: codex_tools::JsonSchema::object(BTreeMap::new(), None, None),
+            parameters: codex_tools::JsonSchema::object(
+                BTreeMap::new(),
+                /*required*/ None,
+                /*additional_properties*/ None,
+            ),
             output_schema: None,
         })
     }
@@ -2626,9 +2630,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
         assert_eq!(request.model, "claude-sonnet-4-6");
@@ -2796,9 +2800,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -2863,9 +2867,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -2921,9 +2925,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -2994,9 +2998,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -3023,9 +3027,9 @@ mod tests {
         let request = build_request_for_profile(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
             ClaudeCodeProfile::Bare,
         )
         .expect("build request");
@@ -3064,9 +3068,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-opus-4-7"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -3109,9 +3113,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-opus-4-7"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -3233,9 +3237,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -3298,9 +3302,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -3402,9 +3406,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
         let serialized = serde_json::to_string(&request).expect("serialize request");
@@ -3495,9 +3499,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
         let serialized = serde_json::to_string(&request).expect("serialize request");
@@ -3568,9 +3572,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
         let tool_result_texts = request
@@ -3693,9 +3697,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
         let serialized = serde_json::to_string(&request).expect("serialize request");
@@ -3782,9 +3786,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
         let serialized = serde_json::to_string(&request).expect("serialize request");
@@ -3846,9 +3850,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -3986,7 +3990,12 @@ mod tests {
             },
         ];
 
-        let tools = build_tools(&tools, false, ClaudeCodeProfile::Full).expect("build tools");
+        let tools = build_tools(
+            &tools,
+            /*is_child_agent_request*/ false,
+            ClaudeCodeProfile::Full,
+        )
+        .expect("build tools");
 
         assert_eq!(
             tools
@@ -4150,9 +4159,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-sonnet-4-6"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -4320,7 +4329,12 @@ mod tests {
                 image_url: "data:image/png;base64,AAAB".to_string(),
                 detail: None,
             }]);
-        let content = build_claude_tool_result_content(Some("Read"), &body, false, None);
+        let content = build_claude_tool_result_content(
+            Some("Read"),
+            &body,
+            /*is_error*/ false,
+            /*todo_reminder_text*/ None,
+        );
         let json = serde_json::to_value(&content).expect("serialize tool result");
         assert_eq!(
             json,
@@ -4375,9 +4389,9 @@ mod tests {
         let request = build_request(
             &prompt,
             &test_model_info("claude-opus-4-7"),
-            None,
+            /*effort*/ None,
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -4420,7 +4434,7 @@ mod tests {
             &test_model_info("claude-opus-4-7"),
             Some(ReasoningEffortConfig::Medium),
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -4463,7 +4477,7 @@ mod tests {
             &test_model_info("anthropic/claude-opus-4.7"),
             Some(ReasoningEffortConfig::XHigh),
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -4506,7 +4520,7 @@ mod tests {
             &test_model_info("anthropic/claude-sonnet-4.6"),
             Some(ReasoningEffortConfig::Medium),
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
@@ -4549,13 +4563,15 @@ mod tests {
             &thinking_only_model_info("claude-haiku-4-5-20251001"),
             Some(ReasoningEffortConfig::High),
             "session-123",
-            None,
+            /*session_source*/ None,
         )
         .expect("build request");
 
         assert_eq!(
             request.thinking,
-            Some(AnthropicThinkingConfig::enabled(31_999))
+            Some(AnthropicThinkingConfig::enabled(
+                /*budget_tokens*/ 31_999
+            ))
         );
         assert_eq!(request.output_config, None);
     }
@@ -4566,7 +4582,11 @@ mod tests {
             description: name.to_string(),
             strict: false,
             defer_loading: None,
-            parameters: codex_tools::JsonSchema::object(BTreeMap::new(), None, None),
+            parameters: codex_tools::JsonSchema::object(
+                BTreeMap::new(),
+                /*required*/ None,
+                /*additional_properties*/ None,
+            ),
             output_schema: None,
         })
     }
@@ -4606,7 +4626,7 @@ mod tests {
         let request = build_claude_code_responses_shaped_request(
             &prompt,
             &test_model_info("deepseek-v4-pro"),
-            None,
+            /*session_source*/ None,
             ClaudeCodeProfile::Bare,
             Some("thread-123".to_string()),
         )
@@ -4661,9 +4681,9 @@ mod tests {
         let request = build_claude_code_responses_shaped_request(
             &prompt,
             &test_model_info("claude-opus-4-7"),
-            None,
+            /*session_source*/ None,
             ClaudeCodeProfile::Full,
-            None,
+            /*prompt_cache_key*/ None,
         )
         .expect("build full chat shaping");
 

@@ -1832,7 +1832,7 @@ mod tests {
             &Terminus2RequestKind::Action {
                 current_workdir: "/app".to_string(),
             },
-            false,
+            /*pending_completion*/ false,
         );
         assert!(
             matches!(items.first(), Some(ResponseItem::Message { role, .. }) if role == "user")
@@ -1843,7 +1843,7 @@ mod tests {
                 &Terminus2RequestKind::Action {
                     current_workdir: "/app".to_string(),
                 },
-                true,
+                /*pending_completion*/ true,
             )
             .is_empty()
         );

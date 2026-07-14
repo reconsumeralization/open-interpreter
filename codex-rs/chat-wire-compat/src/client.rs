@@ -781,7 +781,8 @@ mod tests {
         });
 
         let retry_body =
-            openrouter_affordability_retry_body(true, &body, &error).expect("retry body");
+            openrouter_affordability_retry_body(/*is_openrouter*/ true, &body, &error)
+                .expect("retry body");
 
         assert_eq!(retry_body["max_completion_tokens"], serde_json::json!(140));
         assert_eq!(retry_body["max_tokens"], serde_json::json!(140));

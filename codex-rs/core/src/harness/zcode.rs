@@ -324,7 +324,7 @@ fn move_compaction_cache_control_to_previous_user_text(messages: &mut [Anthropic
 }
 
 fn build_messages(items: &[ResponseItem]) -> Result<Vec<AnthropicMessage>, serde_json::Error> {
-    build_messages_for_session(items, false)
+    build_messages_for_session(items, /*include_builtin_skills_system_message*/ false)
 }
 
 fn build_messages_for_session(
@@ -441,7 +441,9 @@ fn build_messages_for_session(
                     _ => {
                         let blocks = content
                             .iter()
-                            .filter_map(|item| map_zcode_user_content_item(item, false))
+                            .filter_map(|item| {
+                                map_zcode_user_content_item(item, /*cache_non_reminder*/ false)
+                            })
                             .collect::<Vec<_>>();
                         push_message(&mut messages, "user", blocks);
                     }

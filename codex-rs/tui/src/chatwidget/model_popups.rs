@@ -1085,7 +1085,7 @@ fn provider_description(
             WireApi::Messages => "Anthropic Messages endpoint".to_string(),
         }
     };
-    let harness = default_harness_for_provider_model(provider_id, provider, None);
+    let harness = default_harness_for_provider_model(provider_id, provider, /*model*/ None);
     harness.map_or(description.clone(), |harness| {
         format!("{description} | Harness: {harness}")
     })

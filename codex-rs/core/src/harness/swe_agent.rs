@@ -313,7 +313,7 @@ fn swe_observation_content(
 }
 
 fn normalize_bash_observation(content: &str, command: Option<&str>) -> String {
-    if is_timeout_observation(content, None, command)
+    if is_timeout_observation(content, /*structured*/ None, command)
         && let Some(command) = command
     {
         return format_swe_timeout(command);
@@ -743,7 +743,7 @@ mod tests {
         );
 
         assert_eq!(
-            swe_observation_content(&output, None),
+            swe_observation_content(&output, /*command*/ None),
             Some("hello\n".to_string())
         );
     }
@@ -755,7 +755,7 @@ mod tests {
         );
 
         assert_eq!(
-            swe_observation_content(&output, None),
+            swe_observation_content(&output, /*command*/ None),
             Some("bash: R: command not found\n".to_string())
         );
     }

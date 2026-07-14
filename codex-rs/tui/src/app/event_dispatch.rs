@@ -1088,7 +1088,7 @@ impl App {
                     self.chat_widget.open_custom_model_prompt_for_provider(
                         provider_id,
                         provider_name,
-                        None,
+                        /*initial_text*/ None,
                     );
                 }
             },
