@@ -4454,9 +4454,11 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
+                let expected_cwd =
+                    dunce::canonicalize(workspace.path()).expect("canonical workspace path");
                 let expected = format!(
                     "{HARNESS_NO_TRUNCATE_PREFIX}File does not exist. Note: your current working directory is {}.",
-                    workspace.path().display()
+                    expected_cwd.display()
                 );
                 assert_eq!(output.success, Some(false));
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
@@ -4584,9 +4586,11 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
+                let expected_path =
+                    dunce::canonicalize(workspace.path()).expect("canonical workspace path");
                 let expected = format!(
                     "File not found: {}",
-                    workspace.path().join("missing-dir").display()
+                    expected_path.join("missing-dir").display()
                 );
                 assert_eq!(output.success, Some(false));
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
@@ -4627,10 +4631,11 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
+                let expected_path = dunce::canonicalize(&target).expect("canonical target");
                 let expected = format!(
                     "{HARNESS_NO_TRUNCATE_PREFIX}{}:2:WEB_RESEARCH_ANIMATION\n{}:4:WEB_RESEARCH_ANIMATION",
-                    target.display(),
-                    target.display()
+                    expected_path.display(),
+                    expected_path.display()
                 );
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
             }
@@ -4669,10 +4674,11 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
+                let expected_path = dunce::canonicalize(&target).expect("canonical target");
                 let expected = format!(
                     "{HARNESS_NO_TRUNCATE_PREFIX}{}:1:WEB_RESEARCH_ANIMATION first\n{}:2:WEB_RESEARCH_ANIMATION second\n\n[Showing results with pagination = limit: 2]",
-                    target.display(),
-                    target.display()
+                    expected_path.display(),
+                    expected_path.display()
                 );
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
             }
