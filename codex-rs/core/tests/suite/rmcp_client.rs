@@ -168,6 +168,7 @@ enum McpCallEvent {
 }
 
 const REMOTE_MCP_ENVIRONMENT: &str = "remote";
+const REMOTE_MCP_TEST_DIR: &str = "/tmp/codex-remote-env";
 
 fn remote_aware_environment_id() -> String {
     if is_remote_test_environment() {
@@ -206,7 +207,7 @@ fn remote_aware_stdio_server_bin() -> anyhow::Result<String> {
 fn unique_remote_path(binary_name: &str) -> anyhow::Result<String> {
     let unique_suffix = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     Ok(format!(
-        "/tmp/codex-remote-env/{binary_name}-{}-{unique_suffix}",
+        "{REMOTE_MCP_TEST_DIR}/{binary_name}-{}-{unique_suffix}",
         std::process::id()
     ))
 }
@@ -291,7 +292,10 @@ fn stdio_transport(
     env: Option<HashMap<String, String>>,
     env_vars: Vec<McpServerEnvVar>,
 ) -> McpServerTransportConfig {
-    stdio_transport_with_cwd(command, env, env_vars, /*cwd*/ None)
+    let cwd = Path::new(&command)
+        .starts_with(REMOTE_MCP_TEST_DIR)
+        .then(|| PathBuf::from(REMOTE_MCP_TEST_DIR));
+    stdio_transport_with_cwd(command, env, env_vars, cwd)
 }
 
 fn stdio_transport_with_cwd(
