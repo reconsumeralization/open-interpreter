@@ -1540,7 +1540,9 @@ fn zcode_history_resolve_path(invocation: &ToolInvocation, path: &str) -> PathBu
     if path.is_absolute() {
         path
     } else {
-        harness_fs::primary_cwd(invocation).join(path)
+        dunce::canonicalize(harness_fs::primary_cwd(invocation))
+            .unwrap_or_else(|_| harness_fs::primary_cwd(invocation))
+            .join(path)
     }
 }
 

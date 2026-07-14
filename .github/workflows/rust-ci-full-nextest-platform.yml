@@ -406,18 +406,13 @@ jobs:
             )
           fi
 
-          test_command=(
-            env
-            "INSTA_WORKSPACE_ROOT=${workspace_root}"
-            cargo nextest "${nextest_args[@]}"
-          )
+          test_command=(cargo nextest "${nextest_args[@]}")
           if [[ "${RUNNER_OS}" == "Linux" ]]; then
             sandbox_helper="${helper_target_dir}/codex-linux-sandbox"
             test_command=(
               env
               "CARGO_BIN_EXE_codex-linux-sandbox=${sandbox_helper}"
               "CARGO_BIN_EXE_codex_linux_sandbox=${sandbox_helper}"
-              "INSTA_WORKSPACE_ROOT=${workspace_root}"
               cargo nextest "${nextest_args[@]}"
             )
           elif [[ "${RUNNER_OS}" == "Windows" ]]; then
@@ -427,7 +422,6 @@ jobs:
               env
               "CARGO_BIN_EXE_codex_windows_sandbox_setup=${setup_helper}"
               "CARGO_BIN_EXE_codex_command_runner=${command_runner}"
-              "INSTA_WORKSPACE_ROOT=${workspace_root}"
               cargo nextest "${nextest_args[@]}"
             )
           fi

@@ -53,6 +53,19 @@ fn canonical_str(path: &Path) -> anyhow::Result<String> {
     Ok(path)
 }
 
+fn json_contains_string(value: &serde_json::Value, needle: &str) -> bool {
+    match value {
+        serde_json::Value::String(value) => value.contains(needle),
+        serde_json::Value::Array(values) => values
+            .iter()
+            .any(|value| json_contains_string(value, needle)),
+        serde_json::Value::Object(values) => values
+            .values()
+            .any(|value| json_contains_string(value, needle)),
+        _ => false,
+    }
+}
+
 #[test]
 fn i_alias_runs_as_open_interpreter_with_interpreter_home() -> anyhow::Result<()> {
     let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
@@ -86,12 +99,13 @@ fn i_alias_runs_as_open_interpreter_with_interpreter_home() -> anyhow::Result<()
     let (stdout, stderr) = run(&alias, &["doctor", "--json"], &env_refs, &[])?;
     let interpreter_home_str = canonical_str(interpreter_home.path())?;
     let decoy_str = canonical_str(codex_home_decoy.path())?;
+    let doctor: serde_json::Value = serde_json::from_str(&stdout)?;
     assert!(
-        stdout.contains(&interpreter_home_str),
+        json_contains_string(&doctor, &interpreter_home_str),
         "doctor output should reference INTERPRETER_HOME {interpreter_home_str}; stdout: {stdout}; stderr: {stderr}"
     );
     assert!(
-        !stdout.contains(&decoy_str),
+        !json_contains_string(&doctor, &decoy_str),
         "doctor output must not reference CODEX_HOME decoy {decoy_str}; stdout: {stdout}"
     );
     Ok(())

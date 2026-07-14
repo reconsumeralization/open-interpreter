@@ -1049,26 +1049,26 @@ fn kimi_skill_roots(
 ) -> Vec<KimiSkillRoot> {
     let mut roots = Vec::new();
     if let Some(root) = first_existing_dir([
-        work_dir.join(".kimi/skills"),
-        work_dir.join(".claude/skills"),
-        work_dir.join(".codex/skills"),
+        work_dir.join(".kimi").join("skills"),
+        work_dir.join(".claude").join("skills"),
+        work_dir.join(".codex").join("skills"),
     ]) {
         roots.push(KimiSkillRoot::new(root, KimiSkillScope::Project));
     }
-    if let Some(root) = first_existing_dir([work_dir.join(".agents/skills")]) {
+    if let Some(root) = first_existing_dir([work_dir.join(".agents").join("skills")]) {
         roots.push(KimiSkillRoot::new(root, KimiSkillScope::Project));
     }
     if let Some(home) = home_dir {
         if let Some(root) = first_existing_dir([
-            home.join(".kimi/skills"),
-            home.join(".claude/skills"),
-            home.join(".codex/skills"),
+            home.join(".kimi").join("skills"),
+            home.join(".claude").join("skills"),
+            home.join(".codex").join("skills"),
         ]) {
             roots.push(KimiSkillRoot::new(root, KimiSkillScope::User));
         }
         if let Some(root) = first_existing_dir([
-            home.join(".config/agents/skills"),
-            home.join(".agents/skills"),
+            home.join(".config").join("agents").join("skills"),
+            home.join(".agents").join("skills"),
         ]) {
             roots.push(KimiSkillRoot::new(root, KimiSkillScope::User));
         }
