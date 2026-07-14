@@ -1547,9 +1547,11 @@ fn zcode_history_resolve_path(invocation: &ToolInvocation, path: &str) -> PathBu
 }
 
 fn zcode_same_path(left: &Path, right: &Path) -> bool {
-    let left = left.canonicalize().unwrap_or_else(|_| left.to_path_buf());
-    let right = right.canonicalize().unwrap_or_else(|_| right.to_path_buf());
-    left == right
+    let left_candidates = harness_fs::policy_candidates_for_path(left);
+    let right_candidates = harness_fs::policy_candidates_for_path(right);
+    left_candidates
+        .iter()
+        .any(|left| right_candidates.iter().any(|right| left == right))
 }
 
 fn zcode_history_write_content_hash(arguments: &str) -> Option<String> {
