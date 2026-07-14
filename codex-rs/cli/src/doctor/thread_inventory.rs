@@ -779,12 +779,15 @@ mod tests {
                 .as_deref()
                 .is_some_and(|remedy| remedy.starts_with("Restart Codex"))
         }));
-        assert!(
-            check
-                .details
-                .iter()
-                .any(|detail| detail.contains("00000000-0000-0000-0000-000000000001.jsonl"))
-        );
+        assert!(check.details.iter().any(|detail| {
+            detail.contains(
+                missing_path
+                    .file_name()
+                    .expect("missing rollout path should have a file name")
+                    .to_string_lossy()
+                    .as_ref(),
+            )
+        }));
     }
 
     struct Fixture {
