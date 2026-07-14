@@ -220,7 +220,7 @@ pub struct OpenAiModelsManager {
     /// which case the bundled compatibility catalog refines their metadata.
     enrich_with_compatibility_catalog: bool,
     etag: RwLock<Option<String>>,
-    cache_manager: ModelsCacheManager,
+    cache_manager: Option<ModelsCacheManager>,
     endpoint_client: SharedModelsEndpointClient,
     auth_manager: Option<Arc<AuthManager>>,
 }
@@ -251,7 +251,43 @@ impl OpenAiModelsManager {
         base_models: Vec<ModelInfo>,
     ) -> Self {
         let cache_path = codex_home.join(MODEL_CACHE_FILE);
-        let cache_manager = ModelsCacheManager::new(cache_path, DEFAULT_MODEL_CACHE_TTL);
+        Self::new_with_cache_manager(
+            Some(ModelsCacheManager::new(cache_path, DEFAULT_MODEL_CACHE_TTL)),
+            endpoint_client,
+            auth_manager,
+            base_models,
+        )
+    }
+
+    /// Construct an OpenAI-compatible model manager with caching disabled.
+    pub fn new_without_cache(
+        endpoint_client: Arc<dyn ModelsEndpointClient>,
+        auth_manager: Option<Arc<AuthManager>>,
+    ) -> Self {
+        Self::new_without_cache_with_base_models(endpoint_client, auth_manager, Vec::new())
+    }
+
+    /// Construct an OpenAI-compatible model manager with caching disabled and
+    /// provider-local models available before the first live refresh.
+    pub fn new_without_cache_with_base_models(
+        endpoint_client: Arc<dyn ModelsEndpointClient>,
+        auth_manager: Option<Arc<AuthManager>>,
+        base_models: Vec<ModelInfo>,
+    ) -> Self {
+        Self::new_with_cache_manager(
+            /*cache_manager*/ None,
+            endpoint_client,
+            auth_manager,
+            base_models,
+        )
+    }
+
+    fn new_with_cache_manager(
+        cache_manager: Option<ModelsCacheManager>,
+        endpoint_client: Arc<dyn ModelsEndpointClient>,
+        auth_manager: Option<Arc<AuthManager>>,
+        base_models: Vec<ModelInfo>,
+    ) -> Self {
         // Provider-catalog models are refined with the bundled compatibility
         // catalog; the curated codex `models.json` fallback stays authoritative.
         let (base_models, enrich_with_compatibility_catalog) = if base_models.is_empty() {
@@ -344,7 +380,9 @@ impl OpenAiModelsManager {
     async fn refresh_if_new_etag(&self, etag: String, http_client_factory: HttpClientFactory) {
         let current_etag = self.get_etag().await;
         if current_etag.clone().is_some() && current_etag.as_deref() == Some(etag.as_str()) {
-            if let Err(err) = self.cache_manager.renew_cache_ttl().await {
+            if let Some(cache_manager) = self.cache_manager.as_ref()
+                && let Err(err) = cache_manager.renew_cache_ttl().await
+            {
                 error!("failed to renew cache TTL: {err}");
             }
             return;
@@ -407,9 +445,11 @@ impl OpenAiModelsManager {
         self.apply_remote_models(models).await;
         let models = self.get_remote_models().await;
         *self.etag.write().await = etag.clone();
-        self.cache_manager
-            .persist_cache(&models, etag, client_version)
-            .await;
+        if let Some(cache_manager) = self.cache_manager.as_ref() {
+            cache_manager
+                .persist_cache(&models, etag, client_version)
+                .await;
+        }
         Ok(())
     }
 
@@ -464,13 +504,16 @@ impl OpenAiModelsManager {
 
     /// Attempt to satisfy the refresh from the cache when it matches the provider and TTL.
     async fn try_load_cache(&self) -> bool {
+        let Some(cache_manager) = self.cache_manager.as_ref() else {
+            return false;
+        };
         let _timer =
             codex_otel::start_global_timer("codex.remote_models.load_cache.duration_ms", &[]);
         let client_version = crate::client_version_to_whole();
         info!(client_version, "models cache: evaluating cache eligibility");
         // TODO(celia-oai): Include provider identity in cache eligibility so switching
         // providers does not reuse a fresh models_cache.json entry from another provider.
-        let cache = match self.cache_manager.load_fresh(&client_version).await {
+        let cache = match cache_manager.load_fresh(&client_version).await {
             Some(cache) => cache,
             None => {
                 info!("models cache: no usable cache entry");
