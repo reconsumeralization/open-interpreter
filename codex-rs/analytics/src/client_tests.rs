@@ -341,7 +341,7 @@ async fn capture_file_writes_final_batches_as_separate_lines() {
 
 #[tokio::test]
 #[cfg(debug_assertions)]
-async fn api_key_auth_sends_only_plugin_events_to_codex_backend() {
+async fn api_key_auth_sends_all_events_anonymously_to_interpreter_backend() {
     let capture_path = unique_capture_path("api-key-plugin-events");
     let destination = AnalyticsEventsDestination::CaptureFile {
         path: capture_path.clone(),
@@ -366,12 +366,16 @@ async fn api_key_auth_sends_only_plugin_events_to_codex_backend() {
     .await;
 
     let contents = fs::read_to_string(&capture_path).expect("read capture file");
-    let lines = contents.lines().collect::<Vec<_>>();
-    assert_eq!(lines.len(), 1);
-    let payload: serde_json::Value =
-        serde_json::from_str(lines[0]).expect("parse captured payload");
-    let events = payload["events"].as_array().expect("events array");
-    for event in events {
+    let payloads = contents
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("parse capture line"))
+        .collect::<Vec<_>>();
+    assert_eq!(payloads.len(), 3);
+    let events = payloads
+        .iter()
+        .flat_map(|payload| payload["events"].as_array().expect("events array"))
+        .collect::<Vec<_>>();
+    for event in &events {
         let event_params = event["event_params"].as_object().expect("event params");
         for server_owned_field in [
             "auth_mode",
@@ -395,6 +399,26 @@ async fn api_key_auth_sends_only_plugin_events_to_codex_backend() {
     assert_eq!(
         delivered_events,
         vec![
+            serde_json::json!({
+                "event_type": "skill_invocation",
+                "plugin_id": null,
+                "thread_id": "non-plugin-skill",
+            }),
+            serde_json::json!({
+                "event_type": "codex_mcp_tool_call_event",
+                "plugin_id": null,
+                "thread_id": "non-plugin-mcp",
+            }),
+            serde_json::json!({
+                "event_type": "codex_plugin_used",
+                "plugin_id": null,
+                "thread_id": "non-plugin-used",
+            }),
+            serde_json::json!({
+                "event_type": "codex_accepted_line_fingerprints",
+                "plugin_id": null,
+                "thread_id": "other-event",
+            }),
             serde_json::json!({
                 "event_type": "codex_plugin_used",
                 "plugin_id": "sample@test",
