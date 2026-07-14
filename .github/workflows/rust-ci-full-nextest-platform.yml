@@ -67,6 +67,7 @@ jobs:
       CARGO_INCREMENTAL: "0"
       SCCACHE_CACHE_SIZE: 10G
       NEXTEST_ARCHIVE_FILE: nextest-${{ inputs.artifact_id }}.tar.zst
+      NEXTEST_SOURCE_ROOT_FILE: nextest-source-root-${{ inputs.artifact_id }}.txt
       TEST_HELPERS_ARTIFACT: nextest-test-helpers-${{ inputs.artifact_id }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -190,6 +191,11 @@ jobs:
           set -euo pipefail
           archive_dir="${RUNNER_TEMP}/nextest-archive"
           mkdir -p "${archive_dir}"
+          source_root="$(pwd)"
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            source_root="$(cygpath -w "${source_root}")"
+          fi
+          printf '%s\n' "${source_root}" > "${archive_dir}/${NEXTEST_SOURCE_ROOT_FILE}"
           cargo nextest archive \
             --target ${{ inputs.target }} \
             --cargo-profile ${{ inputs.profile }} \
@@ -234,7 +240,9 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: nextest-archive-${{ inputs.artifact_id }}
-          path: ${{ runner.temp }}/nextest-archive/${{ env.NEXTEST_ARCHIVE_FILE }}
+          path: |
+            ${{ runner.temp }}/nextest-archive/${{ env.NEXTEST_ARCHIVE_FILE }}
+            ${{ runner.temp }}/nextest-archive/${{ env.NEXTEST_SOURCE_ROOT_FILE }}
           if-no-files-found: error
           retention-days: 1
 
@@ -294,6 +302,7 @@ jobs:
         working-directory: codex-rs
     env:
       NEXTEST_ARCHIVE_FILE: nextest-${{ inputs.artifact_id }}.tar.zst
+      NEXTEST_SOURCE_ROOT_FILE: nextest-source-root-${{ inputs.artifact_id }}.txt
       TEST_HELPERS_ARTIFACT: nextest-test-helpers-${{ inputs.artifact_id }}
     strategy:
       fail-fast: false
@@ -349,6 +358,27 @@ jobs:
         with:
           name: nextest-archive-${{ inputs.artifact_id }}
           path: ${{ runner.temp }}/nextest-archive
+
+      # Cross-compiled Windows archives retain compile-time source paths. The
+      # hosted x64 and ARM64 images use different workspace drives, so expose
+      # the checked-out source at the producer path for snapshots and tests
+      # that intentionally inspect workspace files.
+      - name: Map archive source root to checkout (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $sourceRootFile = Join-Path $env:RUNNER_TEMP "nextest-archive/$env:NEXTEST_SOURCE_ROOT_FILE"
+          $archiveSourceRoot = (Get-Content -Raw $sourceRootFile).Trim()
+          $checkoutSourceRoot = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE "codex-rs")).Path
+
+          if (-not $archiveSourceRoot.Equals($checkoutSourceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $archiveSourceParent = Split-Path -Parent $archiveSourceRoot
+            New-Item -ItemType Directory -Force -Path $archiveSourceParent | Out-Null
+            if (Test-Path $archiveSourceRoot) {
+              throw "archive source root already exists at $archiveSourceRoot"
+            }
+            New-Item -ItemType Junction -Path $archiveSourceRoot -Target $checkoutSourceRoot | Out-Null
+          }
 
       - name: Download runtime test helpers
         if: ${{ runner.os == 'Linux' || runner.os == 'Windows' }}
