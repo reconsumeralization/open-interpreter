@@ -167,7 +167,7 @@ async fn guardian_network_approval_preserves_action_and_outcome_routing() -> Res
             "trigger": {
                 "callId": first_call_id,
                 "command": ["/bin/sh", "-c", first_command],
-                "cwd": test.config.cwd,
+                "cwd": test.local_environment_cwd(),
                 "sandboxPermissions": "use_default",
                 "toolName": "exec_command",
                 "tty": false,
@@ -433,7 +433,7 @@ async fn user_network_approval_once_session_and_denial_semantics() -> Result<()>
     );
     assert_eq!(approval.approval_id, None);
     assert!(!approval.turn_id.is_empty());
-    assert_eq!(approval.cwd, test.config.cwd);
+    assert_eq!(approval.cwd, test.local_environment_cwd());
     assert_eq!(
         approval.reason.as_deref(),
         Some("codex-network-test.invalid is not in the allowed_domains")
@@ -711,7 +711,7 @@ async fn unattributed_network_request_uses_active_turn_environment_fallback() ->
     let proxy_request = tokio::spawn(raw_http_proxy_request(proxy_addr, NETWORK_TEST_HOST));
     let approval = expect_network_approval(&test, LOCAL_ENVIRONMENT_ID).await?;
     assert_eq!(approval.command, ["network-access", NETWORK_TEST_TARGET]);
-    assert_eq!(approval.cwd, test.config.cwd);
+    assert_eq!(approval.cwd, test.local_environment_cwd());
     test.codex
         .submit(Op::ExecApproval {
             id: approval.effective_approval_id(),
