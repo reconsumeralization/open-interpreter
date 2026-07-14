@@ -32,9 +32,10 @@ prints its path after the package is built.
 
 The `--variant` flag selects the package entrypoint. Supported variants are
 `codex`, `codex-app-server`, and `open-interpreter`. The `open-interpreter`
-variant packages the `interpreter` entrypoint and a managed internal `codex`
-binary for the app-server daemon. The `version` field in `codex-package.json`
-is read from `[workspace.package].version` in `codex-rs/Cargo.toml`.
+variant packages the upstream multitool as `interpreter` with the `i` alias;
+the same entrypoint provides TUI, exec, app-server, and daemon subcommands. The
+`version` field in `codex-package.json` is read from `[workspace.package].version`
+in `codex-rs/Cargo.toml`.
 
 ## Source-built artifacts
 

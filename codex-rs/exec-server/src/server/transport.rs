@@ -24,6 +24,7 @@ use tracing::warn;
 use crate::ExecServerRuntimePaths;
 use crate::ExecServerTelemetry;
 use crate::connection::JsonRpcConnection;
+use crate::connection::MAX_PLAIN_JSONRPC_MESSAGE_LEN;
 use crate::server::processor::ConnectionProcessor;
 use crate::telemetry::ConnectionTransport;
 
@@ -178,18 +179,21 @@ async fn websocket_upgrade_handler(
     State(state): State<ExecServerWebSocketState>,
 ) -> impl IntoResponse {
     info!(%peer_addr, "exec-server websocket client connected");
-    websocket.on_upgrade(move |stream| async move {
-        state
-            .processor
-            .run_connection(
-                JsonRpcConnection::from_axum_websocket(
-                    stream,
-                    format!("exec-server websocket {peer_addr}"),
-                ),
-                ConnectionTransport::WebSocket,
-            )
-            .await;
-    })
+    websocket
+        .max_frame_size(MAX_PLAIN_JSONRPC_MESSAGE_LEN)
+        .max_message_size(MAX_PLAIN_JSONRPC_MESSAGE_LEN)
+        .on_upgrade(move |stream| async move {
+            state
+                .processor
+                .run_connection(
+                    JsonRpcConnection::from_axum_websocket(
+                        stream,
+                        format!("exec-server websocket {peer_addr}"),
+                    ),
+                    ConnectionTransport::WebSocket,
+                )
+                .await;
+        })
 }
 
 #[cfg(test)]

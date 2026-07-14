@@ -440,6 +440,9 @@ jobs:
           set +e
           if [[ "${STEPS_TEST_OUTCOME}" != "success" ]]; then
             docker logs "${CODEX_TEST_REMOTE_ENV_CONTAINER_NAME}" || true
+            docker inspect --format '{{json .State}}' "${CODEX_TEST_REMOTE_ENV_CONTAINER_NAME}" || true
+            docker exec "${CODEX_TEST_REMOTE_ENV_CONTAINER_NAME}" \
+              sh -lc 'cat /tmp/codex-remote-env/exec-server.stdout 2>/dev/null || true' || true
           fi
           docker rm -f "${CODEX_TEST_REMOTE_ENV_CONTAINER_NAME}" >/dev/null 2>&1 || true
         env:

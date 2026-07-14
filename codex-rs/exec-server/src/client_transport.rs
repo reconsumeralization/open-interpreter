@@ -6,9 +6,9 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::Command;
 use tokio::time::timeout;
-use tokio_tungstenite::connect_async;
 use tokio_tungstenite::connect_async_with_config;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tracing::debug;
 use tracing::warn;
 
@@ -27,6 +27,7 @@ use crate::client_api::RemoteExecServerConnectArgs;
 use crate::client_api::StdioExecServerCommand;
 use crate::client_api::StdioExecServerConnectArgs;
 use crate::connection::JsonRpcConnection;
+use crate::connection::MAX_PLAIN_JSONRPC_MESSAGE_LEN;
 use crate::noise_channel::NoiseChannelIdentity;
 use crate::noise_relay::NoiseHarnessConnectionArgs;
 use crate::noise_relay::noise_harness_connection_from_websocket;
@@ -204,16 +205,28 @@ impl ExecServerClient {
         ensure_rustls_crypto_provider();
         let websocket_url = args.websocket_url.clone();
         let connect_timeout = args.connect_timeout;
-        let (stream, _) = timeout(connect_timeout, connect_async(websocket_url.as_str()))
-            .await
-            .map_err(|_| ExecServerError::WebSocketConnectTimeout {
-                url: websocket_url.clone(),
-                timeout: connect_timeout,
-            })?
-            .map_err(|source| ExecServerError::WebSocketConnect {
-                url: websocket_url.clone(),
-                source,
-            })?;
+        let websocket_config = (!is_rendezvous_harness_url(&websocket_url)).then(|| {
+            WebSocketConfig::default()
+                .max_frame_size(Some(MAX_PLAIN_JSONRPC_MESSAGE_LEN))
+                .max_message_size(Some(MAX_PLAIN_JSONRPC_MESSAGE_LEN))
+        });
+        let (stream, _) = timeout(
+            connect_timeout,
+            connect_async_with_config(
+                websocket_url.as_str(),
+                websocket_config,
+                /*disable_nagle*/ false,
+            ),
+        )
+        .await
+        .map_err(|_| ExecServerError::WebSocketConnectTimeout {
+            url: websocket_url.clone(),
+            timeout: connect_timeout,
+        })?
+        .map_err(|source| ExecServerError::WebSocketConnect {
+            url: websocket_url.clone(),
+            source,
+        })?;
 
         let connection_label = format!("exec-server websocket {websocket_url}");
         let connection = if is_rendezvous_harness_url(&websocket_url) {

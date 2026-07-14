@@ -146,7 +146,7 @@ async fn guardian_network_approval_preserves_action_and_outcome_routing() -> Res
         submit_managed_network_turn(
             &test,
             prompt,
-            vec![local(test.config.cwd.clone())],
+            vec![test.local_environment_selection()],
             ApprovalsReviewer::AutoReview,
             AskForApproval::OnRequest,
         )
@@ -248,7 +248,7 @@ async fn cancelled_guardian_network_review_fails_closed_without_rewriting_turn_s
     submit_managed_network_turn(
         &test,
         marker,
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::AutoReview,
         AskForApproval::OnRequest,
     )
@@ -276,7 +276,7 @@ async fn cancelled_guardian_network_review_fails_closed_without_rewriting_turn_s
     submit_managed_network_turn(
         &test,
         "verify preserved state",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::User,
         AskForApproval::OnRequest,
     )
@@ -367,7 +367,7 @@ async fn timed_out_guardian_network_review_uses_timeout_outcome_without_user_fal
     submit_managed_network_turn(
         &test,
         "time out the Guardian network review",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::AutoReview,
         AskForApproval::OnRequest,
     )
@@ -409,7 +409,7 @@ async fn user_network_approval_once_session_and_denial_semantics() -> Result<()>
 
     let server = start_mock_server().await;
     let test = managed_network_unified_exec_test(&server).await?;
-    let environments = vec![local(test.config.cwd.clone())];
+    let environments = vec![test.local_environment_selection()];
 
     mount_exec_network_turn(
         &server,
@@ -551,7 +551,7 @@ async fn user_network_approval_once_session_and_denial_semantics() -> Result<()>
     submit_managed_network_turn(
         &test,
         "a different protocol must prompt and the user abort must stay a user outcome",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::User,
         AskForApproval::OnRequest,
     )
@@ -592,7 +592,7 @@ async fn allowing_network_policy_amendment_persists_context_and_bypasses_prompt(
 
     let server = start_mock_server().await;
     let test = managed_network_unified_exec_test(&server).await?;
-    let environments = vec![local(test.config.cwd.clone())];
+    let environments = vec![test.local_environment_selection()];
     let first_responses = mount_exec_network_turn(
         &server,
         "resp-network-amendment-1",
@@ -694,7 +694,7 @@ async fn unattributed_network_request_uses_active_turn_environment_fallback() ->
     submit_managed_network_turn(
         &test,
         "hold the active turn",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::User,
         AskForApproval::OnRequest,
     )
@@ -776,7 +776,7 @@ async fn ambiguous_unattributed_network_request_is_not_assigned_to_active_calls(
     submit_managed_network_turn(
         &test,
         "start two active commands",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::User,
         AskForApproval::OnRequest,
     )
@@ -936,7 +936,7 @@ async fn guardian_receives_exact_triggers_for_concurrent_network_requests() -> R
     submit_managed_network_turn(
         &test,
         "run both network requests",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::AutoReview,
         AskForApproval::OnRequest,
     )
@@ -1023,7 +1023,7 @@ async fn guardian_receives_exact_trigger_for_single_network_request() -> Result<
     submit_managed_network_turn(
         &test,
         "run one network request",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::AutoReview,
         AskForApproval::OnRequest,
     )
@@ -1082,7 +1082,7 @@ async fn approved_network_host_for_one_environment_still_prompts_in_another() ->
         "fetch from the local environment",
         environments.clone(),
         ApprovalsReviewer::User,
-        AskForApproval::UnlessTrusted,
+        AskForApproval::OnRequest,
     )
     .await?;
     let approval = expect_network_approval(&test, LOCAL_ENVIRONMENT_ID).await?;
@@ -1107,7 +1107,7 @@ async fn approved_network_host_for_one_environment_still_prompts_in_another() ->
         "fetch from the remote environment",
         environments.clone(),
         ApprovalsReviewer::User,
-        AskForApproval::UnlessTrusted,
+        AskForApproval::OnRequest,
     )
     .await?;
     let approval = expect_network_approval(&test, REMOTE_ENVIRONMENT_ID).await?;
