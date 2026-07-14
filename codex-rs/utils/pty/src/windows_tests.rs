@@ -137,7 +137,7 @@ async fn conpty_ctrl_c_interrupts_powershell_foreground_child() -> anyhow::Resul
     tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
     let resumed_marker = "__CODEX_POWERSHELL_RESUMED__";
     writer
-        .send(format!("Write-Output '{resumed_marker}'\n").into_bytes())
+        .send(format!("[Console]::Out.WriteLine('{resumed_marker}')\n").into_bytes())
         .await?;
     let mut output =
         wait_for_output_contains(&mut output_rx, resumed_marker, /*timeout_ms*/ 10_000).await?;

@@ -247,7 +247,7 @@ fn legacy_non_tty_powershell_emits_output() {
                 pwsh.display().to_string(),
                 "-NoProfile".to_string(),
                 "-Command".to_string(),
-                "Write-Output LEGACY-NONTTY-DIRECT".to_string(),
+                "[Console]::Out.WriteLine('LEGACY-NONTTY-DIRECT')".to_string(),
             ],
             cwd.as_path(),
             HashMap::new(),
@@ -433,7 +433,7 @@ fn legacy_capture_powershell_emits_output() {
             pwsh.display().to_string(),
             "-NoProfile".to_string(),
             "-Command".to_string(),
-            "Write-Output LEGACY-CAPTURE-DIRECT".to_string(),
+            "[Console]::Out.WriteLine('LEGACY-CAPTURE-DIRECT')".to_string(),
         ],
         cwd.as_path(),
         HashMap::new(),
@@ -459,8 +459,14 @@ fn legacy_workspace_write_delete_is_limited_to_writable_roots() {
     let _guard = legacy_process_test_guard();
     let runtime = current_thread_runtime();
     runtime.block_on(async move {
-        // Keep writable roots out of USERPROFILE exclusions such as AppData.
-        let test_root = TempDir::new_in(sandbox_cwd()).expect("create legacy delete test root");
+        // GitHub's D: build volume is writable by broad ambient groups, which
+        // defeats a restricted-SID boundary before the sandbox grants any
+        // capabilities. Use the user profile's normal ACL boundary while
+        // keeping the fixture out of excluded locations such as AppData.
+        let user_profile = PathBuf::from(
+            std::env::var_os("USERPROFILE").expect("USERPROFILE should be set on Windows"),
+        );
+        let test_root = TempDir::new_in(user_profile).expect("create legacy delete test root");
         let codex_home = sandbox_home("legacy-delete-writable-roots");
         let workspace = test_root.path().join("workspace");
         let temp_root = test_root.path().join("temp");
@@ -593,7 +599,7 @@ fn legacy_capture_cancellation_is_not_reported_as_timeout() {
             pwsh.display().to_string(),
             "-NoProfile".to_string(),
             "-Command".to_string(),
-            "Start-Sleep -Seconds 30".to_string(),
+            "[Threading.Thread]::Sleep(30000)".to_string(),
         ],
         cwd.as_path(),
         HashMap::new(),
@@ -637,7 +643,7 @@ fn legacy_tty_powershell_emits_output_and_accepts_input() {
                 "-NoProfile".to_string(),
                 "-NoExit".to_string(),
                 "-Command".to_string(),
-                "$PID; Write-Output ready".to_string(),
+                "[Console]::Out.WriteLine('ready')".to_string(),
             ],
             cwd.as_path(),
             HashMap::new(),
@@ -654,7 +660,7 @@ fn legacy_tty_powershell_emits_output_and_accepts_input() {
 
         let writer = spawned.session.writer_sender();
         writer
-            .send(b"Write-Output second\n".to_vec())
+            .send(b"[Console]::Out.WriteLine('second')\n".to_vec())
             .await
             .expect("send second command");
         writer
