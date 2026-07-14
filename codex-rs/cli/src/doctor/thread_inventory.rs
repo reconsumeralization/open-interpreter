@@ -783,7 +783,7 @@ mod tests {
             check
                 .details
                 .iter()
-                .any(|detail| detail.contains(missing_path.to_string_lossy().as_ref()))
+                .any(|detail| detail.contains("00000000-0000-0000-0000-000000000001.jsonl"))
         );
     }
 

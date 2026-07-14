@@ -43,7 +43,14 @@ fn run_in(
 }
 
 fn canonical_str(path: &Path) -> anyhow::Result<String> {
-    Ok(path.canonicalize()?.to_string_lossy().into_owned())
+    let path = path.canonicalize()?.to_string_lossy().into_owned();
+    #[cfg(windows)]
+    if let Some(path) = path.strip_prefix(r"\\?\UNC\") {
+        return Ok(format!(r"\\{path}"));
+    } else if let Some(path) = path.strip_prefix(r"\\?\") {
+        return Ok(path.to_string());
+    }
+    Ok(path)
 }
 
 #[test]
@@ -114,9 +121,19 @@ fn i_alias_never_loads_codex_project_config() -> anyhow::Result<()> {
     let project = tempfile::tempdir()?;
     let project_path = canonical_str(project.path())?;
     let interpreter_home = tempfile::tempdir()?;
+    let config = toml::Table::from_iter([(
+        "projects".to_string(),
+        toml::Value::Table(toml::Table::from_iter([(
+            project_path,
+            toml::Value::Table(toml::Table::from_iter([(
+                "trust_level".to_string(),
+                toml::Value::String("trusted".to_string()),
+            )])),
+        )])),
+    )]);
     std::fs::write(
         interpreter_home.path().join("config.toml"),
-        format!("[projects.\"{project_path}\"]\ntrust_level = \"trusted\"\n"),
+        toml::to_string(&config)?,
     )?;
 
     // A repository's Codex configuration must never load as Interpreter

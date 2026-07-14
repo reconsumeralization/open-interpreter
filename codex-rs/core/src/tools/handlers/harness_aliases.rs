@@ -1484,7 +1484,7 @@ fn zcode_history_has_current_file_state_for_items(
             index += 1;
             continue;
         };
-        if call_path != path {
+        if !zcode_same_path(&call_path, path) {
             index += 1;
             continue;
         }
@@ -4403,7 +4403,7 @@ mod tests {
         std::fs::write(&omitted_path, "beta").expect("write omitted");
         let invocation =
             invocation_with_harness(&workspace, "Read", json!({}), Some("zcode")).await;
-        let retained_path_text = retained_path.to_string_lossy();
+        let retained_arguments = json!({ "file_path": retained_path }).to_string();
         let history = vec![ResponseItem::Message {
             id: None,
             role: "user".to_string(),
@@ -4413,7 +4413,7 @@ mod tests {
                 },
                 ContentItem::InputText {
                     text: format!(
-                        "<system-reminder>\nCalled the Read tool with the following input: {{\"file_path\":\"{retained_path_text}\"}}\nResult of calling the Read tool:\n1\talpha\n</system-reminder>"
+                        "<system-reminder>\nCalled the Read tool with the following input: {retained_arguments}\nResult of calling the Read tool:\n1\talpha\n</system-reminder>"
                     ),
                 },
             ],
@@ -4454,11 +4454,9 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
-                let expected_cwd =
-                    std::fs::canonicalize(workspace.path()).expect("canonical workspace path");
                 let expected = format!(
                     "{HARNESS_NO_TRUNCATE_PREFIX}File does not exist. Note: your current working directory is {}.",
-                    expected_cwd.display()
+                    workspace.path().display()
                 );
                 assert_eq!(output.success, Some(false));
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
@@ -4586,11 +4584,9 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
-                let expected_path =
-                    std::fs::canonicalize(workspace.path()).expect("canonical workspace path");
                 let expected = format!(
                     "File not found: {}",
-                    expected_path.join("missing-dir").display()
+                    workspace.path().join("missing-dir").display()
                 );
                 assert_eq!(output.success, Some(false));
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
@@ -4631,11 +4627,10 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
-                let expected_path = std::fs::canonicalize(&target).expect("canonical target");
                 let expected = format!(
                     "{HARNESS_NO_TRUNCATE_PREFIX}{}:2:WEB_RESEARCH_ANIMATION\n{}:4:WEB_RESEARCH_ANIMATION",
-                    expected_path.display(),
-                    expected_path.display()
+                    target.display(),
+                    target.display()
                 );
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
             }
@@ -4674,11 +4669,10 @@ mod tests {
 
         match response {
             codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } => {
-                let expected_path = std::fs::canonicalize(&target).expect("canonical target");
                 let expected = format!(
                     "{HARNESS_NO_TRUNCATE_PREFIX}{}:1:WEB_RESEARCH_ANIMATION first\n{}:2:WEB_RESEARCH_ANIMATION second\n\n[Showing results with pagination = limit: 2]",
-                    expected_path.display(),
-                    expected_path.display()
+                    target.display(),
+                    target.display()
                 );
                 assert_eq!(output.body.to_text().as_deref(), Some(expected.as_str()));
             }

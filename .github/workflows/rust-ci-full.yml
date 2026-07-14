@@ -1,6 +1,15 @@
 name: rust-ci-full
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: CI scope to run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - windows
 
 # CI builds in debug (dev) for faster signal.
 env:
@@ -12,6 +21,7 @@ env:
 jobs:
   # --- CI that doesn't need specific targets ---------------------------------
   general:
+    if: ${{ inputs.scope == 'all' }}
     name: Format / etc
     runs-on: ubuntu-24.04
     defaults:
@@ -31,6 +41,7 @@ jobs:
         run: just bench-smoke
 
   cargo_shear:
+    if: ${{ inputs.scope == 'all' }}
     name: cargo shear
     runs-on: ubuntu-24.04
     defaults:
@@ -49,6 +60,7 @@ jobs:
         run: cargo shear --deny-warnings
 
   argument_comment_lint_package:
+    if: ${{ inputs.scope == 'all' }}
     name: Argument comment lint package
     runs-on: ubuntu-24.04
     env:
@@ -91,6 +103,7 @@ jobs:
           RUST_MIN_STACK: "8388608" # 8 MiB
 
   argument_comment_lint_prebuilt:
+    if: ${{ inputs.scope == 'all' }}
     name: Argument comment lint - ${{ matrix.name }}
     runs-on: ${{ matrix.runs_on || matrix.runner }}
     # A cold Bazel build of the prebuilt lint can exceed 30 minutes on each
@@ -152,6 +165,7 @@ jobs:
 
   # --- CI to validate on different os/targets --------------------------------
   lint_build:
+    if: ${{ inputs.scope == 'all' }}
     name: Lint/Build — ${{ matrix.runner }} - ${{ matrix.target }}${{ matrix.profile == 'release' && ' (release)' || '' }}
     runs-on: ${{ matrix.runs_on || matrix.runner }}
     timeout-minutes: 30
@@ -428,6 +442,7 @@ jobs:
           key: apt-${{ matrix.runner }}-${{ matrix.target }}-v1
 
   tests_macos_aarch64:
+    if: ${{ inputs.scope == 'all' }}
     name: Tests — macos-15-xlarge - aarch64-apple-darwin
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
     with:
@@ -439,6 +454,7 @@ jobs:
     secrets: inherit
 
   tests_linux_x64_remote:
+    if: ${{ inputs.scope == 'all' }}
     name: Tests — ubuntu-24.04 - x86_64-unknown-linux-gnu (remote)
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
     with:
@@ -451,6 +467,7 @@ jobs:
     secrets: inherit
 
   tests_linux_arm64:
+    if: ${{ inputs.scope == 'all' }}
     name: Tests — ubuntu-24.04-arm - aarch64-unknown-linux-gnu
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
     with:
@@ -462,6 +479,7 @@ jobs:
     secrets: inherit
 
   tests_windows_x64:
+    if: ${{ inputs.scope == 'all' || inputs.scope == 'windows' }}
     name: Tests — windows-x64 - x86_64-pc-windows-msvc
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
     with:
@@ -473,6 +491,7 @@ jobs:
     secrets: inherit
 
   tests_windows_arm64:
+    if: ${{ inputs.scope == 'all' || inputs.scope == 'windows' }}
     name: Tests — windows-arm64 - aarch64-pc-windows-msvc
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
     with:
@@ -501,7 +520,7 @@ jobs:
         tests_windows_x64,
         tests_windows_arm64,
       ]
-    if: always()
+    if: ${{ always() && inputs.scope == 'all' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Summarize

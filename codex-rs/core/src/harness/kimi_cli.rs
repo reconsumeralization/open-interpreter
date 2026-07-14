@@ -2711,8 +2711,16 @@ Body
             skills,
             format!(
                 "### User\n- demo-guide\n  - Path: {}\n  - Description: Read the demo creation workflow guide\n- generic-guide\n  - Path: {}\n  - Description: Read the generic workflow guide",
-                home.join(".claude/skills/demo-guide/SKILL.md").display(),
-                home.join(".agents/skills/generic-guide/SKILL.md").display(),
+                home.join(".claude")
+                    .join("skills")
+                    .join("demo-guide")
+                    .join("SKILL.md")
+                    .display(),
+                home.join(".agents")
+                    .join("skills")
+                    .join("generic-guide")
+                    .join("SKILL.md")
+                    .display(),
             )
         );
     }
