@@ -340,7 +340,7 @@ fn sanitize_chat_body_for_provider(body: &mut Value, base_url: &str) {
     if !is_groq {
         return;
     }
-    cap_chat_token_limits(body, 32_768);
+    cap_chat_token_limits(body, /*cap*/ 32_768);
     if let Some(obj) = body.as_object_mut() {
         // `prompt_cache_key` is a Kimi/OpenAI extension (kimi-cli, kimi-code).
         obj.remove("prompt_cache_key");
