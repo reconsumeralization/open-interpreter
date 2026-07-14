@@ -25,9 +25,6 @@ max-threads = 4
 [test-groups.core_apply_patch_cli_integration]
 max-threads = 1
 
-[test-groups.core_remote_environment_integration]
-max-threads = 1
-
 [test-groups.windows_sandbox_legacy_sessions]
 max-threads = 1
 
@@ -65,13 +62,6 @@ test-group = 'app_server_integration'
 # limits this to the machine's logical CPU count.
 filter = 'package(codex-app-server) & kind(test)'
 test-group = 'app_server_integration_local'
-
-[[profile.default.overrides]]
-# A remote test shard owns one shared exec-server. Serialize the tests that use
-# that connection so independently spawned test processes cannot replace or
-# close each other's transport.
-filter = 'package(codex-core) & (test(suite::remote_env::) | test(suite::network_approval::) | test(suite::openai_file_mcp::codex_apps_file_params_omit_fields_absent_from_tool_schema) | test(suite::view_image::view_image_routes_to_selected_remote_environment) | test(suite::agents_md::multi_environment_thread_loads_every_project_and_keeps_creation_snapshot) | test(suite::apply_patch_cli::apply_patch_turn_diff_tracks_local_and_remote_environment_paths) | test(suite::rmcp_client::remote_stdio_env_var_source_does_not_copy_local_env) | test(unified_exec_uses_remote_exec_server_when_configured) | test(remote_exec_server_rejects_inherited_fd_launches))'
-test-group = 'core_remote_environment_integration'
 
 [[profile.default.overrides]]
 # These tests exercise full Codex turns and apply_patch execution, and they are

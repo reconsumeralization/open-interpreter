@@ -391,6 +391,12 @@ jobs:
           )
           if [[ "${{ inputs.test_threads }}" != "0" ]]; then
             nextest_args+=(--test-threads "${{ inputs.test_threads }}")
+          elif [[ "${{ inputs.remote_env }}" == "true" ]]; then
+            # Every test process in this shard talks to one exec-server, whose
+            # process IDs and active transport are shared. Running tests in
+            # parallel can cross-wire process 1000 or close another test's
+            # connection, so isolate remote integration cases at the shard level.
+            nextest_args+=(--test-threads 1)
           fi
 
           test_command=(cargo nextest "${nextest_args[@]}")
