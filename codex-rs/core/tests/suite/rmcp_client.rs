@@ -2840,6 +2840,25 @@ async fn wait_for_remote_bound_addr(
 
 /// Reads the container IP that the host-side test process can use.
 fn remote_container_ip(container_name: &str) -> anyhow::Result<String> {
+    let network_mode = StdCommand::new("docker")
+        .args([
+            "inspect",
+            "-f",
+            "{{.HostConfig.NetworkMode}}",
+            container_name,
+        ])
+        .output()
+        .context("inspect remote MCP test container network mode")?;
+    ensure!(
+        network_mode.status.success(),
+        "docker inspect remote MCP test container network mode failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&network_mode.stdout).trim(),
+        String::from_utf8_lossy(&network_mode.stderr).trim()
+    );
+    if String::from_utf8_lossy(&network_mode.stdout).trim() == "host" {
+        return Ok("127.0.0.1".to_string());
+    }
+
     let output = StdCommand::new("docker")
         .args([
             "inspect",

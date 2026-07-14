@@ -199,7 +199,9 @@ async fn codex_apps_file_params_omit_fields_absent_from_tool_schema() -> Result<
             .await?;
             Ok(())
         });
-    let test = builder.build_with_auto_env(&server).await?;
+    // Apps MCP stays in the local control-plane environment while the file
+    // itself may live in the selected remote workspace.
+    let test = builder.build_with_remote_and_local_env(&server).await?;
     let mock = run_extract_turn(&test, &server).await?;
 
     let requests = mock.requests();
