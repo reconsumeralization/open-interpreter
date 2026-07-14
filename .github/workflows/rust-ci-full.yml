@@ -93,7 +93,10 @@ jobs:
   argument_comment_lint_prebuilt:
     name: Argument comment lint - ${{ matrix.name }}
     runs-on: ${{ matrix.runs_on || matrix.runner }}
-    timeout-minutes: 30
+    # A cold Bazel build of the prebuilt lint can exceed 30 minutes on each
+    # hosted platform. Keep the real lint running instead of reporting three
+    # synchronized infrastructure cancellations.
+    timeout-minutes: 90
     environment:
       name: bazel
       deployment: false
