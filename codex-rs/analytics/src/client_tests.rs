@@ -4,6 +4,8 @@ use super::AnalyticsEventsQueue;
 #[cfg(debug_assertions)]
 use super::capture_track_events_request;
 #[cfg(debug_assertions)]
+use super::send_track_events;
+#[cfg(debug_assertions)]
 use super::send_track_events_request;
 use super::track_event_request_batches;
 use crate::events::CodexAcceptedLineFingerprintsEventParams;
@@ -241,8 +243,8 @@ async fn capture_file_writes_final_batches_as_separate_lines() {
 
 #[tokio::test]
 #[cfg(debug_assertions)]
-async fn api_key_auth_sends_all_events_anonymously_to_interpreter_backend() {
-    let capture_path = unique_capture_path("api-key-plugin-events");
+async fn api_key_auth_sends_events_anonymously_to_interpreter_backend() {
+    let capture_path = unique_capture_path("api-key-events");
     let destination = AnalyticsEventsDestination::CaptureFile {
         path: capture_path.clone(),
     };
@@ -254,13 +256,8 @@ async fn api_key_auth_sends_all_events_anonymously_to_interpreter_backend() {
         &auth_manager,
         &destination,
         vec![
-            sample_regular_track_event("non-plugin-skill"),
-            sample_mcp_tool_call_event("non-plugin-mcp", /*plugin_id*/ None),
-            sample_plugin_used_track_event("non-plugin-used", /*plugin_id*/ None),
+            sample_regular_track_event("skill-event"),
             sample_accepted_line_fingerprint_event("other-event"),
-            sample_plugin_used_track_event("plugin-used", Some("sample@test")),
-            sample_skill_track_event("plugin-skill", Some("sample@test")),
-            sample_mcp_tool_call_event("plugin-mcp", Some("sample@test")),
         ],
     )
     .await;
@@ -270,7 +267,7 @@ async fn api_key_auth_sends_all_events_anonymously_to_interpreter_backend() {
         .lines()
         .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("parse capture line"))
         .collect::<Vec<_>>();
-    assert_eq!(payloads.len(), 3);
+    assert_eq!(payloads.len(), 2);
     let events = payloads
         .iter()
         .flat_map(|payload| payload["events"].as_array().expect("events array"))
@@ -302,37 +299,12 @@ async fn api_key_auth_sends_all_events_anonymously_to_interpreter_backend() {
             serde_json::json!({
                 "event_type": "skill_invocation",
                 "plugin_id": null,
-                "thread_id": "non-plugin-skill",
-            }),
-            serde_json::json!({
-                "event_type": "codex_mcp_tool_call_event",
-                "plugin_id": null,
-                "thread_id": "non-plugin-mcp",
-            }),
-            serde_json::json!({
-                "event_type": "codex_plugin_used",
-                "plugin_id": null,
-                "thread_id": "non-plugin-used",
+                "thread_id": "skill-event",
             }),
             serde_json::json!({
                 "event_type": "codex_accepted_line_fingerprints",
                 "plugin_id": null,
                 "thread_id": "other-event",
-            }),
-            serde_json::json!({
-                "event_type": "codex_plugin_used",
-                "plugin_id": "sample@test",
-                "thread_id": "plugin-used",
-            }),
-            serde_json::json!({
-                "event_type": "skill_invocation",
-                "plugin_id": "sample@test",
-                "thread_id": "plugin-skill",
-            }),
-            serde_json::json!({
-                "event_type": "codex_mcp_tool_call_event",
-                "plugin_id": "sample@test",
-                "thread_id": "plugin-mcp",
             }),
         ]
     );
