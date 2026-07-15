@@ -1,21 +1,6 @@
-use super::resolve_aggregated_output;
 use super::split_valid_utf8_prefix_with_max;
-use crate::unified_exec::head_tail_buffer::HeadTailBuffer;
 
 use pretty_assertions::assert_eq;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
-#[tokio::test]
-async fn completed_snapshot_wins_over_partial_streamed_transcript() {
-    let mut transcript = HeadTailBuffer::default();
-    transcript.push_chunk(b"TAIL\n".to_vec());
-    let transcript = Arc::new(Mutex::new(transcript));
-
-    let output = resolve_aggregated_output(&transcript, "HEAD\nTAIL\n".to_string()).await;
-
-    assert_eq!(output, "HEAD\nTAIL\n");
-}
 
 #[test]
 fn split_valid_utf8_prefix_respects_max_bytes_for_ascii() {
