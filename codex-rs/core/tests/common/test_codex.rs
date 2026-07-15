@@ -812,6 +812,21 @@ impl TestCodex {
         self.cwd.path()
     }
 
+    /// Returns the host-local workspace used by the local test executor.
+    pub fn local_environment_cwd(&self) -> AbsolutePathBuf {
+        AbsolutePathBuf::try_from(self.cwd_path()).expect("test workspace path should be absolute")
+    }
+
+    /// Selects the host-local executor with the host-local test workspace.
+    ///
+    /// In the remote test matrix, `config.cwd` belongs to the remote executor
+    /// and does not exist on the test runner. Tests that also register the local
+    /// executor must use this selection instead of pairing `local` with the
+    /// remote configuration path.
+    pub fn local_environment_selection(&self) -> TurnEnvironmentSelection {
+        local(self.local_environment_cwd())
+    }
+
     pub fn codex_home_path(&self) -> &Path {
         self.config.codex_home.as_path()
     }

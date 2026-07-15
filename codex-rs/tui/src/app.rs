@@ -103,6 +103,8 @@ use codex_app_server_protocol::McpAuthStatus;
 use codex_app_server_protocol::McpServerStatus;
 use codex_app_server_protocol::McpServerStatusDetail;
 use codex_app_server_protocol::MergeStrategy;
+use codex_app_server_protocol::ModelListParams;
+use codex_app_server_protocol::ModelListResponse;
 use codex_app_server_protocol::PluginInstallParams;
 use codex_app_server_protocol::PluginInstallResponse;
 use codex_app_server_protocol::PluginListMarketplaceKind;
@@ -1009,10 +1011,18 @@ impl App {
 
         let file_search = FileSearchManager::new(config.cwd.to_path_buf(), app_event_tx.clone());
         let runtime_keymap = RuntimeKeymap::from_config(&config.tui_keymap).map_err(|err| {
+            let retry_help = match codex_product_info::Product::current() {
+                codex_product_info::Product::Codex => {
+                    "See the Codex keymap documentation for supported actions and examples."
+                }
+                codex_product_info::Product::OpenInterpreter => {
+                    "Use supported Open Interpreter keymap actions and examples."
+                }
+            };
             color_eyre::eyre::eyre!(
                 "Invalid `tui.keymap` configuration: {err}\n\
 Fix the config and retry.\n\
-See the Codex keymap documentation for supported actions and examples."
+{retry_help}"
             )
         })?;
         #[cfg(not(debug_assertions))]

@@ -3079,12 +3079,21 @@ async fn memories_reset_confirmation_sends_event_on_confirm() {
 
 #[tokio::test]
 async fn model_selection_popup_snapshot() {
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     chat.thread_id = Some(ThreadId::new());
     chat.open_model_popup();
 
     let popup = render_bottom_popup(&chat, /*width*/ 80);
     assert_chatwidget_snapshot!("model_selection_popup", popup);
+
+    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
+    assert_matches!(rx.try_recv(), Ok(AppEvent::LoadProviderModels { .. }));
+
+    let loading_popup = render_bottom_popup(&chat, /*width*/ 80);
+    assert_chatwidget_snapshot!(
+        "model_selection_popup_loading_provider_models",
+        loading_popup
+    );
 }
 
 #[tokio::test]
@@ -3248,19 +3257,117 @@ async fn model_reasoning_selection_popup_applies_custom_effort() {
     chat.handle_key_event(KeyEvent::from(KeyCode::Down));
     chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
 
+    // Open Interpreter's /model flow continues into harness selection after a
+    // reasoning level is chosen; the selection is applied when that final
+    // step completes rather than here.
     let selected_effort_events = std::iter::from_fn(|| rx.try_recv().ok())
         .filter_map(|event| match event {
-            AppEvent::UpdateReasoningEffort(effort) => Some((None, effort)),
-            AppEvent::PersistModelSelection { model, effort } => Some((Some(model), effort)),
+            AppEvent::OpenHarnessPopup { model, effort } => Some((model, effort)),
             _ => None,
         })
         .collect::<Vec<_>>();
     assert_eq!(
         selected_effort_events,
-        vec![
-            (None, Some(custom_effort.clone())),
-            (Some("gpt-5.4".to_string()), Some(custom_effort)),
-        ]
+        vec![("gpt-5.4".to_string(), Some(custom_effort))]
+    );
+}
+
+fn thinking_toggle_preset() -> ModelPreset {
+    let model_info: codex_protocol::openai_models::ModelInfo =
+        serde_json::from_value(serde_json::json!({
+            "slug": "kimi-k2.5",
+            "display_name": "Kimi K2.5",
+            "description": "Thinking toggle model",
+            "default_reasoning_level": "medium",
+            "supported_reasoning_levels": [],
+            "reasoning_control": "thinking_toggle",
+            "shell_type": "shell_command",
+            "visibility": "list",
+            "supported_in_api": true,
+            "priority": 1,
+            "upgrade": null,
+            "base_instructions": "base",
+            "model_messages": null,
+            "supports_reasoning_summaries": false,
+            "default_reasoning_summary": "auto",
+            "support_verbosity": false,
+            "default_verbosity": null,
+            "apply_patch_tool_type": null,
+            "truncation_policy": {"mode": "bytes", "limit": 10000},
+            "supports_parallel_tool_calls": true,
+            "supports_image_detail_original": false,
+            "context_window": 262144,
+            "auto_compact_token_limit": null,
+            "effective_context_window_percent": 95,
+            "experimental_supported_tools": []
+        }))
+        .expect("deserialize model info");
+    ModelPreset::from(model_info)
+}
+
+#[tokio::test]
+async fn model_reasoning_selection_popup_renders_thinking_toggle_options() {
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.4")).await;
+
+    chat.open_reasoning_popup(thinking_toggle_preset());
+
+    let popup = render_bottom_popup(&chat, /*width*/ 80);
+    assert_chatwidget_snapshot!("model_reasoning_selection_popup_thinking_toggle", popup);
+    assert!(
+        popup.contains("Thinking (default)"),
+        "expected the thinking-on option to be marked default:\n{popup}"
+    );
+    assert!(
+        popup.contains("None"),
+        "expected the no-thinking option to render:\n{popup}"
+    );
+}
+
+#[tokio::test]
+async fn model_reasoning_selection_popup_applies_thinking_toggle_choice() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.4")).await;
+
+    chat.open_reasoning_popup(thinking_toggle_preset());
+    while rx.try_recv().is_ok() {}
+
+    // The "Thinking" option is preselected as the model default; move to the
+    // "None" option and accept it.
+    chat.handle_key_event(KeyEvent::from(KeyCode::Down));
+    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
+
+    let selected_effort_events = std::iter::from_fn(|| rx.try_recv().ok())
+        .filter_map(|event| match event {
+            AppEvent::OpenHarnessPopup { model, effort } => Some((model, effort)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        selected_effort_events,
+        vec![("kimi-k2.5".to_string(), Some(ReasoningEffortConfig::None))]
+    );
+}
+
+#[tokio::test]
+async fn model_reasoning_selection_popup_applies_thinking_toggle_default() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.4")).await;
+
+    chat.open_reasoning_popup(thinking_toggle_preset());
+    while rx.try_recv().is_ok() {}
+
+    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
+
+    let selected_effort_events = std::iter::from_fn(|| rx.try_recv().ok())
+        .filter_map(|event| match event {
+            AppEvent::OpenHarnessPopup { model, effort } => Some((model, effort)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        selected_effort_events,
+        vec![(
+            "kimi-k2.5".to_string(),
+            Some(ReasoningEffortConfig::thinking_toggle_on())
+        )]
     );
 }
 
@@ -3755,7 +3862,7 @@ async fn feedback_good_result_consent_popup_includes_connectivity_diagnostics_fi
 }
 
 #[tokio::test]
-async fn reasoning_popup_escape_returns_to_model_popup() {
+async fn reasoning_popup_escape_returns_to_provider_popup() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.4")).await;
     chat.thread_id = Some(ThreadId::new());
     chat.open_model_popup();
@@ -3769,6 +3876,6 @@ async fn reasoning_popup_escape_returns_to_model_popup() {
     chat.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
 
     let after_escape = render_bottom_popup(&chat, /*width*/ 80);
-    assert!(after_escape.contains("Select Model"));
+    assert!(after_escape.contains("Select Provider"));
     assert!(!after_escape.contains("Select Reasoning Level"));
 }

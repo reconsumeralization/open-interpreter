@@ -84,6 +84,7 @@ use codex_model_provider_info::LEGACY_OLLAMA_CHAT_PROVIDER_ID;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::OLLAMA_CHAT_PROVIDER_REMOVED_ERROR;
 use codex_model_provider_info::built_in_model_providers;
+use codex_model_provider_info::default_harness_for_provider_model;
 use codex_model_provider_info::merge_configured_model_providers;
 use codex_models_manager::ModelsManagerConfig;
 use codex_protocol::config_types::AltScreenMode;
@@ -645,6 +646,12 @@ pub struct Config {
 
     /// Info needed to make an API request to the model.
     pub model_provider: ModelProviderInfo,
+
+    /// Optional harness family to emulate for this session.
+    pub harness: Option<String>,
+
+    /// Whether to include Open Interpreter guidance for the selected harness.
+    pub harness_guidance: bool,
 
     /// Optionally specify the personality of the model
     pub personality: Option<Personality>,
@@ -3578,6 +3585,10 @@ impl Config {
         let forced_login_method = cfg.forced_login_method;
 
         let model = model.or(cfg.model);
+        let harness = cfg.harness.clone().or_else(|| {
+            default_harness_for_provider_model(&model_provider_id, &model_provider, model.as_deref())
+                .map(ToOwned::to_owned)
+        });
         let notices = cfg.notice.unwrap_or_default();
         let service_tier = match service_tier_override {
             Some(Some(service_tier)) => Some(service_tier),
@@ -3784,6 +3795,13 @@ impl Config {
         )
         .map_err(std::io::Error::from)?;
         let otel = otel::resolve_config(cfg.otel.unwrap_or_default(), &mut startup_warnings);
+        let tool_output_token_limit = cfg.tool_output_token_limit.or_else(|| {
+            harness
+                .as_deref()
+                .is_some_and(|harness| harness == "kimi-code")
+                .then_some(50_000)
+        });
+
         let config = Self {
             model,
             service_tier,
@@ -3795,6 +3813,8 @@ impl Config {
                 .unwrap_or_default(),
             model_provider_id,
             model_provider,
+            harness,
+            harness_guidance: cfg.harness_guidance.unwrap_or(true),
             cwd: resolved_cwd,
             workspace_roots: workspace_roots.clone(),
             workspace_roots_explicit,
@@ -3855,7 +3875,7 @@ impl Config {
                     }
                 })
                 .collect(),
-            tool_output_token_limit: cfg.tool_output_token_limit,
+            tool_output_token_limit,
             agent_max_threads,
             agent_max_depth,
             agent_roles,

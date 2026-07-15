@@ -1,9 +1,11 @@
 use std::ffi::OsStr;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use codex_utils_absolute_path::AbsolutePathBuf;
+use serde::Deserialize;
 
 const BIN_DIRNAME: &str = "bin";
 const PACKAGE_METADATA_FILENAME: &str = "codex-package.json";
@@ -36,6 +38,13 @@ pub struct CodexPackageLayout {
 pub struct InstallContext {
     pub method: InstallMethod,
     pub package_layout: Option<CodexPackageLayout>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PackageMetadata {
+    entrypoint: Option<PathBuf>,
+    managed_codex: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -106,7 +115,15 @@ impl InstallContext {
     pub fn current() -> &'static Self {
         INSTALL_CONTEXT.get_or_init(|| {
             let current_exe = std::env::current_exe().ok();
-            let method_override = if std::env::var_os("CODEX_MANAGED_BY_PNPM").is_some() {
+            // The npm/bun/pnpm wrapper env markers describe a Codex install; an
+            // Open Interpreter binary inheriting them from the environment
+            // (for example through a long-lived tmux server) must not adopt
+            // a Codex install identity.
+            let is_codex =
+                codex_product_info::Product::current() == codex_product_info::Product::Codex;
+            let method_override = if !is_codex {
+                None
+            } else if std::env::var_os("CODEX_MANAGED_BY_PNPM").is_some() {
                 Some(InstallMethod::Pnpm)
             } else if std::env::var_os("CODEX_MANAGED_BY_NPM").is_some() {
                 Some(InstallMethod::Npm)
@@ -209,6 +226,17 @@ impl CodexPackageLayout {
     }
 }
 
+/// Resolve the managed Codex executable declared by a package-layout install.
+pub fn managed_codex_bin_from_package_dir(package_dir: &Path) -> Option<AbsolutePathBuf> {
+    let package_dir = canonical_absolute_path(package_dir)?;
+    let metadata = read_package_metadata(&package_dir)?;
+    let managed_codex = metadata
+        .managed_codex
+        .as_deref()
+        .or(metadata.entrypoint.as_deref())?;
+    package_relative_file(&package_dir, managed_codex)
+}
+
 fn install_method_from_exe(
     exe_path: &Path,
     codex_home: Option<&Path>,
@@ -269,6 +297,31 @@ fn standalone_platform() -> StandalonePlatform {
 
 fn existing_dir(path: AbsolutePathBuf) -> Option<AbsolutePathBuf> {
     path.is_dir().then_some(path)
+}
+
+fn read_package_metadata(package_dir: &Path) -> Option<PackageMetadata> {
+    let metadata = std::fs::read_to_string(package_dir.join(PACKAGE_METADATA_FILENAME)).ok()?;
+    serde_json::from_str(&metadata).ok()
+}
+
+fn package_relative_file(
+    package_dir: &AbsolutePathBuf,
+    relative_path: &Path,
+) -> Option<AbsolutePathBuf> {
+    if !relative_path.is_relative() {
+        return None;
+    }
+    if relative_path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        return None;
+    }
+
+    let path = package_dir.join(relative_path);
+    path.is_file().then_some(path)
 }
 
 fn default_rg_command() -> PathBuf {
@@ -479,6 +532,66 @@ mod tests {
             context.bundled_resource(TEST_RESOURCE_NAME),
             Some(canonical_resources_dir.join(TEST_RESOURCE_NAME))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn package_metadata_resolves_managed_codex_path() -> std::io::Result<()> {
+        let package_dir = tempfile::tempdir()?;
+        let bin_dir = package_dir.path().join(BIN_DIRNAME);
+        fs::create_dir_all(&bin_dir)?;
+        let managed_codex = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+        fs::write(&managed_codex, "")?;
+        fs::write(
+            package_dir.path().join(PACKAGE_METADATA_FILENAME),
+            format!(
+                "{{\"managedCodex\":\"bin/{}\"}}",
+                if cfg!(windows) { "codex.exe" } else { "codex" }
+            ),
+        )?;
+
+        assert_eq!(
+            managed_codex_bin_from_package_dir(package_dir.path()),
+            Some(AbsolutePathBuf::from_absolute_path(
+                managed_codex.canonicalize()?
+            )?)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn package_metadata_falls_back_to_entrypoint_for_managed_codex_path() -> std::io::Result<()> {
+        let package_dir = tempfile::tempdir()?;
+        let bin_dir = package_dir.path().join(BIN_DIRNAME);
+        fs::create_dir_all(&bin_dir)?;
+        let entrypoint = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+        fs::write(&entrypoint, "")?;
+        fs::write(
+            package_dir.path().join(PACKAGE_METADATA_FILENAME),
+            format!(
+                "{{\"entrypoint\":\"bin/{}\"}}",
+                if cfg!(windows) { "codex.exe" } else { "codex" }
+            ),
+        )?;
+
+        assert_eq!(
+            managed_codex_bin_from_package_dir(package_dir.path()),
+            Some(AbsolutePathBuf::from_absolute_path(
+                entrypoint.canonicalize()?
+            )?)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn package_metadata_rejects_managed_codex_paths_outside_package() -> std::io::Result<()> {
+        let package_dir = tempfile::tempdir()?;
+        fs::write(
+            package_dir.path().join(PACKAGE_METADATA_FILENAME),
+            "{\"managedCodex\":\"../codex\"}",
+        )?;
+
+        assert_eq!(managed_codex_bin_from_package_dir(package_dir.path()), None);
         Ok(())
     }
 

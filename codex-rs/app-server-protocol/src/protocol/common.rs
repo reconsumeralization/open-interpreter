@@ -871,6 +871,36 @@ client_request_definitions! {
         serialization: None,
         response: v2::ModelProviderCapabilitiesReadResponse,
     },
+    InterpreterProviderList => "interpreter/provider/list" {
+        params: v2::InterpreterProviderListParams,
+        serialization: global_shared_read("config"),
+        response: v2::InterpreterProviderListResponse,
+    },
+    InterpreterProviderSet => "interpreter/provider/set" {
+        params: v2::InterpreterProviderSetParams,
+        serialization: global("config"),
+        response: v2::InterpreterProviderSetResponse,
+    },
+    InterpreterModelList => "interpreter/model/list" {
+        params: v2::InterpreterModelListParams,
+        serialization: None,
+        response: v2::InterpreterModelListResponse,
+    },
+    InterpreterModelSet => "interpreter/model/set" {
+        params: v2::InterpreterModelSetParams,
+        serialization: global("config"),
+        response: v2::InterpreterModelSetResponse,
+    },
+    InterpreterHarnessList => "interpreter/harness/list" {
+        params: v2::InterpreterHarnessListParams,
+        serialization: global_shared_read("config"),
+        response: v2::InterpreterHarnessListResponse,
+    },
+    InterpreterHarnessSet => "interpreter/harness/set" {
+        params: v2::InterpreterHarnessSetParams,
+        serialization: global("config"),
+        response: v2::InterpreterHarnessSetResponse,
+    },
     ExperimentalFeatureList => "experimentalFeature/list" {
         params: v2::ExperimentalFeatureListParams,
         serialization: global("config"),
@@ -2980,7 +3010,8 @@ mod tests {
                 "params": {
                     "limit": null,
                     "cursor": null,
-                    "includeHidden": null
+                    "includeHidden": null,
+                    "modelProvider": null
                 }
             }),
             serde_json::to_value(&request)?,

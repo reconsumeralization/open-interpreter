@@ -199,6 +199,13 @@ impl CodexResponsesMetadata {
         self.request_kind.is_some()
     }
 
+    pub(crate) fn is_compaction_request(&self) -> bool {
+        matches!(
+            self.request_kind,
+            Some(CodexResponsesRequestKind::Compaction(_))
+        )
+    }
+
     pub(crate) fn turn_metadata_json(&self) -> Option<String> {
         to_ascii_json_string(&self.turn_metadata_payload()).ok()
     }

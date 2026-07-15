@@ -56,6 +56,7 @@ use crate::stream_events_utils::record_completed_response_item_with_finalized_fa
 use crate::tasks::emit_compact_metric;
 use crate::tools::ToolRouter;
 use crate::tools::context::SharedTurnDiffTracker;
+use crate::tools::handlers::take_claude_code_bare_completed_task_notification;
 use crate::tools::parallel::ToolCallRuntime;
 use crate::tools::registry::ToolArgumentDiffConsumer;
 use crate::tools::router::ToolRouterParams;
@@ -115,6 +116,7 @@ use codex_utils_stream_parser::strip_citations;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use futures::stream::FuturesOrdered;
+use futures::stream::FuturesUnordered;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
 use tracing::error;
@@ -370,6 +372,40 @@ pub(crate) async fn run_turn(
                 }
 
                 if !needs_follow_up {
+                    if turn_context
+                        .config
+                        .harness
+                        .as_deref()
+                        .is_some_and(|harness| harness == "deepseek-tui")
+                        && token_status.active_context_tokens >= DEEPSEEK_TUI_CYCLE_TOKEN_LIMIT
+                        && let Err(err) = run_auto_compact(
+                            &sess,
+                            Arc::clone(&step_context),
+                            /*fallback_step_context*/ None,
+                            &mut client_session,
+                            InitialContextInjection::DoNotInject,
+                            CompactionReason::ContextLimit,
+                            CompactionPhase::MidTurn,
+                        )
+                        .await
+                    {
+                        warn!("DeepSeek TUI post-final cycle handoff failed: {err}");
+                    }
+                    if turn_context
+                        .config
+                        .harness
+                        .as_deref()
+                        .is_some_and(|harness| harness == "claude-code-bare")
+                        && let Some(notification) =
+                            take_claude_code_bare_completed_task_notification()
+                    {
+                        sess.record_conversation_items(
+                            &turn_context,
+                            std::slice::from_ref(&notification),
+                        )
+                        .await;
+                        continue;
+                    }
                     last_agent_message = sampling_request_last_agent_message;
                     let stop_outcome = run_turn_stop_hooks(
                         &sess,
@@ -794,6 +830,8 @@ async fn track_turn_resolved_config_analytics(
         });
 }
 
+const DEEPSEEK_TUI_CYCLE_TOKEN_LIMIT: i64 = 28_800;
+
 #[instrument(level = "trace", skip_all)]
 async fn run_pre_sampling_compact(
     sess: &Arc<Session>,
@@ -1091,6 +1129,11 @@ pub(crate) fn build_prompt(
         input,
         tools: router.model_visible_specs(),
         parallel_tool_calls: turn_context.model_info.supports_parallel_tool_calls,
+        cwd: turn_context
+            .environments
+            .primary()
+            .and_then(|turn_environment| turn_environment.cwd().to_abs_path().ok())
+            .map(codex_utils_absolute_path::AbsolutePathBuf::into_path_buf),
         base_instructions,
         output_schema: turn_context.final_output_json_schema.clone(),
         output_schema_strict: !crate::guardian::is_guardian_reviewer_source(
@@ -1888,9 +1931,49 @@ async fn handle_assistant_item_done_in_plan_mode(
     false
 }
 
+enum InFlightTools {
+    Ordered(FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>>),
+    Unordered(FuturesUnordered<BoxFuture<'static, CodexResult<ResponseInputItem>>>),
+}
+
+enum InFlightToolOrdering {
+    Model,
+    Completion,
+}
+
+impl InFlightTools {
+    fn new(ordering: InFlightToolOrdering) -> Self {
+        match ordering {
+            InFlightToolOrdering::Model => Self::Ordered(FuturesOrdered::new()),
+            InFlightToolOrdering::Completion => Self::Unordered(FuturesUnordered::new()),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Ordered(in_flight) => in_flight.is_empty(),
+            Self::Unordered(in_flight) => in_flight.is_empty(),
+        }
+    }
+
+    fn push(&mut self, future: BoxFuture<'static, CodexResult<ResponseInputItem>>) {
+        match self {
+            Self::Ordered(in_flight) => in_flight.push_back(future),
+            Self::Unordered(in_flight) => in_flight.push(future),
+        }
+    }
+
+    async fn next(&mut self) -> Option<CodexResult<ResponseInputItem>> {
+        match self {
+            Self::Ordered(in_flight) => in_flight.next().await,
+            Self::Unordered(in_flight) => in_flight.next().await,
+        }
+    }
+}
+
 #[instrument(level = "trace", skip_all)]
 async fn drain_in_flight(
-    in_flight: &mut FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>>,
+    in_flight: &mut InFlightTools,
     sess: Arc<Session>,
     turn_context: Arc<TurnContext>,
 ) -> CodexResult<()> {
@@ -1982,8 +2065,17 @@ async fn try_run_sampling_request(
         .instrument(trace_span!("stream_request"))
         .or_cancel(&cancellation_token)
         .await??;
-    let mut in_flight: FuturesOrdered<BoxFuture<'static, CodexResult<ResponseInputItem>>> =
-        FuturesOrdered::new();
+    let in_flight_ordering = if turn_context
+        .config
+        .harness
+        .as_deref()
+        .is_some_and(|harness| harness == "zcode")
+    {
+        InFlightToolOrdering::Completion
+    } else {
+        InFlightToolOrdering::Model
+    };
+    let mut in_flight = InFlightTools::new(in_flight_ordering);
     let mut needs_follow_up = false;
     let mut last_agent_message: Option<String> = None;
     let mut active_item: Option<TurnItem> = None;
@@ -2127,7 +2219,7 @@ async fn try_run_sampling_request(
                         Err(err) => break Err(err),
                     };
                 if let Some(tool_future) = output_result.tool_future {
-                    in_flight.push_back(tool_future);
+                    in_flight.push(tool_future);
                 }
                 if let Some(agent_message) = output_result.last_agent_message {
                     last_agent_message = Some(agent_message);

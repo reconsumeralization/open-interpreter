@@ -188,9 +188,9 @@ async fn process_chunk(
     }
 }
 
-/// Emit an ExecCommandEnd event for a unified exec session, using the transcript
-/// as the primary source of aggregated_output and falling back to the provided
-/// text when the transcript is empty.
+/// Emit an ExecCommandEnd event for a unified exec session, using a completed
+/// initial output snapshot when one is available and the streamed transcript
+/// for background sessions.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn emit_exec_end_for_unified_exec(
     session_ref: Arc<Session>,

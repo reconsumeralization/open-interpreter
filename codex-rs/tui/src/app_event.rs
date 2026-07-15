@@ -70,6 +70,15 @@ pub(crate) struct HistoryLookupResponse {
     pub(crate) entry: Option<String>,
 }
 
+/// How the Kimi Code OAuth device login flow finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KimiCodeLoginOutcome {
+    /// Stored credentials (or an API key in the environment) already work.
+    AlreadyAuthenticated,
+    /// The browser device flow completed and credentials were stored.
+    SignedIn,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ConsolidationScrollbackReflow {
     IfResizeReflowRan,
@@ -726,6 +735,82 @@ pub(crate) enum AppEvent {
         effort: Option<ReasoningEffort>,
     },
 
+    /// Load the model catalog for a provider selected in `/model`.
+    LoadProviderModels {
+        provider_id: String,
+        provider_name: String,
+    },
+
+    /// Ensure Kimi Code OAuth credentials exist (running the device login flow
+    /// when needed) before loading its models in `/model`.
+    StartKimiCodeLogin {
+        provider_id: String,
+        provider_name: String,
+    },
+
+    /// Show the Kimi Code device-login verification details to the user.
+    KimiCodeLoginVerification {
+        verification_url: String,
+        user_code: String,
+    },
+
+    /// Result of the Kimi Code OAuth device login flow.
+    KimiCodeLoginComplete {
+        provider_id: String,
+        provider_name: String,
+        result: Result<KimiCodeLoginOutcome, String>,
+    },
+
+    /// Result of loading the provider-specific model catalog for `/model`.
+    ProviderModelsLoaded {
+        provider_id: String,
+        provider_name: String,
+        result: Result<Vec<ModelPreset>, String>,
+    },
+
+    /// Open the custom model prompt for a selected provider.
+    OpenCustomProviderModelPrompt {
+        provider_id: String,
+        provider_name: String,
+        initial_text: Option<String>,
+    },
+
+    /// Open the reasoning picker for a provider/model selection.
+    OpenReasoningPopupForProvider {
+        provider_id: String,
+        provider_name: String,
+        model: ModelPreset,
+    },
+
+    /// Open the harness picker for the current provider/model selection.
+    OpenHarnessPopup {
+        model: String,
+        effort: Option<ReasoningEffort>,
+    },
+
+    /// Open the harness picker for a provider/model selection.
+    OpenHarnessPopupForProvider {
+        provider_id: String,
+        provider_name: String,
+        model: String,
+        effort: Option<ReasoningEffort>,
+    },
+
+    /// Persist provider, model, reasoning, and harness, then start a fresh thread.
+    PersistProviderModelSelection {
+        provider_id: String,
+        provider_name: String,
+        model: String,
+        effort: Option<ReasoningEffort>,
+        harness: Option<String>,
+    },
+
+    /// Persist the selected harness for the current provider/model.
+    #[allow(dead_code)]
+    PersistHarnessSelection {
+        harness: Option<String>,
+    },
+
     /// Persist the selected personality to the appropriate config.
     PersistPersonalitySelection {
         personality: Personality,
@@ -759,6 +844,7 @@ pub(crate) enum AppEvent {
     },
 
     /// Open the full model picker (non-auto models).
+    #[allow(dead_code)]
     OpenAllModelsPopup {
         models: Vec<ModelPreset>,
     },

@@ -465,6 +465,11 @@ pub(crate) fn truncate_function_output_payload(
     policy: TruncationPolicy,
 ) -> FunctionCallOutputPayload {
     let body = match &output.body {
+        FunctionCallOutputBody::Text(content)
+            if content.starts_with(crate::tools::handlers::HARNESS_NO_TRUNCATE_PREFIX) =>
+        {
+            FunctionCallOutputBody::Text(content.clone())
+        }
         FunctionCallOutputBody::Text(content) => {
             FunctionCallOutputBody::Text(truncate_text(content, policy))
         }

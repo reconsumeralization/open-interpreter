@@ -272,6 +272,9 @@ impl ChatWidget {
                 self.open_model_popup();
                 self.defer_input_until_settings_applied();
             }
+            SlashCommand::Harness => {
+                self.open_current_harness_popup();
+            }
             SlashCommand::Personality => {
                 self.open_personality_popup();
                 self.defer_input_until_settings_applied();
@@ -736,7 +739,7 @@ impl ChatWidget {
                 if self.is_session_configured() {
                     self.reasoning_buffer.clear();
                     self.full_reasoning_buffer.clear();
-                    self.set_status_header(String::from("Working"));
+                    self.set_status_header(String::from(STATUS_HEADER_INTERPRETING));
                     self.submit_user_message(user_message);
                 } else {
                     self.queue_user_message(user_message);
@@ -1070,6 +1073,7 @@ impl ChatWidget {
             | SlashCommand::Compact
             | SlashCommand::Review
             | SlashCommand::Model
+            | SlashCommand::Harness
             | SlashCommand::Personality
             | SlashCommand::Plan
             | SlashCommand::Goal

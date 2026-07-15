@@ -7,6 +7,7 @@ use anyhow::Context;
 use anyhow::Result;
 #[cfg(unix)]
 use anyhow::anyhow;
+use codex_install_context::InstallContext;
 #[cfg(unix)]
 use sha2::Digest;
 #[cfg(unix)]
@@ -17,11 +18,49 @@ use tokio::fs;
 use tokio::process::Command;
 
 pub(crate) fn managed_codex_bin(codex_home: &Path) -> PathBuf {
-    codex_home
+    let package_dir = InstallContext::current()
+        .package_layout
+        .as_ref()
+        .map(|layout| layout.package_dir.as_path());
+    managed_codex_bin_for_package_dir_and_current_exe(
+        codex_home,
+        package_dir,
+        std::env::current_exe().ok().as_deref(),
+    )
+}
+
+fn managed_codex_bin_for_package_dir_and_current_exe(
+    codex_home: &Path,
+    package_dir: Option<&Path>,
+    current_exe: Option<&Path>,
+) -> PathBuf {
+    if let Some(package_dir) = package_dir
+        && let Some(managed_codex) =
+            codex_install_context::managed_codex_bin_from_package_dir(package_dir)
+    {
+        return managed_codex.into_path_buf();
+    }
+
+    let package_dir = codex_home
         .join("packages")
         .join("standalone")
-        .join("current")
-        .join(managed_codex_file_name())
+        .join("current");
+    if let Some(managed_codex) =
+        codex_install_context::managed_codex_bin_from_package_dir(&package_dir)
+    {
+        return managed_codex.into_path_buf();
+    }
+
+    if let Some(current_exe) = current_exe
+        && let Some(current_exe_dir) = current_exe.parent()
+    {
+        let sibling_codex = current_exe_dir.join(managed_codex_file_name());
+        if sibling_codex.is_file() {
+            return sibling_codex;
+        }
+    }
+
+    package_dir.join(managed_codex_file_name())
 }
 
 #[cfg(unix)]

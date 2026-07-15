@@ -62,6 +62,772 @@ const NETWORK_TEST_TARGET: &str = "http://codex-network-test.invalid:80";
     not(target_os = "linux"),
     ignore = "requires the trusted Linux proxy bridge"
 )]
+async fn guardian_network_approval_preserves_action_and_outcome_routing() -> Result<()> {
+    skip_if_target_windows!(Ok(()), "uses the POSIX/Python network fixture");
+    skip_if_host_windows!(Ok(()));
+    skip_if_no_network!(Ok(()));
+    skip_if_sandbox!(Ok(()));
+
+    let server = start_mock_server().await;
+    let test = managed_network_unified_exec_test(&server).await?;
+    let first_call_id = "guardian-network-approved";
+    let second_call_id = "guardian-network-denied";
+    let first_command = network_fetch_args(LOCAL_ENVIRONMENT_ID)["cmd"]
+        .as_str()
+        .context("expected network command")?
+        .to_string();
+    let second_command = first_command.clone();
+    let denial = "The destination is outside the approved test boundary.";
+    let responses = mount_sse_sequence(
+        &server,
+        vec![
+            sse(vec![
+                ev_response_created("resp-guardian-network-parent-1"),
+                ev_function_call(
+                    first_call_id,
+                    "exec_command",
+                    &serde_json::to_string(&network_fetch_args(LOCAL_ENVIRONMENT_ID))?,
+                ),
+                ev_completed("resp-guardian-network-parent-1"),
+            ]),
+            sse(vec![
+                ev_response_created("resp-guardian-network-allow"),
+                ev_assistant_message(
+                    "msg-guardian-network-allow",
+                    r#"{"risk_level":"low","user_authorization":"high","outcome":"allow","rationale":"The test request is safe."}"#,
+                ),
+                ev_completed("resp-guardian-network-allow"),
+            ]),
+            sse(vec![
+                ev_response_created("resp-guardian-network-parent-2"),
+                ev_assistant_message("msg-guardian-network-parent-2", "approved"),
+                ev_completed("resp-guardian-network-parent-2"),
+            ]),
+            sse(vec![
+                ev_response_created("resp-guardian-network-parent-3"),
+                ev_function_call(
+                    second_call_id,
+                    "exec_command",
+                    &serde_json::to_string(&network_fetch_args(LOCAL_ENVIRONMENT_ID))?,
+                ),
+                ev_completed("resp-guardian-network-parent-3"),
+            ]),
+            sse(vec![
+                ev_response_created("resp-guardian-network-deny"),
+                ev_assistant_message(
+                    "msg-guardian-network-deny",
+                    &json!({
+                        "risk_level": "high",
+                        "user_authorization": "low",
+                        "outcome": "deny",
+                        "rationale": denial,
+                    })
+                    .to_string(),
+                ),
+                ev_completed("resp-guardian-network-deny"),
+            ]),
+            sse(vec![
+                ev_response_created("resp-guardian-network-parent-4"),
+                ev_assistant_message("msg-guardian-network-parent-4", "denied"),
+                ev_completed("resp-guardian-network-parent-4"),
+            ]),
+        ],
+    )
+    .await;
+
+    for prompt in ["approve the network request", "deny the network request"] {
+        submit_managed_network_turn(
+            &test,
+            prompt,
+            vec![test.local_environment_selection()],
+            ApprovalsReviewer::AutoReview,
+            AskForApproval::OnRequest,
+        )
+        .await?;
+        wait_for_completion_without_network_prompt(&test).await;
+    }
+
+    let actions = guardian_network_actions(&responses)?;
+    assert_eq!(actions.len(), 2);
+    assert_eq!(
+        actions[0],
+        json!({
+            "host": NETWORK_TEST_HOST,
+            "port": 80,
+            "protocol": "http",
+            "target": NETWORK_TEST_TARGET,
+            "tool": "network_access",
+            "trigger": {
+                "callId": first_call_id,
+                "command": ["/bin/sh", "-c", first_command],
+                "cwd": test.local_environment_cwd(),
+                "sandboxPermissions": "use_default",
+                "toolName": "exec_command",
+                "tty": false,
+            },
+        })
+    );
+    assert_eq!(
+        actions[1]
+            .pointer("/trigger/callId")
+            .and_then(Value::as_str),
+        Some(second_call_id)
+    );
+    assert_eq!(
+        actions[1]
+            .pointer("/trigger/command/2")
+            .and_then(Value::as_str),
+        Some(second_command.as_str())
+    );
+
+    let requests = responses.requests();
+    let approved_output = requests
+        .iter()
+        .find_map(|request| request.function_call_output_text(first_call_id))
+        .context("expected approved network tool output")?;
+    assert!(!approved_output.contains("rejected"));
+    let denied_output = requests
+        .iter()
+        .find_map(|request| request.function_call_output_text(second_call_id))
+        .context("expected denied network tool output")?;
+    assert!(denied_output.contains(denial));
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "requires the trusted Linux proxy bridge"
+)]
+async fn cancelled_guardian_network_review_fails_closed_without_rewriting_turn_state() -> Result<()>
+{
+    skip_if_target_windows!(Ok(()), "uses the POSIX/Python network fixture");
+    skip_if_host_windows!(Ok(()));
+    skip_if_no_network!(Ok(()));
+    skip_if_sandbox!(Ok(()));
+
+    let server = start_mock_server().await;
+    let test = managed_network_unified_exec_test(&server).await?;
+    let call_id = "guardian-network-cancelled";
+    let marker = "guardian cancellation must preserve this turn marker";
+    mount_sse_once_match(
+        &server,
+        |request: &wiremock::Request| {
+            !is_guardian_request(request) && request_body_contains(request, marker)
+        },
+        sse(vec![
+            ev_response_created("resp-guardian-cancel-parent"),
+            ev_function_call(
+                call_id,
+                "exec_command",
+                &serde_json::to_string(&network_fetch_args(LOCAL_ENVIRONMENT_ID))?,
+            ),
+            ev_completed("resp-guardian-cancel-parent"),
+        ]),
+    )
+    .await;
+    let pending_guardian = mount_response_once_match(
+        &server,
+        is_guardian_request,
+        sse_response(sse(vec![
+            ev_response_created("resp-guardian-cancelled-review"),
+            ev_assistant_message("msg-guardian-cancelled-review", r#"{"outcome":"allow"}"#),
+            ev_completed("resp-guardian-cancelled-review"),
+        ]))
+        .set_delay(Duration::from_secs(30)),
+    )
+    .await;
+    submit_managed_network_turn(
+        &test,
+        marker,
+        vec![test.local_environment_selection()],
+        ApprovalsReviewer::AutoReview,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    wait_for_response_request(&pending_guardian).await;
+    test.codex.submit(Op::Interrupt).await?;
+    wait_for_event(&test.codex, |event| {
+        matches!(event, EventMsg::TurnAborted(_))
+    })
+    .await;
+
+    let state_check = mount_sse_once_match(
+        &server,
+        |request: &wiremock::Request| {
+            !is_guardian_request(request)
+                && request_body_contains(request, "verify preserved state")
+        },
+        sse(vec![
+            ev_response_created("resp-guardian-cancel-state-check"),
+            ev_assistant_message("msg-guardian-cancel-state-check", "state preserved"),
+            ev_completed("resp-guardian-cancel-state-check"),
+        ]),
+    )
+    .await;
+    submit_managed_network_turn(
+        &test,
+        "verify preserved state",
+        vec![test.local_environment_selection()],
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    wait_for_turn_complete(&test).await;
+    assert!(state_check.single_request().body_contains_text(marker));
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "requires the trusted Linux proxy bridge"
+)]
+async fn timed_out_guardian_network_review_uses_timeout_outcome_without_user_fallback() -> Result<()>
+{
+    skip_if_target_windows!(Ok(()), "uses the POSIX/Python network fixture");
+    skip_if_host_windows!(Ok(()));
+    skip_if_no_network!(Ok(()));
+    skip_if_sandbox!(Ok(()));
+
+    let server = start_mock_server().await;
+    let test = managed_network_unified_exec_test(&server).await?;
+    let call_id = "guardian-network-timeout";
+    let poll_call_id = "guardian-network-timeout-poll";
+    mount_sse_once_match(
+        &server,
+        |request: &wiremock::Request| {
+            !is_guardian_request(request)
+                && request_body_contains(request, "time out the Guardian network review")
+        },
+        sse(vec![
+            ev_response_created("resp-guardian-timeout-parent"),
+            ev_function_call(
+                call_id,
+                "exec_command",
+                &serde_json::to_string(&network_fetch_args(LOCAL_ENVIRONMENT_ID))?,
+            ),
+            ev_completed("resp-guardian-timeout-parent"),
+        ]),
+    )
+    .await;
+    let pending_guardian = mount_response_once_match(
+        &server,
+        is_guardian_request,
+        sse_response(sse(vec![
+            ev_response_created("resp-guardian-timeout-review"),
+            ev_assistant_message("msg-guardian-timeout-review", r#"{"outcome":"allow"}"#),
+            ev_completed("resp-guardian-timeout-review"),
+        ]))
+        .set_delay(Duration::from_secs(300)),
+    )
+    .await;
+    mount_sse_once_match(
+        &server,
+        |request: &wiremock::Request| {
+            !is_guardian_request(request) && request_body_contains(request, call_id)
+        },
+        sse(vec![
+            ev_response_created("resp-guardian-timeout-parent-followup"),
+            ev_function_call(
+                poll_call_id,
+                "write_stdin",
+                &serde_json::to_string(&json!({
+                    "session_id": 1000,
+                    "chars": "",
+                    "yield_time_ms": 1_000,
+                }))?,
+            ),
+            ev_completed("resp-guardian-timeout-parent-followup"),
+        ]),
+    )
+    .await;
+    let parent_final = mount_sse_once_match(
+        &server,
+        |request: &wiremock::Request| {
+            !is_guardian_request(request) && request_body_contains(request, poll_call_id)
+        },
+        sse(vec![
+            ev_response_created("resp-guardian-timeout-parent-final"),
+            ev_assistant_message("msg-guardian-timeout-parent-final", "timed out"),
+            ev_completed("resp-guardian-timeout-parent-final"),
+        ]),
+    )
+    .await;
+
+    submit_managed_network_turn(
+        &test,
+        "time out the Guardian network review",
+        vec![test.local_environment_selection()],
+        ApprovalsReviewer::AutoReview,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    wait_for_response_request(&pending_guardian).await;
+    tokio::time::pause();
+    tokio::time::advance(Duration::from_secs(91)).await;
+    tokio::time::resume();
+    wait_for_completion_without_network_prompt(&test).await;
+
+    let tool_output = parent_final
+        .requests()
+        .iter()
+        .find_map(|request| request.function_call_output_text(poll_call_id))
+        .context("expected timed-out Guardian tool output")?;
+    assert!(
+        tool_output.contains(concat!(
+            "The automatic permission approval review did not finish before its deadline. ",
+            "Do not assume the action is unsafe based on the timeout alone. ",
+            "You may retry once, or ask the user for guidance or explicit approval."
+        )),
+        "unexpected timed-out Guardian tool output: {tool_output}"
+    );
+    assert!(!tool_output.contains("rejected by user"));
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "requires the trusted Linux proxy bridge"
+)]
+async fn user_network_approval_once_session_and_denial_semantics() -> Result<()> {
+    skip_if_target_windows!(Ok(()), "uses the POSIX/Python network fixture");
+    skip_if_host_windows!(Ok(()));
+    skip_if_no_network!(Ok(()));
+    skip_if_sandbox!(Ok(()));
+
+    let server = start_mock_server().await;
+    let test = managed_network_unified_exec_test(&server).await?;
+    let environments = vec![test.local_environment_selection()];
+
+    mount_exec_network_turn(
+        &server,
+        "resp-user-network-once-1",
+        "user-network-once-1",
+        network_fetch_args(LOCAL_ENVIRONMENT_ID),
+    )
+    .await?;
+    submit_managed_network_turn(
+        &test,
+        "approve this network request once",
+        environments.clone(),
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    let approval = expect_network_approval(&test, LOCAL_ENVIRONMENT_ID).await?;
+    assert_eq!(
+        approval.call_id,
+        "network#local#http#codex-network-test.invalid#80"
+    );
+    assert_eq!(approval.approval_id, None);
+    assert!(!approval.turn_id.is_empty());
+    assert_eq!(approval.cwd, test.local_environment_cwd());
+    assert_eq!(
+        approval.reason.as_deref(),
+        Some("codex-network-test.invalid is not in the allowed_domains")
+    );
+    test.codex
+        .submit(Op::ExecApproval {
+            id: approval.effective_approval_id(),
+            turn_id: Some(approval.turn_id),
+            decision: ReviewDecision::Approved,
+        })
+        .await?;
+    wait_for_turn_complete(&test).await;
+
+    mount_exec_network_turn(
+        &server,
+        "resp-user-network-once-2",
+        "user-network-once-2",
+        network_fetch_args(LOCAL_ENVIRONMENT_ID),
+    )
+    .await?;
+    submit_managed_network_turn(
+        &test,
+        "the once decision must prompt again",
+        environments.clone(),
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    let approval = expect_network_approval(&test, LOCAL_ENVIRONMENT_ID).await?;
+    test.codex
+        .submit(Op::ExecApproval {
+            id: approval.effective_approval_id(),
+            turn_id: Some(approval.turn_id),
+            decision: ReviewDecision::ApprovedForSession,
+        })
+        .await?;
+    wait_for_turn_complete(&test).await;
+
+    mount_exec_network_turn(
+        &server,
+        "resp-user-network-session",
+        "user-network-session",
+        network_fetch_args(LOCAL_ENVIRONMENT_ID),
+    )
+    .await?;
+    submit_managed_network_turn(
+        &test,
+        "the session decision must bypass another prompt",
+        environments.clone(),
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    wait_for_completion_without_network_prompt(&test).await;
+
+    let different_port_target = format!("http://{NETWORK_TEST_HOST}:81");
+    let different_port_command = format!(
+        "python3 -c \"import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler()).open('{different_port_target}', timeout=2).read()\""
+    );
+    let denied_responses = mount_exec_network_turn(
+        &server,
+        "resp-user-network-port",
+        "user-network-port",
+        network_exec_args(&different_port_command),
+    )
+    .await?;
+    submit_managed_network_turn(
+        &test,
+        "a different port must prompt",
+        environments,
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    let approval = expect_network_approval_target(
+        &test,
+        LOCAL_ENVIRONMENT_ID,
+        &different_port_target,
+        NetworkApprovalProtocol::Http,
+    )
+    .await?;
+    test.codex
+        .submit(Op::ExecApproval {
+            id: approval.effective_approval_id(),
+            turn_id: Some(approval.turn_id),
+            decision: ReviewDecision::Denied,
+        })
+        .await?;
+    wait_for_turn_complete(&test).await;
+    let denied_output = denied_responses
+        .requests()
+        .iter()
+        .find_map(|request| request.function_call_output_text("user-network-port"))
+        .context("expected user-denied network output")?;
+    assert!(denied_output.contains("rejected by user"));
+    assert!(!denied_output.contains("blocked by policy"));
+
+    let socks_target = format!("socks5-tcp://{NETWORK_TEST_HOST}:443");
+    let socks_command = format!(
+        r#"python3 -c "import os,socket,urllib.parse; proxy=urllib.parse.urlparse(os.environ['ALL_PROXY']); host='{NETWORK_TEST_HOST}'.encode(); sock=socket.create_connection((proxy.hostname, proxy.port)); sock.sendall(b'\x05\x01\x00'); assert sock.recv(2) == b'\x05\x00'; sock.sendall(b'\x05\x01\x00\x03' + bytes([len(host)]) + host + (443).to_bytes(2, 'big')); print(sock.recv(10))""#
+    );
+    let abort_response = mount_sse_once(
+        &server,
+        sse(vec![
+            ev_response_created("resp-user-network-abort"),
+            ev_function_call(
+                "user-network-abort",
+                "exec_command",
+                &serde_json::to_string(&network_exec_args(&socks_command))?,
+            ),
+            ev_completed("resp-user-network-abort"),
+        ]),
+    )
+    .await;
+    submit_managed_network_turn(
+        &test,
+        "a different protocol must prompt and the user abort must stay a user outcome",
+        vec![test.local_environment_selection()],
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    let approval = expect_network_approval_target(
+        &test,
+        LOCAL_ENVIRONMENT_ID,
+        &socks_target,
+        NetworkApprovalProtocol::Socks5Tcp,
+    )
+    .await?;
+    test.codex
+        .submit(Op::ExecApproval {
+            id: approval.effective_approval_id(),
+            turn_id: Some(approval.turn_id),
+            decision: ReviewDecision::Abort,
+        })
+        .await?;
+    wait_for_event(&test.codex, |event| {
+        matches!(event, EventMsg::TurnAborted(_))
+    })
+    .await;
+    abort_response.single_request();
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "requires the trusted Linux proxy bridge"
+)]
+async fn allowing_network_policy_amendment_persists_context_and_bypasses_prompt() -> Result<()> {
+    skip_if_target_windows!(Ok(()), "uses the POSIX/Python network fixture");
+    skip_if_host_windows!(Ok(()));
+    skip_if_no_network!(Ok(()));
+    skip_if_sandbox!(Ok(()));
+
+    let server = start_mock_server().await;
+    let test = managed_network_unified_exec_test(&server).await?;
+    let environments = vec![test.local_environment_selection()];
+    let first_responses = mount_exec_network_turn(
+        &server,
+        "resp-network-amendment-1",
+        "network-amendment-1",
+        network_fetch_args(LOCAL_ENVIRONMENT_ID),
+    )
+    .await?;
+    submit_managed_network_turn(
+        &test,
+        "persist an allow rule for this host",
+        environments.clone(),
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    let approval = expect_network_approval(&test, LOCAL_ENVIRONMENT_ID).await?;
+    let amendments = approval
+        .proposed_network_policy_amendments
+        .clone()
+        .context("expected network policy amendments")?;
+    assert_eq!(
+        amendments,
+        vec![
+            NetworkPolicyAmendment {
+                host: NETWORK_TEST_HOST.to_string(),
+                action: NetworkPolicyRuleAction::Allow,
+            },
+            NetworkPolicyAmendment {
+                host: NETWORK_TEST_HOST.to_string(),
+                action: NetworkPolicyRuleAction::Deny,
+            },
+        ]
+    );
+    test.codex
+        .submit(Op::ExecApproval {
+            id: approval.effective_approval_id(),
+            turn_id: Some(approval.turn_id),
+            decision: ReviewDecision::NetworkPolicyAmendment {
+                network_policy_amendment: amendments[0].clone(),
+            },
+        })
+        .await?;
+    wait_for_turn_complete(&test).await;
+
+    let policy = fs::read_to_string(test.home.path().join("rules/default.rules"))?;
+    assert!(policy.contains(
+        r#"network_rule(host="codex-network-test.invalid", protocol="http", decision="allow""#
+    ));
+    assert!(first_responses.requests().iter().any(|request| {
+        request.body_contains_text(
+            "Allowed network rule saved in execpolicy (allowlist): codex-network-test.invalid",
+        )
+    }));
+
+    mount_exec_network_turn(
+        &server,
+        "resp-network-amendment-2",
+        "network-amendment-2",
+        network_fetch_args(LOCAL_ENVIRONMENT_ID),
+    )
+    .await?;
+    submit_managed_network_turn(
+        &test,
+        "reuse the persisted allow rule",
+        environments,
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    wait_for_completion_without_network_prompt(&test).await;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "requires the trusted Linux proxy bridge"
+)]
+async fn unattributed_network_request_uses_active_turn_environment_fallback() -> Result<()> {
+    skip_if_target_windows!(Ok(()), "uses a raw TCP proxy fixture");
+    skip_if_host_windows!(Ok(()));
+    skip_if_no_network!(Ok(()));
+    skip_if_sandbox!(Ok(()));
+
+    let server = start_mock_server().await;
+    let test = managed_network_unified_exec_test(&server).await?;
+    let pending_model = mount_response_once_match(
+        &server,
+        |request: &wiremock::Request| request_body_contains(request, "hold the active turn"),
+        sse_response(sse(vec![
+            ev_response_created("resp-unattributed-network"),
+            ev_assistant_message("msg-unattributed-network", "done"),
+            ev_completed("resp-unattributed-network"),
+        ]))
+        .set_delay(Duration::from_secs(30)),
+    )
+    .await;
+    submit_managed_network_turn(
+        &test,
+        "hold the active turn",
+        vec![test.local_environment_selection()],
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    wait_for_response_request(&pending_model).await;
+
+    let proxy_addr = test
+        .session_configured
+        .network_proxy
+        .as_ref()
+        .context("expected managed network proxy")?
+        .http_addr
+        .clone();
+    let proxy_request = tokio::spawn(raw_http_proxy_request(proxy_addr, NETWORK_TEST_HOST));
+    let approval = expect_network_approval(&test, LOCAL_ENVIRONMENT_ID).await?;
+    assert_eq!(approval.command, ["network-access", NETWORK_TEST_TARGET]);
+    assert_eq!(approval.cwd, test.local_environment_cwd());
+    test.codex
+        .submit(Op::ExecApproval {
+            id: approval.effective_approval_id(),
+            turn_id: Some(approval.turn_id),
+            decision: ReviewDecision::Approved,
+        })
+        .await?;
+    let response = tokio::time::timeout(Duration::from_secs(10), proxy_request)
+        .await
+        .context("unattributed proxy request did not finish")???;
+    assert!(response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.1 502"));
+
+    test.codex.submit(Op::Interrupt).await?;
+    wait_for_event(&test.codex, |event| {
+        matches!(event, EventMsg::TurnAborted(_))
+    })
+    .await;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "requires the trusted Linux proxy bridge"
+)]
+async fn ambiguous_unattributed_network_request_is_not_assigned_to_active_calls() -> Result<()> {
+    skip_if_target_windows!(Ok(()), "uses POSIX shell and raw TCP fixtures");
+    skip_if_host_windows!(Ok(()));
+    skip_if_no_network!(Ok(()));
+    skip_if_sandbox!(Ok(()));
+
+    let server = start_mock_server().await;
+    let test = managed_network_unified_exec_test(&server).await?;
+    let first_marker = test.cwd.path().join("ambiguous-network-first");
+    let second_marker = test.cwd.path().join("ambiguous-network-second");
+    let wait_command = |marker: &std::path::Path| {
+        format!(
+            "touch '{}' && while true; do sleep 1; done",
+            marker.display()
+        )
+    };
+    mount_sse_once_match(
+        &server,
+        |request: &wiremock::Request| request_body_contains(request, "start two active commands"),
+        sse(vec![
+            ev_response_created("resp-ambiguous-network"),
+            ev_function_call(
+                "ambiguous-network-first",
+                "exec_command",
+                &serde_json::to_string(&network_exec_args(&wait_command(&first_marker)))?,
+            ),
+            ev_function_call(
+                "ambiguous-network-second",
+                "exec_command",
+                &serde_json::to_string(&network_exec_args(&wait_command(&second_marker)))?,
+            ),
+            ev_completed("resp-ambiguous-network"),
+        ]),
+    )
+    .await;
+    submit_managed_network_turn(
+        &test,
+        "start two active commands",
+        vec![test.local_environment_selection()],
+        ApprovalsReviewer::User,
+        AskForApproval::OnRequest,
+    )
+    .await?;
+    wait_for_paths(&[&first_marker, &second_marker]).await?;
+
+    let proxy_addr = test
+        .session_configured
+        .network_proxy
+        .as_ref()
+        .context("expected managed network proxy")?
+        .http_addr
+        .clone();
+    let response = tokio::time::timeout(
+        Duration::from_secs(10),
+        raw_http_proxy_request(proxy_addr, NETWORK_TEST_HOST),
+    )
+    .await
+    .context("ambiguous proxy request did not finish")??;
+    assert!(response.starts_with("HTTP/1.1 403"));
+    assert!(
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            wait_for_event(&test.codex, |event| matches!(
+                event,
+                EventMsg::ExecApprovalRequest(_)
+            ))
+        )
+        .await
+        .is_err(),
+        "ambiguous request was incorrectly assigned to an active call"
+    );
+
+    test.codex.submit(Op::Interrupt).await?;
+    wait_for_event(&test.codex, |event| {
+        matches!(event, EventMsg::TurnAborted(_))
+    })
+    .await;
+    test.codex.submit(Op::CleanBackgroundTerminals).await?;
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if test.codex.list_background_terminals().await.is_empty() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .context("timed out waiting for background terminal cleanup")?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "requires the trusted Linux proxy bridge"
+)]
 async fn guardian_receives_exact_triggers_for_concurrent_network_requests() -> Result<()> {
     skip_if_target_windows!(Ok(()), "uses the POSIX/Python network fixture");
     skip_if_host_windows!(Ok(()));
@@ -143,7 +909,7 @@ async fn guardian_receives_exact_triggers_for_concurrent_network_requests() -> R
     submit_managed_network_turn(
         &test,
         "run both network requests",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::AutoReview,
         AskForApproval::OnRequest,
     )
@@ -217,7 +983,7 @@ async fn guardian_receives_exact_trigger_for_single_network_request() -> Result<
     submit_managed_network_turn(
         &test,
         "run one network request",
-        vec![local(test.config.cwd.clone())],
+        vec![test.local_environment_selection()],
         ApprovalsReviewer::AutoReview,
         AskForApproval::OnRequest,
     )
@@ -276,7 +1042,7 @@ async fn approved_network_host_for_one_environment_still_prompts_in_another() ->
         "fetch from the local environment",
         environments.clone(),
         ApprovalsReviewer::User,
-        AskForApproval::UnlessTrusted,
+        AskForApproval::OnRequest,
     )
     .await?;
     let approval = expect_network_approval(&test, LOCAL_ENVIRONMENT_ID).await?;
@@ -301,7 +1067,7 @@ async fn approved_network_host_for_one_environment_still_prompts_in_another() ->
         "fetch from the remote environment",
         environments.clone(),
         ApprovalsReviewer::User,
-        AskForApproval::UnlessTrusted,
+        AskForApproval::OnRequest,
     )
     .await?;
     let approval = expect_network_approval(&test, REMOTE_ENVIRONMENT_ID).await?;
@@ -409,6 +1175,9 @@ fn network_fetch_args(environment_id: &str) -> Value {
         "python3 -c \"import urllib.request; opener = urllib.request.build_opener(urllib.request.ProxyHandler()); print('OK:' + opener.open('http://{NETWORK_TEST_HOST}', timeout=2).read().decode(errors='replace'))\""
     );
     let mut args = network_exec_args(&command);
+    if environment_id == REMOTE_ENVIRONMENT_ID {
+        args["shell"] = json!("bash");
+    }
     args["environment_id"] = json!(environment_id);
     args
 }

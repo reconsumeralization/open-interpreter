@@ -1042,7 +1042,7 @@ mod tests {
         );
         assert_eq!(
             view.event_table_lines()[1].spans[3].style.fg,
-            Some(Color::Cyan)
+            Some(crate::style::app_accent_color())
         );
         assert!(
             view.event_table_lines()[1].spans[3]

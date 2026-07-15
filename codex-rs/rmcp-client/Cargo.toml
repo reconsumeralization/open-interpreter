@@ -19,6 +19,7 @@ codex-api = { workspace = true }
 codex-config = { workspace = true }
 codex-exec-server = { workspace = true }
 codex-keyring-store = { workspace = true }
+codex-product-info = { workspace = true }
 codex-protocol = { workspace = true }
 codex-secrets = { workspace = true }
 codex-utils-path-uri = { workspace = true }

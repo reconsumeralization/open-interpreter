@@ -65,6 +65,7 @@ use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::turn_permission_fields;
 use core_test_support::test_docker_container_name;
 use core_test_support::wait_for_event;
+use core_test_support::wait_for_event_with_timeout;
 use core_test_support::wait_for_mcp_server;
 use image::DynamicImage;
 use image::GenericImageView;
@@ -168,6 +169,7 @@ enum McpCallEvent {
 }
 
 const REMOTE_MCP_ENVIRONMENT: &str = "remote";
+const REMOTE_MCP_TEST_DIR: &str = "/tmp/codex-remote-env";
 
 fn remote_aware_environment_id() -> String {
     if is_remote_test_environment() {
@@ -206,7 +208,7 @@ fn remote_aware_stdio_server_bin() -> anyhow::Result<String> {
 fn unique_remote_path(binary_name: &str) -> anyhow::Result<String> {
     let unique_suffix = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     Ok(format!(
-        "/tmp/codex-remote-env/{binary_name}-{}-{unique_suffix}",
+        "{REMOTE_MCP_TEST_DIR}/{binary_name}-{}-{unique_suffix}",
         std::process::id()
     ))
 }
@@ -291,7 +293,10 @@ fn stdio_transport(
     env: Option<HashMap<String, String>>,
     env_vars: Vec<McpServerEnvVar>,
 ) -> McpServerTransportConfig {
-    stdio_transport_with_cwd(command, env, env_vars, /*cwd*/ None)
+    let cwd = Path::new(&command)
+        .starts_with(REMOTE_MCP_TEST_DIR)
+        .then(|| PathBuf::from(REMOTE_MCP_TEST_DIR));
+    stdio_transport_with_cwd(command, env, env_vars, cwd)
 }
 
 fn stdio_transport_with_cwd(
@@ -1499,7 +1504,12 @@ async fn stdio_image_responses_resize_large_image() -> anyhow::Result<()> {
             "call the rmcp image_scenario tool",
         ))
         .await?;
-    wait_for_event(&fixture.codex, |ev| matches!(ev, EventMsg::TurnComplete(_))).await;
+    wait_for_event_with_timeout(
+        &fixture.codex,
+        |ev| matches!(ev, EventMsg::TurnComplete(_)),
+        Duration::from_secs(60),
+    )
+    .await;
 
     let output_item = final_mock.single_request().function_call_output(call_id);
     assert_eq!(output_item["call_id"], call_id);
@@ -1642,6 +1652,7 @@ async fn stdio_image_responses_are_sanitized_for_text_only_model() -> anyhow::Re
                     effort: codex_protocol::openai_models::ReasoningEffort::Medium,
                     description: "Medium".to_string(),
                 }],
+                reasoning_control: codex_protocol::openai_models::ReasoningControl::None,
                 shell_type: ConfigShellToolType::Default,
                 visibility: ModelVisibility::List,
                 supported_in_api: true,
@@ -2835,6 +2846,25 @@ async fn wait_for_remote_bound_addr(
 
 /// Reads the container IP that the host-side test process can use.
 fn remote_container_ip(container_name: &str) -> anyhow::Result<String> {
+    let network_mode = StdCommand::new("docker")
+        .args([
+            "inspect",
+            "-f",
+            "{{.HostConfig.NetworkMode}}",
+            container_name,
+        ])
+        .output()
+        .context("inspect remote MCP test container network mode")?;
+    ensure!(
+        network_mode.status.success(),
+        "docker inspect remote MCP test container network mode failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&network_mode.stdout).trim(),
+        String::from_utf8_lossy(&network_mode.stderr).trim()
+    );
+    if String::from_utf8_lossy(&network_mode.stdout).trim() == "host" {
+        return Ok("127.0.0.1".to_string());
+    }
+
     let output = StdCommand::new("docker")
         .args([
             "inspect",

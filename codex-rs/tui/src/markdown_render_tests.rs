@@ -1,4 +1,5 @@
 use pretty_assertions::assert_eq;
+use ratatui::style::Styled as _;
 use ratatui::style::Modifier;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
@@ -12,6 +13,8 @@ use crate::markdown_render::render_markdown_lines_with_width_and_cwd;
 use crate::markdown_render::render_markdown_text;
 use crate::markdown_render::render_markdown_text_with_width;
 use crate::markdown_render::render_markdown_text_with_width_and_cwd;
+use crate::style::app_accent_style;
+use crate::style::app_accent_underlined_style;
 use insta::assert_debug_snapshot;
 use insta::assert_snapshot;
 
@@ -169,7 +172,7 @@ fn headings() {
 #[test]
 fn blockquote_single() {
     let text = render_markdown_text("> Blockquote");
-    let expected = Text::from(Line::from_iter(["> ", "Blockquote"]).green());
+    let expected = Text::from(Line::from_iter(["> ", "Blockquote"]).set_style(app_accent_style()));
     assert_eq!(text, expected);
 }
 
@@ -200,9 +203,9 @@ fn blockquote_soft_break() {
 fn blockquote_multiple_with_break() {
     let text = render_markdown_text("> Blockquote 1\n\n> Blockquote 2\n");
     let expected = Text::from_iter([
-        Line::from_iter(["> ", "Blockquote 1"]).green(),
+        Line::from_iter(["> ", "Blockquote 1"]).set_style(app_accent_style()),
         Line::default(),
-        Line::from_iter(["> ", "Blockquote 2"]).green(),
+        Line::from_iter(["> ", "Blockquote 2"]).set_style(app_accent_style()),
     ]);
     assert_eq!(text, expected);
 }
@@ -212,11 +215,11 @@ fn blockquote_three_paragraphs_short_lines() {
     let md = "> one\n>\n> two\n>\n> three\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["> ", "one"]).green(),
-        Line::from_iter(["> "]).green(),
-        Line::from_iter(["> ", "two"]).green(),
-        Line::from_iter(["> "]).green(),
-        Line::from_iter(["> ", "three"]).green(),
+        Line::from_iter(["> ", "one"]).set_style(app_accent_style()),
+        Line::from_iter(["> "]).set_style(app_accent_style()),
+        Line::from_iter(["> ", "two"]).set_style(app_accent_style()),
+        Line::from_iter(["> "]).set_style(app_accent_style()),
+        Line::from_iter(["> ", "three"]).set_style(app_accent_style()),
     ]);
     assert_eq!(text, expected);
 }
@@ -226,9 +229,9 @@ fn blockquote_nested_two_levels() {
     let md = "> Level 1\n>> Level 2\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["> ", "Level 1"]).green(),
-        Line::from_iter(["> "]).green(),
-        Line::from_iter(["> ", "> ", "Level 2"]).green(),
+        Line::from_iter(["> ", "Level 1"]).set_style(app_accent_style()),
+        Line::from_iter(["> "]).set_style(app_accent_style()),
+        Line::from_iter(["> ", "> ", "Level 2"]).set_style(app_accent_style()),
     ]);
     assert_eq!(text, expected);
 }
@@ -238,8 +241,18 @@ fn blockquote_with_list_items() {
     let md = "> - item 1\n> - item 2\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["> ", "- ", "item 1"]).green(),
-        Line::from_iter(["> ", "- ", "item 2"]).green(),
+        Line::from_iter(vec![
+            Span::from("> "),
+            "- ".set_style(app_accent_style()),
+            Span::from("item 1"),
+        ])
+        .set_style(app_accent_style()),
+        Line::from_iter(vec![
+            Span::from("> "),
+            "- ".set_style(app_accent_style()),
+            Span::from("item 2"),
+        ])
+        .set_style(app_accent_style()),
     ]);
     assert_eq!(text, expected);
 }
@@ -251,16 +264,16 @@ fn blockquote_with_ordered_list() {
     let expected = Text::from_iter([
         Line::from_iter(vec![
             Span::from("> "),
-            "1. ".light_blue(),
+            "1. ".set_style(app_accent_style()),
             Span::from("first"),
         ])
-        .green(),
+        .set_style(app_accent_style()),
         Line::from_iter(vec![
             Span::from("> "),
-            "2. ".light_blue(),
+            "2. ".set_style(app_accent_style()),
             Span::from("second"),
         ])
-        .green(),
+        .set_style(app_accent_style()),
     ]);
     assert_eq!(text, expected);
 }
@@ -270,8 +283,13 @@ fn blockquote_list_then_nested_blockquote() {
     let md = "> - parent\n>   > child\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["> ", "- ", "parent"]).green(),
-        Line::from_iter(["> ", "  ", "> ", "child"]).green(),
+        Line::from_iter(vec![
+            Span::from("> "),
+            "- ".set_style(app_accent_style()),
+            Span::from("parent"),
+        ])
+        .set_style(app_accent_style()),
+        Line::from_iter(["> ", "  ", "> ", "child"]).set_style(app_accent_style()),
     ]);
     assert_eq!(text, expected);
 }
@@ -481,9 +499,9 @@ fn blockquote_heading_inherits_heading_style() {
                 "# ".bold().underlined(),
                 "test header".bold().underlined(),
             ])
-            .green(),
-            Line::from_iter(["> "]).green(),
-            Line::from_iter(["> ", "in blockquote"]).green(),
+            .set_style(app_accent_style()),
+            Line::from_iter(["> "]).set_style(app_accent_style()),
+            Line::from_iter(["> ", "in blockquote"]).set_style(app_accent_style()),
         ]
     );
 }
@@ -568,7 +586,10 @@ fn nested_blockquote_with_inline_and_fenced_code() {
 #[test]
 fn list_unordered_single() {
     let text = render_markdown_text("- List item 1\n");
-    let expected = Text::from_iter([Line::from_iter(["- ", "List item 1"])]);
+    let expected = Text::from_iter([Line::from_iter([
+        "- ".set_style(app_accent_style()),
+        "List item 1".into(),
+    ])]);
     assert_eq!(text, expected);
 }
 
@@ -576,8 +597,8 @@ fn list_unordered_single() {
 fn list_unordered_multiple() {
     let text = render_markdown_text("- List item 1\n- List item 2\n");
     let expected = Text::from_iter([
-        Line::from_iter(["- ", "List item 1"]),
-        Line::from_iter(["- ", "List item 2"]),
+        Line::from_iter(["- ".set_style(app_accent_style()), "List item 1".into()]),
+        Line::from_iter(["- ".set_style(app_accent_style()), "List item 2".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -586,8 +607,8 @@ fn list_unordered_multiple() {
 fn list_ordered() {
     let text = render_markdown_text("1. List item 1\n2. List item 2\n");
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "List item 1".into()]),
-        Line::from_iter(["2. ".light_blue(), "List item 2".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "List item 1".into()]),
+        Line::from_iter(["2. ".set_style(app_accent_style()), "List item 2".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -596,8 +617,11 @@ fn list_ordered() {
 fn list_nested() {
     let text = render_markdown_text("- List item 1\n  - Nested list item 1\n");
     let expected = Text::from_iter([
-        Line::from_iter(["- ", "List item 1"]),
-        Line::from_iter(["    - ", "Nested list item 1"]),
+        Line::from_iter(["- ".set_style(app_accent_style()), "List item 1".into()]),
+        Line::from_iter([
+            "    - ".set_style(app_accent_style()),
+            "Nested list item 1".into(),
+        ]),
     ]);
     assert_eq!(text, expected);
 }
@@ -606,8 +630,8 @@ fn list_nested() {
 fn list_ordered_custom_start() {
     let text = render_markdown_text("3. First\n4. Second\n");
     let expected = Text::from_iter([
-        Line::from_iter(["3. ".light_blue(), "First".into()]),
-        Line::from_iter(["4. ".light_blue(), "Second".into()]),
+        Line::from_iter(["3. ".set_style(app_accent_style()), "First".into()]),
+        Line::from_iter(["4. ".set_style(app_accent_style()), "Second".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -617,11 +641,11 @@ fn nested_unordered_in_ordered() {
     let md = "1. Outer\n    - Inner A\n    - Inner B\n2. Next\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "Outer".into()]),
-        Line::from_iter(["    - ", "Inner A"]),
-        Line::from_iter(["    - ", "Inner B"]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "Outer".into()]),
+        Line::from_iter(["    - ".set_style(app_accent_style()), "Inner A".into()]),
+        Line::from_iter(["    - ".set_style(app_accent_style()), "Inner B".into()]),
         Line::default(),
-        Line::from_iter(["2. ".light_blue(), "Next".into()]),
+        Line::from_iter(["2. ".set_style(app_accent_style()), "Next".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -631,11 +655,11 @@ fn nested_ordered_in_unordered() {
     let md = "- Outer\n    1. One\n    2. Two\n- Last\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["- ", "Outer"]),
-        Line::from_iter(["    1. ".light_blue(), "One".into()]),
-        Line::from_iter(["    2. ".light_blue(), "Two".into()]),
+        Line::from_iter(["- ".set_style(app_accent_style()), "Outer".into()]),
+        Line::from_iter(["    1. ".set_style(app_accent_style()), "One".into()]),
+        Line::from_iter(["    2. ".set_style(app_accent_style()), "Two".into()]),
         Line::default(),
-        Line::from_iter(["- ", "Last"]),
+        Line::from_iter(["- ".set_style(app_accent_style()), "Last".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -645,11 +669,11 @@ fn loose_list_item_multiple_paragraphs() {
     let md = "1. First paragraph\n\n   Second paragraph of same item\n\n2. Next item\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "First paragraph".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "First paragraph".into()]),
         Line::default(),
         Line::from_iter(["   ", "Second paragraph of same item"]),
         Line::default(),
-        Line::from_iter(["2. ".light_blue(), "Next item".into()]),
+        Line::from_iter(["2. ".set_style(app_accent_style()), "Next item".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -659,7 +683,7 @@ fn tight_item_with_soft_break() {
     let md = "- item line1\n  item line2\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["- ", "item line1"]),
+        Line::from_iter(["- ".set_style(app_accent_style()), "item line1".into()]),
         Line::from_iter(["  ", "item line2"]),
     ]);
     assert_eq!(text, expected);
@@ -670,11 +694,11 @@ fn deeply_nested_mixed_three_levels() {
     let md = "1. A\n    - B\n        1. C\n2. D\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "A".into()]),
-        Line::from_iter(["    - ", "B"]),
-        Line::from_iter(["        1. ".light_blue(), "C".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "A".into()]),
+        Line::from_iter(["    - ".set_style(app_accent_style()), "B".into()]),
+        Line::from_iter(["        1. ".set_style(app_accent_style()), "C".into()]),
         Line::default(),
-        Line::from_iter(["2. ".light_blue(), "D".into()]),
+        Line::from_iter(["2. ".set_style(app_accent_style()), "D".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -684,8 +708,8 @@ fn loose_items_due_to_blank_line_between_items() {
     let md = "1. First\n\n2. Second\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "First".into()]),
-        Line::from_iter(["2. ".light_blue(), "Second".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "First".into()]),
+        Line::from_iter(["2. ".set_style(app_accent_style()), "Second".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -695,8 +719,8 @@ fn mixed_tight_then_loose_in_one_list() {
     let md = "1. Tight\n\n2.\n   Loose\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "Tight".into()]),
-        Line::from_iter(["2. ".light_blue(), "Loose".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "Tight".into()]),
+        Line::from_iter(["2. ".set_style(app_accent_style()), "Loose".into()]),
     ]);
     assert_eq!(text, expected);
 }
@@ -706,7 +730,7 @@ fn ordered_item_with_indented_continuation_is_tight() {
     let md = "1. Foo\n   Bar\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "Foo".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "Foo".into()]),
         Line::from_iter(["   ", "Bar"]),
     ]);
     assert_eq!(text, expected);
@@ -715,7 +739,7 @@ fn ordered_item_with_indented_continuation_is_tight() {
 #[test]
 fn inline_code() {
     let text = render_markdown_text("Example of `Inline code`");
-    let expected = Line::from_iter(["Example of ".into(), "Inline code".cyan()]).into();
+    let expected = Line::from_iter(["Example of ".into(), "Inline code".set_style(app_accent_style())]).into();
     assert_eq!(text, expected);
 }
 
@@ -759,7 +783,7 @@ fn link() {
     let expected = Text::from(Line::from_iter([
         "Link".into(),
         " (".into(),
-        "https://example.com".cyan().underlined(),
+        "https://example.com".set_style(app_accent_underlined_style()),
         ")".into(),
     ]));
     assert_eq!(text, expected);
@@ -778,7 +802,7 @@ fn file_link_hides_destination() {
         Path::new("/Users/example/code/codex"),
     );
     let expected =
-        Text::from(Line::from_iter(["codex-rs/tui/src/markdown_render.rs".cyan()]));
+        Text::from(Line::from_iter(["codex-rs/tui/src/markdown_render.rs".set_style(app_accent_style())]));
     assert_eq!(text, expected);
 }
 
@@ -789,7 +813,7 @@ fn file_link_decodes_percent_encoded_bare_path_destination() {
         Path::new("/Users/example/code/codex"),
     );
     let expected = Text::from(Line::from_iter([
-        "Example Folder/Résumé/report.md".cyan(),
+        "Example Folder/Résumé/report.md".set_style(app_accent_style()),
     ]));
     assert_eq!(text, expected);
 }
@@ -801,7 +825,7 @@ fn file_link_appends_line_number_when_label_lacks_it() {
         Path::new("/Users/example/code/codex"),
     );
     let expected = Text::from(Line::from_iter([
-        "codex-rs/tui/src/markdown_render.rs:74".cyan(),
+        "codex-rs/tui/src/markdown_render.rs:74".set_style(app_accent_style()),
     ]));
     assert_eq!(text, expected);
 }
@@ -812,7 +836,7 @@ fn file_link_keeps_absolute_paths_outside_cwd() {
         "[README.md:74](/Users/example/code/codex/README.md:74)",
         Path::new("/Users/example/code/codex/codex-rs/tui"),
     );
-    let expected = Text::from(Line::from_iter(["/Users/example/code/codex/README.md:74".cyan()]));
+    let expected = Text::from(Line::from_iter(["/Users/example/code/codex/README.md:74".set_style(app_accent_style())]));
     assert_eq!(text, expected);
 }
 
@@ -824,7 +848,7 @@ fn file_link_appends_hash_anchor_when_label_lacks_it() {
     );
     let expected =
         Text::from(Line::from_iter([
-            "codex-rs/tui/src/markdown_render.rs:74:3".cyan(),
+            "codex-rs/tui/src/markdown_render.rs:74:3".set_style(app_accent_style()),
         ]));
     assert_eq!(text, expected);
 }
@@ -837,7 +861,7 @@ fn file_link_uses_target_path_for_hash_anchor() {
     );
     let expected =
         Text::from(Line::from_iter([
-            "codex-rs/tui/src/markdown_render.rs:74:3".cyan(),
+            "codex-rs/tui/src/markdown_render.rs:74:3".set_style(app_accent_style()),
         ]));
     assert_eq!(text, expected);
 }
@@ -850,7 +874,7 @@ fn file_link_appends_range_when_label_lacks_it() {
     );
     let expected =
         Text::from(Line::from_iter([
-            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".cyan(),
+            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".set_style(app_accent_style()),
         ]));
     assert_eq!(text, expected);
 }
@@ -863,7 +887,7 @@ fn file_link_uses_target_path_for_range() {
     );
     let expected =
         Text::from(Line::from_iter([
-            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".cyan(),
+            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".set_style(app_accent_style()),
         ]));
     assert_eq!(text, expected);
 }
@@ -876,7 +900,7 @@ fn file_link_appends_hash_range_when_label_lacks_it() {
     );
     let expected =
         Text::from(Line::from_iter([
-            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".cyan(),
+            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".set_style(app_accent_style()),
         ]));
     assert_eq!(text, expected);
 }
@@ -890,7 +914,7 @@ fn multiline_file_link_label_after_styled_prefix_does_not_panic() {
     let expected = Text::from(Line::from_iter([
         "bold".bold(),
         " plain ".into(),
-        "codex-rs/tui/src/markdown_render.rs:74:3".cyan(),
+        "codex-rs/tui/src/markdown_render.rs:74:3".set_style(app_accent_style()),
     ]));
     assert_eq!(text, expected);
 }
@@ -903,7 +927,7 @@ fn file_link_uses_target_path_for_hash_range() {
     );
     let expected =
         Text::from(Line::from_iter([
-            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".cyan(),
+            "codex-rs/tui/src/markdown_render.rs:74:3-76:9".set_style(app_accent_style()),
         ]));
     assert_eq!(text, expected);
 }
@@ -914,7 +938,7 @@ fn url_link_shows_destination() {
     let expected = Text::from(Line::from_iter([
         "docs".into(),
         " (".into(),
-        "https://example.com/docs".cyan().underlined(),
+        "https://example.com/docs".set_style(app_accent_underlined_style()),
         ")".into(),
     ]));
     assert_eq!(text, expected);
@@ -1419,13 +1443,19 @@ fn nested_five_levels_mixed_lists() {
     let md = "1. First\n   - Second level\n     1. Third level (ordered)\n        - Fourth level (bullet)\n          - Fifth level to test indent consistency\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "First".into()]),
-        Line::from_iter(["    - ", "Second level"]),
-        Line::from_iter(["        1. ".light_blue(), "Third level (ordered)".into()]),
-        Line::from_iter(["            - ", "Fourth level (bullet)"]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "First".into()]),
         Line::from_iter([
-            "                - ",
-            "Fifth level to test indent consistency",
+            "    - ".set_style(app_accent_style()),
+            "Second level".into(),
+        ]),
+        Line::from_iter(["        1. ".set_style(app_accent_style()), "Third level (ordered)".into()]),
+        Line::from_iter([
+            "            - ".set_style(app_accent_style()),
+            "Fourth level (bullet)".into(),
+        ]),
+        Line::from_iter([
+            "                - ".set_style(app_accent_style()),
+            "Fifth level to test indent consistency".into(),
         ]),
     ]);
     assert_eq!(text, expected);
@@ -1456,7 +1486,7 @@ fn html_in_tight_ordered_item_soft_breaks_with_space() {
     let md = "1. Foo\n   <i>Bar</i>\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "Foo".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "Foo".into()]),
         Line::from_iter(["   ", "<i>", "Bar", "</i>"]),
     ]);
     assert_eq!(text, expected);
@@ -1467,7 +1497,7 @@ fn html_continuation_paragraph_in_unordered_item_indented() {
     let md = "- Item\n\n  <em>continued</em>\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["- ", "Item"]),
+        Line::from_iter(["- ".set_style(app_accent_style()), "Item".into()]),
         Line::default(),
         Line::from_iter(["  ", "<em>", "continued", "</em>"]),
     ]);
@@ -1504,7 +1534,7 @@ fn ordered_item_continuation_paragraph_is_indented() {
     let md = "1. Intro\n\n   More details about intro\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "Intro".into()]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "Intro".into()]),
         Line::default(),
         Line::from_iter(["   ", "More details about intro"]),
     ]);
@@ -1516,12 +1546,12 @@ fn nested_item_continuation_paragraph_is_indented() {
     let md = "1. A\n    - B\n\n      Continuation for B\n2. C\n";
     let text = render_markdown_text(md);
     let expected = Text::from_iter([
-        Line::from_iter(["1. ".light_blue(), "A".into()]),
-        Line::from_iter(["    - ", "B"]),
+        Line::from_iter(["1. ".set_style(app_accent_style()), "A".into()]),
+        Line::from_iter(["    - ".set_style(app_accent_style()), "B".into()]),
         Line::default(),
         Line::from_iter(["      ", "Continuation for B"]),
         Line::default(),
-        Line::from_iter(["2. ".light_blue(), "C".into()]),
+        Line::from_iter(["2. ".set_style(app_accent_style()), "C".into()]),
     ]);
     assert_eq!(text, expected);
 }

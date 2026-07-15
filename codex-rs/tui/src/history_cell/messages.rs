@@ -105,6 +105,14 @@ fn trim_trailing_blank_lines(mut lines: Vec<Line<'static>>) -> Vec<Line<'static>
     lines
 }
 
+fn gentle_top_separator_line(width: u16) -> Line<'static> {
+    Line::from("─".repeat(usize::from(width))).dim()
+}
+
+fn gentle_bottom_separator_line(width: u16) -> Line<'static> {
+    Line::from("─".repeat(usize::from(width))).dim()
+}
+
 impl HistoryCell for UserHistoryCell {
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
         let message = sanitize_user_text(&self.message);
@@ -171,7 +179,7 @@ impl HistoryCell for UserHistoryCell {
             return Vec::new();
         }
 
-        let mut lines: Vec<Line<'static>> = vec![Line::from("").style(style)];
+        let mut lines: Vec<Line<'static>> = vec![gentle_top_separator_line(width)];
 
         if let Some(wrapped_remote_images) = wrapped_remote_images {
             lines.extend(prefix_lines(
@@ -192,7 +200,7 @@ impl HistoryCell for UserHistoryCell {
             ));
         }
 
-        lines.push(Line::from("").style(style));
+        lines.push(gentle_bottom_separator_line(width));
         lines
     }
 

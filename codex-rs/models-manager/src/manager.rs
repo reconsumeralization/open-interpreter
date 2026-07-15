@@ -1,5 +1,6 @@
 use super::cache::ModelsCacheManager;
 use crate::collaboration_mode_presets::builtin_collaboration_mode_presets;
+use crate::compatibility_enrichment::apply_compatibility_catalog;
 use crate::config::ModelsManagerConfig;
 use crate::model_info;
 use codex_http_client::HttpClientFactory;
@@ -214,8 +215,12 @@ pub type SharedModelsManager = Arc<dyn ModelsManager>;
 #[derive(Debug)]
 pub struct OpenAiModelsManager {
     remote_models: RwLock<Vec<ModelInfo>>,
+    base_models: Vec<ModelInfo>,
+    /// Whether the base models came from the generated provider catalog, in
+    /// which case the bundled compatibility catalog refines their metadata.
+    enrich_with_compatibility_catalog: bool,
     etag: RwLock<Option<String>>,
-    cache_manager: ModelsCacheManager,
+    cache_manager: Option<ModelsCacheManager>,
     endpoint_client: SharedModelsEndpointClient,
     auth_manager: Option<Arc<AuthManager>>,
 }
@@ -234,11 +239,67 @@ impl OpenAiModelsManager {
         endpoint_client: Arc<dyn ModelsEndpointClient>,
         auth_manager: Option<Arc<AuthManager>>,
     ) -> Self {
+        Self::new_with_base_models(codex_home, endpoint_client, auth_manager, Vec::new())
+    }
+
+    /// Construct an OpenAI-compatible model manager seeded with provider-local
+    /// models before any live `/models` refresh is available.
+    pub fn new_with_base_models(
+        codex_home: PathBuf,
+        endpoint_client: Arc<dyn ModelsEndpointClient>,
+        auth_manager: Option<Arc<AuthManager>>,
+        base_models: Vec<ModelInfo>,
+    ) -> Self {
         let cache_path = codex_home.join(MODEL_CACHE_FILE);
-        let cache_manager = ModelsCacheManager::new(cache_path, DEFAULT_MODEL_CACHE_TTL);
-        let remote_models = load_remote_models_from_file().unwrap_or_default();
+        Self::new_with_cache_manager(
+            Some(ModelsCacheManager::new(cache_path, DEFAULT_MODEL_CACHE_TTL)),
+            endpoint_client,
+            auth_manager,
+            base_models,
+        )
+    }
+
+    /// Construct an OpenAI-compatible model manager with caching disabled.
+    pub fn new_without_cache(
+        endpoint_client: Arc<dyn ModelsEndpointClient>,
+        auth_manager: Option<Arc<AuthManager>>,
+    ) -> Self {
+        Self::new_without_cache_with_base_models(endpoint_client, auth_manager, Vec::new())
+    }
+
+    /// Construct an OpenAI-compatible model manager with caching disabled and
+    /// provider-local models available before the first live refresh.
+    pub fn new_without_cache_with_base_models(
+        endpoint_client: Arc<dyn ModelsEndpointClient>,
+        auth_manager: Option<Arc<AuthManager>>,
+        base_models: Vec<ModelInfo>,
+    ) -> Self {
+        Self::new_with_cache_manager(
+            /*cache_manager*/ None,
+            endpoint_client,
+            auth_manager,
+            base_models,
+        )
+    }
+
+    fn new_with_cache_manager(
+        cache_manager: Option<ModelsCacheManager>,
+        endpoint_client: Arc<dyn ModelsEndpointClient>,
+        auth_manager: Option<Arc<AuthManager>>,
+        base_models: Vec<ModelInfo>,
+    ) -> Self {
+        // Provider-catalog models are refined with the bundled compatibility
+        // catalog; the curated codex `models.json` fallback stays authoritative.
+        let (base_models, enrich_with_compatibility_catalog) = if base_models.is_empty() {
+            (load_remote_models_from_file().unwrap_or_default(), false)
+        } else {
+            (apply_compatibility_catalog(base_models), true)
+        };
+        let remote_models = base_models.clone();
         Self {
             remote_models: RwLock::new(remote_models),
+            base_models,
+            enrich_with_compatibility_catalog,
             etag: RwLock::new(None),
             cache_manager,
             endpoint_client,
@@ -319,7 +380,9 @@ impl OpenAiModelsManager {
     async fn refresh_if_new_etag(&self, etag: String, http_client_factory: HttpClientFactory) {
         let current_etag = self.get_etag().await;
         if current_etag.clone().is_some() && current_etag.as_deref() == Some(etag.as_str()) {
-            if let Err(err) = self.cache_manager.renew_cache_ttl().await {
+            if let Some(cache_manager) = self.cache_manager.as_ref()
+                && let Err(err) = cache_manager.renew_cache_ttl().await
+            {
                 error!("failed to renew cache TTL: {err}");
             }
             return;
@@ -379,11 +442,14 @@ impl OpenAiModelsManager {
             .endpoint_client
             .list_models(&client_version, http_client_factory.clone())
             .await?;
-        self.apply_remote_models(models.clone()).await;
+        self.apply_remote_models(models).await;
+        let models = self.get_remote_models().await;
         *self.etag.write().await = etag.clone();
-        self.cache_manager
-            .persist_cache(&models, etag, client_version)
-            .await;
+        if let Some(cache_manager) = self.cache_manager.as_ref() {
+            cache_manager
+                .persist_cache(&models, etag, client_version)
+                .await;
+        }
         Ok(())
     }
 
@@ -413,29 +479,41 @@ impl OpenAiModelsManager {
             return;
         }
 
-        let mut existing_models = load_remote_models_from_file().unwrap_or_default();
+        let existing_models = self.merged_provider_catalog_models(models);
+        *self.remote_models.write().await = existing_models;
+    }
+
+    fn merged_provider_catalog_models(&self, models: Vec<ModelInfo>) -> Vec<ModelInfo> {
+        let mut existing_models = self.base_models.clone();
         for model in models {
             if let Some(existing_index) = existing_models
                 .iter()
                 .position(|existing| existing.slug == model.slug)
             {
-                existing_models[existing_index] = model;
+                existing_models[existing_index] =
+                    merge_provider_catalog_model(&existing_models[existing_index], model);
             } else {
                 existing_models.push(model);
             }
         }
-        *self.remote_models.write().await = existing_models;
+        if self.enrich_with_compatibility_catalog {
+            existing_models = apply_compatibility_catalog(existing_models);
+        }
+        existing_models
     }
 
     /// Attempt to satisfy the refresh from the cache when it matches the provider and TTL.
     async fn try_load_cache(&self) -> bool {
+        let Some(cache_manager) = self.cache_manager.as_ref() else {
+            return false;
+        };
         let _timer =
             codex_otel::start_global_timer("codex.remote_models.load_cache.duration_ms", &[]);
         let client_version = crate::client_version_to_whole();
         info!(client_version, "models cache: evaluating cache eligibility");
         // TODO(celia-oai): Include provider identity in cache eligibility so switching
         // providers does not reuse a fresh models_cache.json entry from another provider.
-        let cache = match self.cache_manager.load_fresh(&client_version).await {
+        let cache = match cache_manager.load_fresh(&client_version).await {
             Some(cache) => cache,
             None => {
                 info!("models cache: no usable cache entry");
@@ -451,6 +529,17 @@ impl OpenAiModelsManager {
             "models cache: cache entry applied"
         );
         true
+    }
+}
+
+fn merge_provider_catalog_model(existing: &ModelInfo, remote: ModelInfo) -> ModelInfo {
+    if existing.visibility == ModelVisibility::List && remote.visibility != ModelVisibility::List {
+        let mut merged = existing.clone();
+        merged.context_window = remote.context_window.or(merged.context_window);
+        merged.max_context_window = remote.max_context_window.or(merged.max_context_window);
+        merged
+    } else {
+        remote
     }
 }
 

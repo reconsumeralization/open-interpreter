@@ -105,6 +105,7 @@ impl App {
             ),
             self.config.cwd.to_path_buf(),
             version,
+            codex_product_info::Product::current(),
         )
         .with_yolo_mode(history_cell::is_yolo_mode(&self.config))
         .display_lines(width)

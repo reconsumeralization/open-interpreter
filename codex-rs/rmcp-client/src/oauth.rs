@@ -66,9 +66,17 @@ use tokio::sync::Mutex;
 
 use codex_utils_home_dir::find_codex_home;
 
-const KEYRING_SERVICE: &str = "Codex MCP Credentials";
 const MCP_OAUTH_SECRET_PREFIX: &str = "MCP_OAUTH";
 const REFRESH_SKEW_MILLIS: u64 = 30_000;
+
+/// Keychain service name, branded per product so Open Interpreter never
+/// reads or writes Codex's stored MCP credentials.
+fn keyring_service() -> &'static str {
+    match codex_product_info::Product::current() {
+        codex_product_info::Product::Codex => "Codex MCP Credentials",
+        codex_product_info::Product::OpenInterpreter => "Open Interpreter MCP Credentials",
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StoredOAuthTokens {
@@ -218,7 +226,7 @@ fn load_oauth_tokens_from_direct_keyring<K: KeyringStore>(
     url: &str,
 ) -> Result<Option<StoredOAuthTokens>> {
     let key = compute_store_key(server_name, url)?;
-    match keyring_store.load(KEYRING_SERVICE, &key) {
+    match keyring_store.load(keyring_service(), &key) {
         Ok(Some(serialized)) => {
             let mut tokens: StoredOAuthTokens = serde_json::from_str(&serialized)
                 .context("failed to deserialize OAuth tokens from keyring")?;
@@ -306,7 +314,7 @@ fn save_oauth_tokens_to_direct_keyring<K: KeyringStore>(
     let serialized = serde_json::to_string(tokens).context("failed to serialize OAuth tokens")?;
 
     let key = compute_store_key(server_name, &tokens.url)?;
-    match keyring_store.save(KEYRING_SERVICE, &key, &serialized) {
+    match keyring_store.save(keyring_service(), &key, &serialized) {
         Ok(()) => {
             if let Err(error) = delete_oauth_tokens_from_file(&key) {
                 warn!("failed to remove OAuth tokens from fallback storage: {error:?}");
@@ -462,7 +470,7 @@ fn delete_oauth_tokens_from_direct_keyring<K: KeyringStore>(
 ) -> Result<bool> {
     let key = compute_store_key(server_name, url)?;
     keyring_store
-        .delete(KEYRING_SERVICE, &key)
+        .delete(keyring_service(), &key)
         .map_err(|error| Error::new(error.into_error()))
 }
 
@@ -882,7 +890,7 @@ mod tests {
         let expected = tokens.clone();
         let serialized = serde_json::to_string(&tokens)?;
         let key = super::compute_store_key(&tokens.server_name, &tokens.url)?;
-        store.save(KEYRING_SERVICE, &key, &serialized)?;
+        store.save(keyring_service(), &key, &serialized)?;
 
         let loaded = super::load_oauth_tokens_from_keyring(
             &store,
@@ -998,7 +1006,7 @@ mod tests {
         let tokens = sample_tokens();
         let key = super::compute_store_key(&tokens.server_name, &tokens.url)?;
         let serialized = serde_json::to_string(&tokens)?;
-        store.save(KEYRING_SERVICE, &key, &serialized)?;
+        store.save(keyring_service(), &key, &serialized)?;
         super::save_oauth_tokens_to_file(&tokens)?;
 
         super::save_oauth_tokens_with_keyring_with_fallback_to_file(
@@ -1058,7 +1066,7 @@ mod tests {
         let tokens = sample_tokens();
         let key = super::compute_store_key(&tokens.server_name, &tokens.url)?;
         let serialized = serde_json::to_string(&tokens)?;
-        store.save(KEYRING_SERVICE, &key, &serialized)?;
+        store.save(keyring_service(), &key, &serialized)?;
 
         let loaded = super::load_oauth_tokens_from_keyring(
             &store,
@@ -1102,14 +1110,14 @@ mod tests {
         let tokens = sample_tokens();
         let serialized = serde_json::to_string(&tokens)?;
         let key = super::compute_store_key(&tokens.server_name, &tokens.url)?;
-        store.save(KEYRING_SERVICE, &key, &serialized)?;
+        store.save(keyring_service(), &key, &serialized)?;
         super::save_oauth_tokens_with_keyring(
             &store,
             AuthKeyringBackendKind::Secrets,
             &tokens.server_name,
             &tokens,
         )?;
-        store.save(KEYRING_SERVICE, &key, &serialized)?;
+        store.save(keyring_service(), &key, &serialized)?;
         super::save_oauth_tokens_to_file(&tokens)?;
 
         let removed = super::delete_oauth_tokens_from_keyring_and_file(
@@ -1141,7 +1149,7 @@ mod tests {
         let tokens = sample_tokens();
         let serialized = serde_json::to_string(&tokens)?;
         let key = super::compute_store_key(&tokens.server_name, &tokens.url)?;
-        store.save(KEYRING_SERVICE, &key, &serialized)?;
+        store.save(keyring_service(), &key, &serialized)?;
         super::save_oauth_tokens_to_file(&tokens)?;
 
         let removed = super::delete_oauth_tokens_from_keyring_and_file(
@@ -1164,7 +1172,7 @@ mod tests {
         let tokens = sample_tokens();
         let serialized = serde_json::to_string(&tokens)?;
         let key = super::compute_store_key(&tokens.server_name, &tokens.url)?;
-        store.save(KEYRING_SERVICE, &key, &serialized)?;
+        store.save(keyring_service(), &key, &serialized)?;
         assert!(store.contains(&key));
 
         let removed = super::delete_oauth_tokens_from_keyring_and_file(

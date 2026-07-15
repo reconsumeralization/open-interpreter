@@ -4,7 +4,6 @@ use std::collections::btree_map::Entry;
 use std::fs;
 use std::io::Write;
 use std::io::{self};
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -33,8 +32,18 @@ pub const DOCTOR_REPORT_ATTACHMENT_FILENAME: &str = "codex-doctor-report.json";
 /// Filename used for the Windows sandbox log feedback attachment.
 pub const WINDOWS_SANDBOX_LOG_ATTACHMENT_FILENAME: &str = "windows-sandbox.log";
 const DEFAULT_MAX_BYTES: usize = 4 * 1024 * 1024; // 4 MiB
-const SENTRY_DSN: &str =
-    "https://ae32ed50620d7a7792c1ce5df38b3e3e@o33249.ingest.us.sentry.io/4510195390611458";
+// The Sentry Rust SDK posts the envelope uncompressed. Sentry rejects raw
+// request bodies over 40 MiB with 413 and drops the whole upload, so keep both
+// individual files and the combined attachment payload under that limit.
+const MAX_ATTACHMENT_BYTES: usize = 28 * 1024 * 1024; // 28 MiB per file.
+const MAX_TOTAL_ATTACHMENT_BYTES: usize = 32 * 1024 * 1024; // 32 MiB combined.
+const MIN_ATTACHMENT_BYTES: usize = 4 * 1024; // Skip fragments below this.
+// Open Interpreter Sentry org. The same Sentry project also receives events
+// from the workstation app and other surfaces, so events from this binary are
+// distinguished by the `app` tag, the `release` prefix below, and the
+// `[interpreter-cli]` prefix in the event title.
+const SENTRY_DSN: &str = "https://08dfb810b5cbe0897400cd839f715727@o4506046614667264.ingest.us.sentry.io/4510858434969600";
+const SENTRY_APP_TAG: &str = "interpreter-cli";
 const UPLOAD_TIMEOUT_SECS: u64 = 10;
 const FEEDBACK_TAGS_TARGET: &str = "feedback_tags";
 const MAX_FEEDBACK_TAGS: usize = 64;
@@ -429,10 +438,22 @@ impl FeedbackSnapshot {
         use sentry::transports::DefaultTransportFactory;
         use sentry::types::Dsn;
 
-        // Build Sentry client
+        // Build Sentry client. The DSN points at the shared Open Interpreter
+        // Sentry org, so set `release` and `environment` up front so CLI
+        // events are easy to filter from workstation / other surfaces.
+        let cli_version = env!("CARGO_PKG_VERSION");
         let client = Client::from_config(ClientOptions {
             dsn: Some(Dsn::from_str(SENTRY_DSN).map_err(|e| anyhow!("invalid DSN: {e}"))?),
             transport: Some(Arc::new(DefaultTransportFactory {})),
+            release: Some(format!("{SENTRY_APP_TAG}@{cli_version}").into()),
+            environment: Some(
+                if cfg!(debug_assertions) {
+                    "development"
+                } else {
+                    "production"
+                }
+                .into(),
+            ),
             ..Default::default()
         });
 
@@ -450,7 +471,7 @@ impl FeedbackSnapshot {
 
         let mut envelope = Envelope::new();
         let title = format!(
-            "[{}]: Codex session {}",
+            "[{SENTRY_APP_TAG}][{}]: Open Interpreter CLI session {}",
             display_classification(options.classification),
             self.thread_id
         );
@@ -496,6 +517,7 @@ impl FeedbackSnapshot {
     ) -> BTreeMap<String, String> {
         let cli_version = env!("CARGO_PKG_VERSION");
         let mut tags = BTreeMap::from([
+            (String::from("app"), SENTRY_APP_TAG.to_string()),
             (String::from("thread_id"), self.thread_id.to_string()),
             (String::from("classification"), classification.to_string()),
             (String::from("cli_version"), cli_version.to_string()),
@@ -508,6 +530,7 @@ impl FeedbackSnapshot {
         }
 
         let reserved = [
+            "app",
             "thread_id",
             "classification",
             "cli_version",
@@ -543,33 +566,37 @@ impl FeedbackSnapshot {
         extra_attachment_paths: &[FeedbackAttachmentPath],
         logs_override: Option<Vec<u8>>,
     ) -> Vec<sentry::protocol::Attachment> {
-        use sentry::protocol::Attachment;
-
         let mut attachments = Vec::new();
+        let mut remaining = MAX_TOTAL_ATTACHMENT_BYTES;
 
         if include_logs {
-            attachments.push(Attachment {
-                buffer: logs_override.unwrap_or_else(|| self.bytes.clone()),
-                filename: String::from("codex-logs.log"),
-                content_type: Some("text/plain".to_string()),
-                ty: None,
-            });
+            push_capped(
+                &mut attachments,
+                &mut remaining,
+                logs_override.unwrap_or_else(|| self.bytes.clone()),
+                String::from("codex-logs.log"),
+                Some("text/plain".to_string()),
+            );
         }
 
-        attachments.extend(extra_attachments.iter().map(|attachment| Attachment {
-            buffer: attachment.buffer.clone(),
-            filename: attachment.filename.clone(),
-            content_type: attachment.content_type.clone(),
-            ty: None,
-        }));
+        for attachment in extra_attachments {
+            push_capped(
+                &mut attachments,
+                &mut remaining,
+                attachment.buffer.clone(),
+                attachment.filename.clone(),
+                attachment.content_type.clone(),
+            );
+        }
 
         if let Some(text) = self.feedback_diagnostics_attachment_text(include_logs) {
-            attachments.push(Attachment {
-                buffer: text.into_bytes(),
-                filename: FEEDBACK_DIAGNOSTICS_ATTACHMENT_FILENAME.to_string(),
-                content_type: Some("text/plain".to_string()),
-                ty: None,
-            });
+            push_capped(
+                &mut attachments,
+                &mut remaining,
+                text.into_bytes(),
+                FEEDBACK_DIAGNOSTICS_ATTACHMENT_FILENAME.to_string(),
+                Some("text/plain".to_string()),
+            );
         }
 
         for attachment_path in extra_attachment_paths {
@@ -594,28 +621,58 @@ impl FeedbackSnapshot {
                         .map(|s| s.to_string_lossy().to_string())
                         .unwrap_or_else(|| "extra-log.log".to_string())
                 });
-            let content_type = match Path::new(&filename)
-                .extension()
-                .and_then(|extension| extension.to_str())
-            {
-                Some(extension) if extension.eq_ignore_ascii_case("jsonl") => {
-                    "text/plain".to_string()
-                }
-                _ => mime_guess::from_path(&filename)
-                    .first_or_octet_stream()
-                    .essence_str()
-                    .to_string(),
-            };
-            attachments.push(Attachment {
-                buffer: data,
+            push_capped(
+                &mut attachments,
+                &mut remaining,
+                data,
                 filename,
-                content_type: Some(content_type),
-                ty: None,
-            });
+                Some("text/plain".to_string()),
+            );
         }
 
         attachments
     }
+}
+
+/// Append a feedback attachment while staying within Sentry's per-event upload
+/// budget. Oversized buffers keep their tail, where the newest log lines live.
+fn push_capped(
+    attachments: &mut Vec<sentry::protocol::Attachment>,
+    remaining: &mut usize,
+    buffer: Vec<u8>,
+    filename: String,
+    content_type: Option<String>,
+) {
+    if *remaining < MIN_ATTACHMENT_BYTES {
+        tracing::warn!(filename = %filename, "feedback attachment budget exhausted; skipping");
+        return;
+    }
+
+    let cap = MAX_ATTACHMENT_BYTES.min(*remaining);
+    let buffer = cap_attachment_buffer(buffer, cap);
+    *remaining = remaining.saturating_sub(buffer.len());
+    attachments.push(sentry::protocol::Attachment {
+        buffer,
+        filename,
+        content_type,
+        ty: None,
+    });
+}
+
+fn cap_attachment_buffer(buffer: Vec<u8>, max: usize) -> Vec<u8> {
+    if buffer.len() <= max {
+        return buffer;
+    }
+
+    const MARKER_RESERVE: usize = 128;
+    let keep = max.saturating_sub(MARKER_RESERVE);
+    let omitted = buffer.len() - keep;
+    let marker = format!(
+        "[codex-feedback] truncated: omitted first {omitted} bytes, kept last {keep} bytes\n"
+    );
+    let mut out = marker.into_bytes();
+    out.extend_from_slice(&buffer[buffer.len() - keep..]);
+    out
 }
 
 fn display_classification(classification: &str) -> String {
@@ -812,58 +869,31 @@ mod tests {
     }
 
     #[test]
-    fn path_backed_attachments_use_binary_content_types() {
-        let suffix = ThreadId::new();
-        let gzip_filename = format!("codex-desktop-app-logs-{suffix}.tar.gz");
-        let unknown_filename = format!("codex-feedback-extra-{suffix}.binunknown");
-        let gzip_path = std::env::temp_dir().join(&gzip_filename);
-        let unknown_path = std::env::temp_dir().join(&unknown_filename);
-        let gzip_bytes = b"\x1f\x8b\x08\x00\xff";
-        let unknown_bytes = b"\x00\x9f\x92\x96";
-        fs::write(&gzip_path, gzip_bytes).expect("gzip attachment should be written");
-        fs::write(&unknown_path, unknown_bytes).expect("unknown attachment should be written");
+    fn cap_attachment_buffer_keeps_tail_with_marker() {
+        let data: Vec<u8> = (0..2048u16).map(|n| n as u8).collect();
+        let capped = cap_attachment_buffer(data.clone(), /*max*/ 512);
+        assert!(capped.len() <= 512);
+        assert!(capped.starts_with(b"[codex-feedback] truncated"));
+        assert!(capped.ends_with(&data[data.len() - 64..]));
+        assert_eq!(
+            cap_attachment_buffer(vec![1, 2, 3], /*max*/ 512),
+            vec![1, 2, 3]
+        );
+    }
 
+    #[test]
+    fn feedback_attachments_cap_oversized_logs() {
+        let big = vec![b'x'; MAX_ATTACHMENT_BYTES + 4096];
         let attachments = CodexFeedback::new()
             .snapshot(/*session_id*/ None)
-            .feedback_attachments(
-                /*include_logs*/ false,
-                &[],
-                &[
-                    FeedbackAttachmentPath {
-                        path: gzip_path.clone(),
-                        attachment_filename_override: None,
-                    },
-                    FeedbackAttachmentPath {
-                        path: unknown_path.clone(),
-                        attachment_filename_override: None,
-                    },
-                ],
-                /*logs_override*/ None,
-            );
-
-        fs::remove_file(gzip_path).expect("gzip attachment should be removed");
-        fs::remove_file(unknown_path).expect("unknown attachment should be removed");
-        assert_eq!(
-            attachments
-                .iter()
-                .map(|attachment| (
-                    attachment.filename.as_str(),
-                    attachment.content_type.as_deref(),
-                    attachment.buffer.as_slice(),
-                ))
-                .collect::<Vec<_>>(),
-            vec![
-                (
-                    gzip_filename.as_str(),
-                    Some("application/gzip"),
-                    gzip_bytes.as_slice(),
-                ),
-                (
-                    unknown_filename.as_str(),
-                    Some("application/octet-stream"),
-                    unknown_bytes.as_slice(),
-                ),
-            ]
+            .feedback_attachments(/*include_logs*/ true, &[], &[], Some(big));
+        assert_eq!(attachments.len(), 1);
+        assert_eq!(attachments[0].filename, "codex-logs.log");
+        assert!(attachments[0].buffer.len() <= MAX_ATTACHMENT_BYTES);
+        assert!(
+            attachments[0]
+                .buffer
+                .starts_with(b"[codex-feedback] truncated")
         );
     }
 

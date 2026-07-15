@@ -3,348 +3,369 @@
 import hashlib
 import json
 import os
-from pathlib import Path
+import platform
+import stat
 import subprocess
 import tarfile
 import tempfile
 import textwrap
 import unittest
+from pathlib import Path
+from shlex import quote
 
 
-INSTALL_SCRIPT = Path(__file__).with_name("install.sh")
-VERSION = "0.142.5"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+INSTALL_SH = REPO_ROOT / "scripts" / "install" / "install.sh"
 
 
-class InstallShTest(unittest.TestCase):
-    def test_metadata_fetch_failure_is_not_reported_as_missing_assets(self) -> None:
-        result, requests = run_installer(VERSION, metadata_failure=True)
+def current_installer_target() -> str:
+    machine = platform.machine().lower()
+    arch = "aarch64" if machine in {"arm64", "aarch64"} else "x86_64"
+    system = platform.system()
+    if system == "Darwin":
+        return f"{arch}-apple-darwin"
+    if system == "Linux":
+        return f"{arch}-unknown-linux-musl"
+    raise unittest.SkipTest(f"install.sh does not support {system}")
+
+
+def write_executable(path: Path, body: str) -> None:
+    path.write_text(body, encoding="utf-8")
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+class InstallShLatestResolutionTests(unittest.TestCase):
+    def run_installer_with_release_list(
+        self,
+        release_list: str,
+        *,
+        repo: str = "openinterpreter/openinterpreter",
+        product_name: str = "Open Interpreter",
+        package_asset_stem: str = "open-interpreter-package",
+        command_name: str = "interpreter",
+    ) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            release_list_path = tmp / "releases.json"
+            release_list_path.write_text(release_list, encoding="utf-8")
+            fake_bin = tmp / "bin"
+            fake_bin.mkdir()
+            fake_curl = fake_bin / "curl"
+            fake_curl.write_text(
+                textwrap.dedent(
+                    f"""\
+                    #!/usr/bin/env bash
+                    url="${{@:$#}}"
+                    case "$url" in
+                      */releases?per_page=100)
+                        cat {quote(str(release_list_path))}
+                        ;;
+                      */releases/tags/rust-v0.2.0)
+                        printf '{{"assets":[]}}\\n'
+                        ;;
+                      */releases/tags/rust-v0.135.0)
+                        printf '{{"assets":[]}}\\n'
+                        ;;
+                      *)
+                        echo "unexpected curl URL: $url" >&2
+                        exit 42
+                        ;;
+                    esac
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake_curl.chmod(fake_curl.stat().st_mode | stat.S_IXUSR)
+
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                "CODEX_GITHUB_REPO": repo,
+                "CODEX_INSTALL_PRODUCT_NAME": product_name,
+                "CODEX_PACKAGE_ASSET_STEM": package_asset_stem,
+                "CODEX_COMMAND_NAME": command_name,
+                "CODEX_RELEASE_TAG_PREFIX": "rust-v",
+                "CODEX_NON_INTERACTIVE": "1",
+                "CODEX_HOME": str(tmp / "home"),
+                "CODEX_INSTALL_DIR": str(tmp / "install-bin"),
+            }
+            return subprocess.run(
+                [str(INSTALL_SH)],
+                cwd=REPO_ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+    def test_latest_without_matching_tag_prefix_fails_at_version_resolution(
+        self,
+    ) -> None:
+        result = self.run_installer_with_release_list(
+            textwrap.dedent(
+                """\
+                [
+                  {
+                    "tag_name": "v0.0.8",
+                    "draft": false,
+                    "prerelease": false
+                  }
+                ]
+                """
+            )
+        )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(
-            requests,
-            [
-                "https://api.github.com/repos/openai/codex/releases/tags/"
-                f"rust-v{VERSION}"
-            ],
-        )
         self.assertIn(
-            f"Could not fetch GitHub release metadata for Codex {VERSION}",
+            "Failed to resolve the latest Open Interpreter release version.",
             result.stderr,
         )
-        self.assertNotIn("Could not find Codex package", result.stderr)
 
-    def test_exact_release_fetches_metadata_once(self) -> None:
-        result, requests = run_installer(VERSION)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(
-            requests,
-            [
-                "https://api.github.com/repos/openai/codex/releases/tags/"
-                f"rust-v{VERSION}",
-                "https://github.com/openai/codex/releases/download/"
-                f"rust-v{VERSION}/codex-package_SHA256SUMS",
-            ],
-        )
-        self.assertIn(f"Resolved version: {VERSION}", result.stdout)
-
-    def test_latest_release_reuses_version_metadata(self) -> None:
-        result, requests = run_installer("latest")
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(
-            requests,
-            [
-                "https://api.github.com/repos/openai/codex/releases/latest",
-                "https://github.com/openai/codex/releases/download/"
-                f"rust-v{VERSION}/codex-package_SHA256SUMS",
-            ],
-        )
-        self.assertIn(f"Resolved version: {VERSION}", result.stdout)
-
-    def test_compact_metadata_is_independent_of_field_order(self) -> None:
-        result, requests = run_installer(
-            "latest", metadata_json=release_metadata(compact=True, reorder=True)
+    def test_latest_uses_matching_non_prerelease_tag_prefix(self) -> None:
+        result = self.run_installer_with_release_list(
+            textwrap.dedent(
+                """\
+                [
+                  {
+                    "tag_name": "v0.0.8",
+                    "draft": false,
+                    "prerelease": false
+                  },
+                  {
+                    "tag_name": "rust-v0.3.0-beta.1",
+                    "draft": false,
+                    "prerelease": true
+                  },
+                  {
+                    "tag_name": "rust-v0.2.0",
+                    "draft": false,
+                    "prerelease": false
+                  }
+                ]
+                """
+            )
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(
-            requests,
-            [
-                "https://api.github.com/repos/openai/codex/releases/latest",
-                "https://github.com/openai/codex/releases/download/"
-                f"rust-v{VERSION}/codex-package_SHA256SUMS",
-            ],
+        self.assertIn(
+            "Could not find Open Interpreter release assets for 0.2.0.", result.stderr
         )
-        self.assertIn(f"Resolved version: {VERSION}", result.stdout)
 
-    def test_json_like_strings_and_nested_fields_do_not_define_assets(self) -> None:
-        result, requests = run_installer(
-            VERSION, metadata_json=legacy_release_metadata_with_decoys()
+    def test_default_codex_latest_skips_prereleases(self) -> None:
+        result = self.run_installer_with_release_list(
+            textwrap.dedent(
+                """\
+                [
+                  {
+                    "tag_name": "rust-v0.136.0-alpha.2",
+                    "draft": false,
+                    "prerelease": true
+                  },
+                  {
+                    "tag_name": "rust-v0.135.0",
+                    "draft": false,
+                    "prerelease": false
+                  }
+                ]
+                """
+            ),
+            repo="openai/codex",
+            product_name="Codex CLI",
+            package_asset_stem="codex-package",
+            command_name="codex",
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(len(requests), 2)
-        self.assertIn("/codex-npm-", requests[1])
-        self.assertNotIn("codex-package_SHA256SUMS", requests[1])
+        self.assertIn(
+            "Could not find Codex CLI release assets for 0.135.0.", result.stderr
+        )
 
-    def test_macos_install_exposes_code_mode_host_beside_codex(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            archive_path, checksum_path, metadata_json = create_package_release(root)
+    def test_open_interpreter_package_install_uses_metadata_entrypoint(self) -> None:
+        target = current_installer_target()
+        package_asset = f"open-interpreter-package-{target}.tar.gz"
+        checksum_asset = "codex-package_SHA256SUMS"
 
-            result, _requests = run_installer_in(
-                root,
-                VERSION,
-                metadata_json=metadata_json,
-                archive_path=archive_path,
-                checksum_path=checksum_path,
-                force_macos=True,
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            package_root = tmp / "package"
+            (package_root / "bin").mkdir(parents=True)
+            (package_root / "codex-path").mkdir()
+            (package_root / "codex-resources").mkdir()
+
+            write_executable(
+                package_root / "bin" / "interpreter",
+                "#!/bin/sh\nprintf 'interpreter 0.2.0\\n'\n",
+            )
+            write_executable(
+                package_root / "bin" / "codex",
+                "#!/bin/sh\nprintf 'codex 0.2.0\\n'\n",
+            )
+            write_executable(
+                package_root / "bin" / "codex-code-mode-host",
+                "#!/bin/sh\nexit 0\n",
+            )
+            write_executable(package_root / "codex-path" / "rg", "#!/bin/sh\nexit 0\n")
+            if "linux" in target:
+                write_executable(
+                    package_root / "codex-resources" / "bwrap", "#!/bin/sh\nexit 0\n"
+                )
+
+            (package_root / "codex-package.json").write_text(
+                json.dumps(
+                    {
+                        "layoutVersion": 1,
+                        "version": "0.2.0",
+                        "target": target,
+                        "variant": "open-interpreter",
+                        "entrypoint": "bin/interpreter",
+                        "managedCodex": "bin/codex",
+                        "resourcesDir": "codex-resources",
+                        "pathDir": "codex-path",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            archive = tmp / package_asset
+            with tarfile.open(archive, "w:gz") as tar:
+                for path in package_root.rglob("*"):
+                    tar.add(path, arcname=path.relative_to(package_root))
+            package_digest = sha256(archive)
+
+            checksum_file = tmp / checksum_asset
+            checksum_file.write_text(
+                f"{package_digest}  {package_asset}\n", encoding="utf-8"
+            )
+            checksum_digest = sha256(checksum_file)
+
+            release_json = tmp / "release.json"
+            release_json.write_text(
+                json.dumps(
+                    {
+                        "assets": [
+                            {
+                                "name": package_asset,
+                                "digest": f"sha256:{package_digest}",
+                            },
+                            {
+                                "name": checksum_asset,
+                                "digest": f"sha256:{checksum_digest}",
+                            },
+                        ]
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            fake_bin = tmp / "fake-bin"
+            fake_bin.mkdir()
+            fake_curl = fake_bin / "curl"
+            fake_curl.write_text(
+                textwrap.dedent(
+                    f"""\
+                    #!/bin/sh
+                    output=""
+                    url=""
+                    want_output=false
+                    for arg in "$@"; do
+                      if [ "$want_output" = true ]; then
+                        output="$arg"
+                        want_output=false
+                        continue
+                      fi
+                      case "$arg" in
+                        -o)
+                          want_output=true
+                          ;;
+                        http*)
+                          url="$arg"
+                          ;;
+                      esac
+                    done
+
+                    emit() {{
+                      if [ -n "$output" ]; then
+                        cat "$1" > "$output"
+                      else
+                        cat "$1"
+                      fi
+                    }}
+
+                    case "$url" in
+                      */releases/tags/rust-v0.2.0)
+                        emit {quote(str(release_json))}
+                        ;;
+                      */{package_asset})
+                        emit {quote(str(archive))}
+                        ;;
+                      */{checksum_asset})
+                        emit {quote(str(checksum_file))}
+                        ;;
+                      *)
+                        echo "unexpected curl URL: $url" >&2
+                        exit 42
+                        ;;
+                    esac
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake_curl.chmod(fake_curl.stat().st_mode | stat.S_IXUSR)
+
+            install_dir = tmp / "install-bin"
+            codex_home = tmp / "home"
+            result = subprocess.run(
+                [str(INSTALL_SH), "--release", "0.2.0"],
+                cwd=REPO_ROOT,
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                    "CODEX_GITHUB_REPO": "openinterpreter/openinterpreter",
+                    "CODEX_INSTALL_PRODUCT_NAME": "Open Interpreter",
+                    "CODEX_PACKAGE_ASSET_STEM": "open-interpreter-package",
+                    "CODEX_COMMAND_NAME": "interpreter",
+                    "CODEX_ALIAS_COMMAND_NAMES": "i",
+                    "CODEX_RELEASE_TAG_PREFIX": "rust-v",
+                    "CODEX_NON_INTERACTIVE": "1",
+                    "CODEX_HOME": str(codex_home),
+                    "CODEX_INSTALL_DIR": str(install_dir),
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            install_bin = root / "install-bin"
-            current = root / "codex-home" / "packages" / "standalone" / "current"
-            codex_path = install_bin / "codex"
-            host_path = install_bin / "codex-code-mode-host"
-            self.assertEqual(os.readlink(codex_path), str(current / "bin" / "codex"))
+            current = codex_home / "packages" / "standalone" / "current"
+            self.assertTrue((current / "codex-package.json").is_file())
+            self.assertTrue((current / "bin" / "interpreter").is_file())
+            self.assertTrue((current / "bin" / "codex").is_file())
+            self.assertFalse((current / "interpreter").exists())
+            self.assertFalse((current / "codex").exists())
             self.assertEqual(
-                os.readlink(host_path),
-                str(current / "bin" / "codex-code-mode-host"),
+                (install_dir / "interpreter").resolve(),
+                (current / "bin" / "interpreter").resolve(),
             )
-            self.assertTrue(os.access(host_path, os.X_OK))
-
-
-def run_installer(
-    release: str,
-    *,
-    metadata_failure: bool = False,
-    metadata_json: str | None = None,
-) -> tuple[subprocess.CompletedProcess[str], list[str]]:
-    with tempfile.TemporaryDirectory() as temp_dir:
-        return run_installer_in(
-            Path(temp_dir),
-            release,
-            metadata_failure=metadata_failure,
-            metadata_json=metadata_json,
-        )
-
-
-def run_installer_in(
-    root: Path,
-    release: str,
-    *,
-    metadata_failure: bool = False,
-    metadata_json: str | None = None,
-    archive_path: Path | None = None,
-    checksum_path: Path | None = None,
-    force_macos: bool = False,
-) -> tuple[subprocess.CompletedProcess[str], list[str]]:
-    bin_dir = root / "bin"
-    bin_dir.mkdir()
-    request_log = root / "requests.log"
-    fake_curl = bin_dir / "curl"
-    fake_curl.write_text(
-        textwrap.dedent(
-            """\
-            #!/bin/sh
-            url=""
-            output=""
-            previous=""
-            for arg in "$@"; do
-              case "$arg" in
-                https://*) url="$arg" ;;
-              esac
-              if [ "$previous" = "-o" ]; then
-                output="$arg"
-              fi
-              previous="$arg"
-            done
-            printf '%s\n' "$url" >>"$CODEX_TEST_REQUEST_LOG"
-
-            case "$url" in
-              https://api.github.com/*)
-                if [ "$CODEX_TEST_METADATA_FAILURE" = "1" ]; then
-                  echo "curl: (22) The requested URL returned error: 403" >&2
-                  exit 22
-                fi
-                printf '%s\n' "$CODEX_TEST_METADATA_JSON"
-                ;;
-              */codex-package_SHA256SUMS)
-                if [ -n "$CODEX_TEST_CHECKSUM_PATH" ]; then
-                  cp "$CODEX_TEST_CHECKSUM_PATH" "$output"
-                else
-                  exit 22
-                fi
-                ;;
-              */codex-package-*.tar.gz)
-                if [ -n "$CODEX_TEST_ARCHIVE_PATH" ]; then
-                  cp "$CODEX_TEST_ARCHIVE_PATH" "$output"
-                else
-                  exit 22
-                fi
-                ;;
-              *)
-                exit 22
-                ;;
-            esac
-            """
-        ),
-        encoding="utf-8",
-    )
-    fake_curl.chmod(0o755)
-    if force_macos:
-        fake_uname = bin_dir / "uname"
-        fake_uname.write_text(
-            "#!/bin/sh\n"
-            'case "$1" in\n'
-            "  -s) printf 'Darwin\\n' ;;\n"
-            "  -m) printf 'arm64\\n' ;;\n"
-            "esac\n",
-            encoding="utf-8",
-        )
-        fake_uname.chmod(0o755)
-
-    home = root / "home"
-    home.mkdir()
-    env = os.environ.copy()
-    env.update(
-        {
-            "CODEX_HOME": str(root / "codex-home"),
-            "CODEX_INSTALL_DIR": str(root / "install-bin"),
-            "CODEX_NON_INTERACTIVE": "1",
-            "CODEX_RELEASE": release,
-            "CODEX_TEST_ARCHIVE_PATH": str(archive_path or ""),
-            "CODEX_TEST_CHECKSUM_PATH": str(checksum_path or ""),
-            "CODEX_TEST_METADATA_FAILURE": "1" if metadata_failure else "0",
-            "CODEX_TEST_METADATA_JSON": (
-                metadata_json if metadata_json is not None else release_metadata()
-            ),
-            "CODEX_TEST_REQUEST_LOG": str(request_log),
-            "HOME": str(home),
-            "PATH": f"{bin_dir}:/usr/bin:/bin",
-            "SHELL": "/bin/sh",
-        }
-    )
-    result = subprocess.run(
-        ["/bin/sh", str(INSTALL_SCRIPT)],
-        capture_output=True,
-        check=False,
-        env=env,
-        text=True,
-    )
-    requests = (
-        request_log.read_text(encoding="utf-8").splitlines()
-        if request_log.exists()
-        else []
-    )
-    return result, requests
-
-
-def create_package_release(root: Path) -> tuple[Path, Path, str]:
-    package_dir = root / "package"
-    (package_dir / "bin").mkdir(parents=True)
-    (package_dir / "codex-path").mkdir()
-    (package_dir / "codex-package.json").write_text("{}\n", encoding="utf-8")
-    write_executable(
-        package_dir / "bin" / "codex",
-        f"#!/bin/sh\nprintf 'codex-cli {VERSION}\\n'\n",
-    )
-    write_executable(
-        package_dir / "bin" / "codex-code-mode-host",
-        "#!/bin/sh\nexit 0\n",
-    )
-    write_executable(package_dir / "codex-path" / "rg", "#!/bin/sh\nexit 0\n")
-
-    asset = "codex-package-aarch64-apple-darwin.tar.gz"
-    archive_path = root / asset
-    with tarfile.open(archive_path, "w:gz") as archive:
-        for path in package_dir.iterdir():
-            archive.add(path, arcname=path.name)
-
-    archive_digest = hashlib.sha256(archive_path.read_bytes()).hexdigest()
-    checksum_path = root / "codex-package_SHA256SUMS"
-    checksum_path.write_text(f"{archive_digest}  {asset}\n", encoding="utf-8")
-    checksum_digest = hashlib.sha256(checksum_path.read_bytes()).hexdigest()
-    metadata_json = json.dumps(
-        {
-            "assets": [
-                {"name": asset, "digest": f"sha256:{archive_digest}"},
-                {
-                    "name": "codex-package_SHA256SUMS",
-                    "digest": f"sha256:{checksum_digest}",
-                },
-            ],
-            "tag_name": f"rust-v{VERSION}",
-        },
-        indent=2,
-    )
-    return archive_path, checksum_path, metadata_json
-
-
-def write_executable(path: Path, contents: str) -> None:
-    path.write_text(contents, encoding="utf-8")
-    path.chmod(0o755)
-
-
-def release_metadata(*, compact: bool = False, reorder: bool = False) -> str:
-    assets = [
-        asset_metadata(
-            f"codex-package-{target}.tar.gz",
-            f"sha256:{'a' * 64}",
-            reorder=reorder,
-        )
-        for target in (
-            "aarch64-apple-darwin",
-            "x86_64-apple-darwin",
-            "aarch64-unknown-linux-musl",
-            "x86_64-unknown-linux-musl",
-        )
-    ]
-    assets.append(
-        asset_metadata(
-            "codex-package_SHA256SUMS",
-            f"sha256:{'b' * 64}",
-            reorder=reorder,
-        )
-    )
-    separators = (",", ":") if compact else None
-    return json.dumps(
-        {"assets": assets, "body": "braces: { } [ ]", "tag_name": f"rust-v{VERSION}"},
-        indent=None if compact else 2,
-        separators=separators,
-    )
-
-
-def asset_metadata(name: str, digest: str, *, reorder: bool) -> dict[str, str]:
-    if reorder:
-        return {"digest": digest, "name": name}
-    return {"name": name, "digest": digest}
-
-
-def legacy_release_metadata_with_decoys() -> str:
-    fake_digest = f"sha256:{'0' * 64}"
-    assets = [
-        {
-            "metadata": {
-                "name": "codex-package-x86_64-unknown-linux-musl.tar.gz",
-                "digest": fake_digest,
-            },
-            "digest": f"sha256:{'c' * 64}",
-            "name": f"codex-npm-{target}-{VERSION}.tgz",
-        }
-        for target in ("darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64")
-    ]
-    return json.dumps(
-        {
-            "body": (
-                f'fake: {{"name":"codex-package_SHA256SUMS","digest":"{fake_digest}"}}'
-            ),
-            "assets": assets,
-            "tag_name": f"rust-v{VERSION}",
-        },
-        separators=(",", ":"),
-    )
+            self.assertEqual(
+                (install_dir / "i").resolve(),
+                (current / "bin" / "interpreter").resolve(),
+            )
+            if platform.system() == "Darwin":
+                self.assertEqual(
+                    (install_dir / "codex-code-mode-host").resolve(),
+                    (current / "bin" / "codex-code-mode-host").resolve(),
+                )
 
 
 if __name__ == "__main__":

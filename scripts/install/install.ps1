@@ -1,6 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$Release = $env:CODEX_RELEASE
+    [string]$Release = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_RELEASE)) { $env:CODEX_RELEASE } else { $env:OPEN_INTERPRETER_RELEASE }),
+    [string]$Repo = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_GITHUB_REPO)) { if ([string]::IsNullOrWhiteSpace($env:CODEX_GITHUB_REPO)) { "openinterpreter/openinterpreter" } else { $env:CODEX_GITHUB_REPO } } else { $env:OPEN_INTERPRETER_GITHUB_REPO }),
+    [string]$ProductName = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_PRODUCT_NAME)) { "Open Interpreter" } else { $env:CODEX_INSTALL_PRODUCT_NAME }),
+    [string]$PackageAssetStem = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_PACKAGE_ASSET_STEM)) { "open-interpreter-package" } else { $env:CODEX_PACKAGE_ASSET_STEM }),
+    [string]$CommandName = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_COMMAND_NAME)) { "interpreter" } else { $env:CODEX_COMMAND_NAME }),
+    [string]$ReleaseTagPrefix = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_RELEASE_TAG_PREFIX)) { "rust-v" } else { $env:CODEX_RELEASE_TAG_PREFIX })
 )
 
 Set-StrictMode -Version Latest
@@ -11,7 +16,17 @@ if ([string]::IsNullOrWhiteSpace($Release)) {
     $Release = "latest"
 }
 
-$NonInteractive = $env:CODEX_NON_INTERACTIVE -match "^(?i:1|true|yes)$"
+$nonInteractiveValue = if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_NONINTERACTIVE)) {
+    $env:CODEX_NON_INTERACTIVE
+} else {
+    $env:OPEN_INTERPRETER_NONINTERACTIVE
+}
+$NonInteractive = $nonInteractiveValue -match "^(?i:1|true|yes)$"
+$AliasCommandNames = if ([string]::IsNullOrWhiteSpace($env:CODEX_ALIAS_COMMAND_NAMES)) {
+    @("i")
+} else {
+    $env:CODEX_ALIAS_COMMAND_NAMES -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+}
 
 function Write-Step {
     param(
@@ -72,7 +87,7 @@ function Assert-ValidReleaseVersion {
     )
 
     if ($Version -cne "latest" -and $Version -cnotmatch "^[0-9]+\.[0-9]+\.[0-9]+(?:-(?:alpha|beta)(?:\.[0-9]+)?)?$") {
-        throw "Invalid Codex release version: $Version. Expected latest or x.y.z[-alpha[.N]|-beta[.N]]."
+        throw "Invalid $ProductName release version: $Version. Expected latest or x.y.z[-alpha[.N]|-beta[.N]]."
     }
 }
 
@@ -106,7 +121,7 @@ function Test-ArchiveDigest {
 
     $actualDigest = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualDigest -ne $ExpectedDigest) {
-        throw "Downloaded Codex archive checksum did not match expected digest. Expected $ExpectedDigest but got $actualDigest."
+        throw "Downloaded $ProductName archive checksum did not match expected digest. Expected $ExpectedDigest but got $actualDigest."
     }
 }
 
@@ -124,7 +139,7 @@ function Get-PackageArchiveDigest {
         }
     }
 
-    throw "Could not find SHA-256 digest for $AssetName in codex-package_SHA256SUMS."
+    throw "Could not find SHA-256 digest for $AssetName in $checksumAsset."
 }
 
 function Path-Contains {
@@ -205,33 +220,35 @@ function Resolve-Release {
     $normalizedVersion = Normalize-Version -RawVersion $Release
     Assert-ValidReleaseVersion -Version $normalizedVersion
 
-    if ($normalizedVersion -eq "latest") {
-        $requestedRelease = "latest"
-        $metadataUri = "https://api.github.com/repos/openai/codex/releases/latest"
-    } else {
+    if ($normalizedVersion -ne "latest") {
         $resolvedVersion = $normalizedVersion
-        $requestedRelease = $resolvedVersion
-        $metadataUri = "https://api.github.com/repos/openai/codex/releases/tags/rust-v$resolvedVersion"
-    }
-
-    try {
-        $releaseMetadata = Invoke-RestMethod -Uri $metadataUri
-    } catch {
-        throw "Could not fetch GitHub release metadata for Codex $requestedRelease. GitHub API may be unavailable or rate limited. $($_.Exception.Message)"
-    }
-
-    if ($normalizedVersion -eq "latest") {
-        if (-not $releaseMetadata.tag_name) {
-            throw "Failed to resolve the latest Codex release version."
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$ReleaseTagPrefix$resolvedVersion"
+        return [PSCustomObject]@{
+            Version = $resolvedVersion
+            Metadata = $release
         }
-
-        $resolvedVersion = Normalize-Version -RawVersion $releaseMetadata.tag_name
-        Assert-ValidReleaseVersion -Version $resolvedVersion
+    } elseif ([string]::IsNullOrWhiteSpace($ReleaseTagPrefix)) {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
+    } else {
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=100"
+        $release = $releases |
+            Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -like "$ReleaseTagPrefix*" } |
+            Select-Object -First 1
+    }
+    if (-not $release.tag_name) {
+        Write-Error "Failed to resolve the latest $ProductName release version."
+        exit 1
     }
 
+    $resolvedVersion = Normalize-Version -RawVersion $release.tag_name
+    if ($resolvedVersion -eq "latest") {
+        Write-Error "Failed to resolve the latest $ProductName release version."
+        exit 1
+    }
+    Assert-ValidReleaseVersion -Version $resolvedVersion
     return [PSCustomObject]@{
         Version = $resolvedVersion
-        Metadata = $releaseMetadata
+        Metadata = $release
     }
 }
 
@@ -262,12 +279,13 @@ function Get-CurrentInstalledVersion {
         [string]$StandaloneCurrentDir
     )
 
-    $standaloneVersion = Get-VersionFromBinary -CodexPath (Join-Path $StandaloneCurrentDir "bin\codex.exe")
+    $packageEntrypoint = Get-PackageEntrypointPath -PackageDir $StandaloneCurrentDir
+    $standaloneVersion = Get-VersionFromBinary -CodexPath $packageEntrypoint
     if (-not [string]::IsNullOrWhiteSpace($standaloneVersion)) {
         return $standaloneVersion
     }
 
-    $standaloneVersion = Get-VersionFromBinary -CodexPath (Join-Path $StandaloneCurrentDir "codex.exe")
+    $standaloneVersion = Get-VersionFromBinary -CodexPath (Join-Path $StandaloneCurrentDir "$CommandName.exe")
     if (-not [string]::IsNullOrWhiteSpace($standaloneVersion)) {
         return $standaloneVersion
     }
@@ -526,6 +544,62 @@ function Ensure-Junction {
     throw "Refusing to replace file at $LinkPath with a junction."
 }
 
+function Get-PackageMetadata {
+    param(
+        [string]$PackageDir
+    )
+
+    $metadataPath = Join-Path $PackageDir "codex-package.json"
+    if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        return Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+}
+
+function Test-PackageRelativeFile {
+    param(
+        [string]$PackageDir,
+        [string]$RelativePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RelativePath)) {
+        return $false
+    }
+    if ([IO.Path]::IsPathRooted($RelativePath)) {
+        return $false
+    }
+
+    $parts = $RelativePath -split '[\\/]'
+    if ($parts -contains "..") {
+        return $false
+    }
+
+    return Test-Path -LiteralPath (Join-Path $PackageDir $RelativePath) -PathType Leaf
+}
+
+function Get-PackageEntrypointPath {
+    param(
+        [string]$PackageDir
+    )
+
+    $metadata = Get-PackageMetadata -PackageDir $PackageDir
+    if ($null -ne $metadata -and (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $metadata.entrypoint)) {
+        return Join-Path $PackageDir $metadata.entrypoint
+    }
+
+    $binEntrypoint = Join-Path $PackageDir "bin\$CommandName.exe"
+    if (Test-Path -LiteralPath $binEntrypoint -PathType Leaf) {
+        return $binEntrypoint
+    }
+
+    return Join-Path $PackageDir "$CommandName.exe"
+}
+
 function Test-PackageContentsAreComplete {
     param(
         [string]$PackageDir
@@ -535,16 +609,34 @@ function Test-PackageContentsAreComplete {
         return $false
     }
 
+    $metadata = Get-PackageMetadata -PackageDir $PackageDir
+    if ($null -eq $metadata) {
+        return $false
+    }
+
+    if (-not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $metadata.entrypoint)) {
+        return $false
+    }
+
+    $managedCodexProperty = $metadata.PSObject.Properties["managedCodex"]
+    $managedCodex = if ($null -eq $managedCodexProperty) { $null } else { $managedCodexProperty.Value }
+    if (-not [string]::IsNullOrWhiteSpace($managedCodex) -and
+        -not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $managedCodex)) {
+        return $false
+    }
+
+    $pathDir = if ([string]::IsNullOrWhiteSpace($metadata.pathDir)) { "codex-path" } else { $metadata.pathDir }
+    $resourcesDir = if ([string]::IsNullOrWhiteSpace($metadata.resourcesDir)) { "codex-resources" } else { $metadata.resourcesDir }
+
     $expectedFiles = @(
         "codex-package.json",
-        "bin\codex.exe",
         "bin\codex-code-mode-host.exe",
-        "codex-path\rg.exe",
-        "codex-resources\codex-command-runner.exe",
-        "codex-resources\codex-windows-sandbox-setup.exe"
+        "$pathDir\rg.exe",
+        "$resourcesDir\codex-command-runner.exe",
+        "$resourcesDir\codex-windows-sandbox-setup.exe"
     )
     foreach ($name in $expectedFiles) {
-        if (-not (Test-Path -LiteralPath (Join-Path $PackageDir $name) -PathType Leaf)) {
+        if (-not (Test-PackageRelativeFile -PackageDir $PackageDir -RelativePath $name)) {
             return $false
         }
     }
@@ -642,6 +734,10 @@ function Get-ConflictingInstall {
         [string]$VisibleBinDir
     )
 
+    if ($CommandName -ne "codex") {
+        return $null
+    }
+
     $existingPath = Get-ExistingCodexCommand
     $manager = Get-ExistingCodexManager -ExistingPath $existingPath -VisibleBinDir $VisibleBinDir
     if ($null -eq $manager) {
@@ -692,10 +788,17 @@ function Test-VisibleCodexCommand {
         [string]$VisibleBinDir
     )
 
-    $codexCommand = Join-Path $VisibleBinDir "codex.exe"
+    $codexCommand = Join-Path $VisibleBinDir "$CommandName.exe"
     & $codexCommand --version *> $null
     if ($LASTEXITCODE -ne 0) {
-        throw "Installed Codex command failed verification: $codexCommand --version"
+        throw "Installed $ProductName command failed verification: $codexCommand --version"
+    }
+    foreach ($aliasName in $AliasCommandNames) {
+        $aliasCommand = Join-Path $VisibleBinDir "$aliasName.exe"
+        & $aliasCommand --version *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Installed $ProductName alias failed verification: $aliasCommand --version"
+        }
     }
 }
 
@@ -705,7 +808,7 @@ if ($env:OS -ne "Windows_NT") {
 }
 
 if (-not [Environment]::Is64BitOperatingSystem) {
-    Write-Error "Codex requires a 64-bit version of Windows."
+    Write-Error "$ProductName requires a 64-bit version of Windows."
     exit 1
 }
 
@@ -730,8 +833,10 @@ switch ($architecture) {
     }
 }
 
-$codexHome = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
-    Join-Path $env:USERPROFILE ".codex"
+$codexHome = if (-not [string]::IsNullOrWhiteSpace($env:INTERPRETER_HOME)) {
+    $env:INTERPRETER_HOME
+} elseif ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
+    Join-Path $env:USERPROFILE ".openinterpreter"
 } else {
     $env:CODEX_HOME
 }
@@ -740,8 +845,10 @@ $releasesDir = Join-Path $standaloneRoot "releases"
 $currentDir = Join-Path $standaloneRoot "current"
 $lockPath = Join-Path $standaloneRoot "install.lock"
 
-$defaultVisibleBinDir = Join-Path $env:LOCALAPPDATA "Programs\OpenAI\Codex\bin"
-if ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_DIR)) {
+$defaultVisibleBinDir = Join-Path $env:LOCALAPPDATA "Programs\Open Interpreter\bin"
+if (-not [string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_INSTALL_DIR)) {
+    $visibleBinDir = $env:OPEN_INTERPRETER_INSTALL_DIR
+} elseif ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_DIR)) {
     $visibleBinDir = $defaultVisibleBinDir
 } else {
     $visibleBinDir = $env:CODEX_INSTALL_DIR
@@ -755,11 +862,11 @@ $releaseName = "$resolvedVersion-$target"
 $releaseDir = Join-Path $releasesDir $releaseName
 
 if (-not [string]::IsNullOrWhiteSpace($currentVersion) -and $currentVersion -ne $resolvedVersion) {
-    Write-Step "Updating Codex CLI from $currentVersion to $resolvedVersion"
+    Write-Step "Updating $ProductName from $currentVersion to $resolvedVersion"
 } elseif (-not [string]::IsNullOrWhiteSpace($currentVersion)) {
-    Write-Step "Updating Codex CLI"
+    Write-Step "Updating $ProductName"
 } else {
-    Write-Step "Installing Codex CLI"
+    Write-Step "Installing $ProductName"
 }
 Write-Step "Detected platform: $platformLabel"
 Write-Step "Resolved version: $resolvedVersion"
@@ -767,22 +874,25 @@ Write-Step "Resolved version: $resolvedVersion"
 $conflictingInstall = Get-ConflictingInstall -VisibleBinDir $visibleBinDir
 $oldStandaloneBackup = $null
 
-$packageAsset = "codex-package-$target.tar.gz"
+$packageAsset = "$PackageAssetStem-$target.tar.gz"
 $checksumAsset = "codex-package_SHA256SUMS"
 $packageMetadata = Find-ReleaseAssetMetadata -AssetName $packageAsset -ReleaseMetadata $releaseMetadata
 $checksumMetadata = Find-ReleaseAssetMetadata -AssetName $checksumAsset -ReleaseMetadata $releaseMetadata
 $installLayout = "Package"
-if ($null -eq $packageMetadata -or $null -eq $checksumMetadata) {
+if (($null -eq $packageMetadata -or $null -eq $checksumMetadata) -and $PackageAssetStem -eq "codex-package") {
     $packageAsset = "codex-npm-$npmTag-$resolvedVersion.tgz"
     $packageMetadata = Find-ReleaseAssetMetadata -AssetName $packageAsset -ReleaseMetadata $releaseMetadata
     if ($null -ne $packageMetadata) {
         $installLayout = "LegacyPlatformNpm"
     } else {
-        throw "Could not find Codex package or platform npm release assets for Codex $resolvedVersion."
+        throw "Could not find $ProductName release assets for $resolvedVersion."
     }
     $checksumMetadata = $null
 }
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("codex-install-" + [System.Guid]::NewGuid().ToString("N"))
+if ($null -eq $packageMetadata -or ($installLayout -eq "Package" -and $null -eq $checksumMetadata)) {
+    throw "Could not find $ProductName release assets for $resolvedVersion."
+}
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("$CommandName-install-" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
 try {
@@ -798,7 +908,7 @@ try {
             $checksumPath = Join-Path $tempDir $checksumAsset
             $stagingDir = Join-Path $releasesDir ".staging.$releaseName.$PID"
 
-            Write-Step "Downloading Codex CLI"
+            Write-Step "Downloading $ProductName"
             if ($installLayout -eq "Package") {
                 Invoke-WebRequest -Uri $checksumMetadata.Url -OutFile $checksumPath
                 Test-ArchiveDigest -ArchivePath $checksumPath -ExpectedDigest $checksumMetadata.Sha256
@@ -817,7 +927,7 @@ try {
             if ($installLayout -eq "Package") {
                 tar -xzf $archivePath -C $stagingDir
                 if (-not (Test-PackageContentsAreComplete -PackageDir $stagingDir)) {
-                    throw "Downloaded Codex package archive did not contain the expected package layout."
+                    throw "Downloaded $ProductName package archive did not contain the expected package layout."
                 }
             } else {
                 $extractDir = Join-Path $tempDir "extract"
@@ -917,12 +1027,13 @@ if ($prioritizeVisibleBin) {
     }
 }
 
-Write-Step "Current PowerShell session: codex"
-Write-Step "Future PowerShell windows: open a new PowerShell window and run: codex"
-Write-Host "Codex CLI $resolvedVersion installed successfully."
+$startCommand = if ($CommandName -eq "interpreter") { "i or interpreter" } else { $CommandName }
+Write-Step "Current PowerShell session: $startCommand"
+Write-Step "Future PowerShell windows: open a new PowerShell window and run: $startCommand"
+Write-Host "$ProductName $resolvedVersion installed successfully."
 
-$codexCommand = Join-Path $visibleBinDir "codex.exe"
-if (Prompt-YesNo "Start Codex now?") {
-    Write-Step "Launching Codex"
+$codexCommand = Join-Path $visibleBinDir "$CommandName.exe"
+if (Prompt-YesNo "Start $ProductName now?") {
+    Write-Step "Launching $ProductName"
     & $codexCommand
 }

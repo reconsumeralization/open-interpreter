@@ -88,9 +88,6 @@ use codex_protocol::protocol::AskForApproval;
 use codex_protocol::user_input::UserInput;
 use codex_terminal_detection::TerminalName;
 
-/// Codex CLI
-///
-/// If no subcommand is specified, options will be forwarded to the interactive CLI.
 #[derive(Debug, Parser)]
 #[clap(
     author,
@@ -99,9 +96,13 @@ use codex_terminal_detection::TerminalName;
     subcommand_negates_reqs = true,
     // The executable is sometimes invoked via a platform‑specific name like
     // `codex-x86_64-unknown-linux-musl`, but the help output should always use
-    // the generic `codex` command name that users run.
-    bin_name = "codex",
-    override_usage = "codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND> [ARGS]"
+    // the generic command name users run: `codex`, or `interpreter` when this
+    // binary ships as Open Interpreter. The same product detection drives the
+    // version line and help description.
+    name = product_command_name(),
+    bin_name = product_command_name(),
+    about = product_about(),
+    override_usage = product_usage()
 )]
 struct MultitoolCli {
     #[clap(flatten)]
@@ -143,6 +144,9 @@ enum Subcommand {
 
     /// Start Codex as an MCP server (stdio).
     McpServer(McpServerCommand),
+
+    /// [experimental] Run as an Agent Client Protocol (ACP) agent over stdio.
+    Acp,
 
     /// [experimental] Run the app server or related tooling.
     AppServer(AppServerCommand),
@@ -953,6 +957,25 @@ fn stage_str(stage: Stage) -> &'static str {
     }
 }
 
+fn product_command_name() -> &'static str {
+    codex_product_info::Product::current().command_name()
+}
+
+fn product_about() -> String {
+    format!(
+        "{}\n\nIf no subcommand is specified, options will be forwarded to the interactive CLI.",
+        match codex_product_info::Product::current() {
+            codex_product_info::Product::Codex => "Codex CLI",
+            codex_product_info::Product::OpenInterpreter => "Open Interpreter",
+        }
+    )
+}
+
+fn product_usage() -> String {
+    let command = product_command_name();
+    format!("{command} [OPTIONS] [PROMPT]\n       {command} [OPTIONS] <COMMAND> [ARGS]")
+}
+
 fn main() -> anyhow::Result<()> {
     let remote_control_disabled = codex_app_server::take_remote_control_disabled_env();
     arg0_dispatch_or_else(move |arg0_paths: Arg0DispatchPaths| async move {
@@ -1048,6 +1071,14 @@ async fn cli_main(
                 strict_config || root_strict_config,
             )
             .await?;
+        }
+        Some(Subcommand::Acp) => {
+            reject_remote_mode_for_subcommand(
+                root_remote.as_deref(),
+                root_remote_auth_token_env.as_deref(),
+                "acp",
+            )?;
+            codex_acp_server::run_main(arg0_paths.clone()).await?;
         }
         Some(Subcommand::Mcp(mut mcp_cli)) => {
             reject_remote_mode_for_subcommand(
@@ -2122,6 +2153,7 @@ fn unsupported_subcommand_name_for_strict_config(
             Some(app_server_subcommand_name(app_server.subcommand.as_ref()))
         }
         Some(Subcommand::RemoteControl(remote_control)) => Some(remote_control.subcommand_name()),
+        Some(Subcommand::Acp) => Some("acp"),
         Some(Subcommand::Mcp(_)) => Some("mcp"),
         Some(Subcommand::Plugin(_)) => Some("plugin"),
         #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -2233,6 +2265,28 @@ fn read_remote_auth_token_from_env_var(env_var_name: &str) -> anyhow::Result<Str
     read_remote_auth_token_from_env_var_with(env_var_name, |name| std::env::var(name))
 }
 
+const DEFAULT_MODE_REQUEST_USER_INPUT_OVERRIDE: &str =
+    "features.default_mode_request_user_input=true";
+
+/// Open Interpreter enables `request_user_input` in the default mode. Applied
+/// here, before config load, so an explicit user override still wins.
+fn apply_open_interpreter_feature_defaults(config_overrides: &mut CliConfigOverrides) {
+    if codex_product_info::Product::current() != codex_product_info::Product::OpenInterpreter {
+        return;
+    }
+    if config_overrides.raw_overrides.iter().all(|override_entry| {
+        let key = override_entry
+            .split_once('=')
+            .map_or(override_entry.as_str(), |(path, _)| path)
+            .trim();
+        key != "features.default_mode_request_user_input"
+    }) {
+        config_overrides
+            .raw_overrides
+            .push(DEFAULT_MODE_REQUEST_USER_INPUT_OVERRIDE.to_string());
+    }
+}
+
 async fn run_interactive_tui(
     mut interactive: TuiCli,
     remote: Option<String>,
@@ -2243,6 +2297,8 @@ async fn run_interactive_tui(
         // Normalize CRLF/CR to LF so CLI-provided text can't leak `\r` into TUI state.
         interactive.prompt = Some(prompt.replace("\r\n", "\n").replace('\r', "\n"));
     }
+
+    apply_open_interpreter_feature_defaults(&mut interactive.config_overrides);
 
     let terminal_info = codex_terminal_detection::terminal_info();
     if terminal_info.name == TerminalName::Dumb {

@@ -33,6 +33,7 @@ use crate::wrapping::RtOptions;
 use crate::wrapping::word_wrap_lines;
 
 pub(crate) const STATUS_DETAILS_DEFAULT_MAX_LINES: usize = 3;
+pub(crate) const STATUS_HEADER_INTERPRETING: &str = "Interpreting";
 const DETAILS_PREFIX: &str = "  └ ";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,7 +44,7 @@ pub(crate) enum StatusDetailsCapitalization {
 
 /// Displays a single-line in-progress status with optional wrapped details.
 pub(crate) struct StatusIndicatorWidget {
-    /// Animated header text (defaults to "Working").
+    /// Animated header text.
     header: String,
     details: Option<String>,
     details_max_lines: usize,
@@ -84,7 +85,7 @@ impl StatusIndicatorWidget {
         animations_enabled: bool,
     ) -> Self {
         Self {
-            header: String::from("Working"),
+            header: String::from(STATUS_HEADER_INTERPRETING),
             details: None,
             details_max_lines: STATUS_DETAILS_DEFAULT_MAX_LINES,
             inline_message: None,
@@ -412,7 +413,7 @@ mod tests {
             .map(ratatui::buffer::Cell::symbol)
             .collect::<String>();
 
-        assert!(line.starts_with("Working (0s • esc to interrupt)"));
+        assert!(line.starts_with("Interpreting (0s • esc to interrupt)"));
     }
 
     #[test]

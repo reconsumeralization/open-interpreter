@@ -51,6 +51,39 @@ fn host_program_is_next_to_the_main_executable_even_when_missing() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn host_program_follows_the_managed_entrypoint_symlink() {
+    use std::os::unix::fs::symlink;
+    use std::time::SystemTime;
+
+    let unique = SystemTime::UNIX_EPOCH
+        .elapsed()
+        .expect("system time after unix epoch")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "codex-code-mode-managed-entrypoint-{}-{unique}",
+        std::process::id()
+    ));
+    let package_bin = root.join("package/bin");
+    let visible_bin = root.join("visible-bin");
+    std::fs::create_dir_all(&package_bin).expect("create package bin");
+    std::fs::create_dir_all(&visible_bin).expect("create visible bin");
+    let package_entrypoint = package_bin.join("interpreter");
+    let package_host = package_bin.join("codex-code-mode-host");
+    std::fs::write(&package_entrypoint, "entrypoint").expect("write package entrypoint");
+    std::fs::write(&package_host, "host").expect("write package host");
+    let visible_entrypoint = visible_bin.join("interpreter");
+    symlink(&package_entrypoint, &visible_entrypoint).expect("link managed entrypoint");
+
+    assert_eq!(
+        resolve_host_program(/*override_path*/ None, Ok(visible_entrypoint)),
+        package_host.canonicalize().expect("canonical package host")
+    );
+
+    std::fs::remove_dir_all(root).expect("remove test root");
+}
+
 #[test]
 fn host_program_falls_back_to_its_name_when_main_executable_is_unknown() {
     let executable_name = if cfg!(windows) {

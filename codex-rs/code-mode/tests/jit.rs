@@ -1,3 +1,5 @@
+#![cfg(feature = "v8-runtime")]
+
 use codex_code_mode::ExecuteRequest;
 use codex_code_mode::InProcessCodeModeSession;
 use codex_code_mode::RuntimeResponse;

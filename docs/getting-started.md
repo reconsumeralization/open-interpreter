@@ -1,3 +1,7 @@
-# Getting started with Codex CLI
+# Getting started with Open Interpreter
 
-For an overview of Codex CLI features, see [this documentation](https://developers.openai.com/codex/cli/features#running-in-interactive-mode).
+Install Open Interpreter, open a project, then type `i` or `interpreter` in
+your terminal to start an interactive session.
+
+For the full terminal guide, see
+[openinterpreter.com/docs/terminal](https://www.openinterpreter.com/docs/terminal).

@@ -1,8 +1,7 @@
 name: repo-checks
 
 on:
-  workflow_call:
-
+  workflow_dispatch:
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -27,8 +26,10 @@ jobs:
       - name: Verify Bazel clippy flags match Cargo workspace lints
         run: python3 .github/scripts/verify_bazel_clippy_lints.py
 
-      - name: Test Codex package builder
-        run: python3 -m unittest discover -s scripts/codex_package -p 'test_*.py'
+      - name: Test packaging scripts
+        run: |
+          python3 -m unittest discover -s scripts/codex_package -p 'test_*.py'
+          python3 -m unittest discover -s scripts/install -p 'test_*.py'
 
       - name: Test standalone installer
         run: python3 -m unittest discover -s scripts/install -p 'test_*.py'

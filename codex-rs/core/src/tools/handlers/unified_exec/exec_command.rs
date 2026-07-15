@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::exec::ExecCapturePolicy;
 use crate::function_tool::FunctionCallError;
 use crate::maybe_emit_implicit_skill_invocation;
 use crate::tools::context::ExecCommandToolOutput;
@@ -33,6 +34,7 @@ use codex_sandboxing::SandboxManager;
 use codex_sandboxing::SandboxType;
 use codex_sandboxing::SandboxablePreference;
 use codex_shell_command::shell_detect::detect_shell_type;
+use codex_tools::Harness;
 use codex_tools::ToolName;
 use codex_tools::ToolSpec;
 use codex_utils_output_truncation::approx_token_count;
@@ -253,6 +255,14 @@ impl ExecCommandHandler {
 
         let exec_permission_approvals_enabled =
             session.features().enabled(Feature::ExecPermissionApprovals);
+        let capture_policy = if matches!(
+            Harness::from_config_name(turn.config.harness.as_deref()),
+            Harness::ZCode
+        ) {
+            ExecCapturePolicy::FullBuffer
+        } else {
+            ExecCapturePolicy::ShellTool
+        };
         let requested_additional_permissions = additional_permissions.clone();
         // TODO(anp): Make permission matching operate on PathUri for remote environments.
         let permission_cwd = native_cwd.as_ref().unwrap_or(&turn.config.cwd);
@@ -361,6 +371,7 @@ impl ExecCommandHandler {
                         .permissions_preapproved,
                     justification,
                     prefix_rule,
+                    capture_policy,
                 },
                 &context,
             )

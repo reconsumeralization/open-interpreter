@@ -35,6 +35,7 @@ use crate::runtime::PendingRuntimeMode;
 use crate::runtime::RuntimeCommand;
 use crate::runtime::RuntimeControlCommand;
 use crate::runtime::RuntimeEvent;
+use crate::runtime::RuntimeTerminateHandle;
 use crate::runtime::spawn_runtime;
 use crate::session_runtime::CellEvent;
 use crate::session_runtime::CreateCellRequest as CellRequest;
@@ -63,12 +64,20 @@ impl CellActor {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let (initial_response_tx, initial_response_rx) = oneshot::channel();
+        #[cfg(feature = "v8-runtime")]
         let (runtime_tx, runtime_control_tx, runtime_terminate_handle) = spawn_runtime(
             stored_values,
             runtime_request(request),
             event_tx,
             PendingRuntimeMode::PauseUntilResumed,
             task_failure_handler.clone(),
+        )?;
+        #[cfg(not(feature = "v8-runtime"))]
+        let (runtime_tx, runtime_control_tx, runtime_terminate_handle) = spawn_runtime(
+            stored_values,
+            runtime_request(request),
+            event_tx,
+            PendingRuntimeMode::PauseUntilResumed,
         )?;
         let handle = CellHandle::new(command_tx, Arc::clone(&cell_state));
         let task = run_cell(
@@ -77,6 +86,7 @@ impl CellActor {
                 runtime_tx,
                 runtime_control_tx,
                 runtime_terminate_handle,
+                cancellation_token: cell_state.cancellation_token(),
                 cell_state,
             },
             event_rx,
@@ -96,7 +106,8 @@ impl CellActor {
 struct CellContext {
     runtime_tx: std::sync::mpsc::Sender<RuntimeCommand>,
     runtime_control_tx: std::sync::mpsc::Sender<RuntimeControlCommand>,
-    runtime_terminate_handle: v8::IsolateHandle,
+    runtime_terminate_handle: RuntimeTerminateHandle,
+    cancellation_token: CancellationToken,
     cell_state: Arc<CellState>,
 }
 
@@ -117,9 +128,9 @@ async fn run_cell<H: CellHost>(
         runtime_tx,
         runtime_control_tx,
         runtime_terminate_handle,
+        cancellation_token,
         cell_state,
     } = context;
-    let cancellation_token = cell_state.cancellation_token();
     let callback_cancellation_token = cancellation_token.child_token();
     let mut content_items = Vec::new();
     let mut pending_tool_call_ids = Vec::new();
@@ -592,15 +603,15 @@ fn resume_for_observation(
 fn begin_termination(
     runtime_tx: &std::sync::mpsc::Sender<RuntimeCommand>,
     runtime_control_tx: &std::sync::mpsc::Sender<RuntimeControlCommand>,
-    runtime_terminate_handle: &v8::IsolateHandle,
+    runtime_terminate_handle: &RuntimeTerminateHandle,
     cancellation_token: &CancellationToken,
 ) {
     cancellation_token.cancel();
     let _ = runtime_tx.send(RuntimeCommand::Terminate);
     let _ = runtime_control_tx.send(RuntimeControlCommand::Terminate);
-    let _ = runtime_terminate_handle.terminate_execution();
+    runtime_terminate_handle.terminate_execution();
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "v8-runtime"))]
 #[path = "tests.rs"]
 mod tests;

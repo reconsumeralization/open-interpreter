@@ -406,10 +406,10 @@ fn missing_wait(cell_id: CellId) -> CodeModeSessionResultFuture<'static, WaitOut
     Box::pin(async move { Ok(WaitOutcome::MissingCell(missing_cell_response(cell_id))) })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "v8-runtime"))]
 #[path = "service_tests.rs"]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "v8-runtime"))]
 #[path = "service_contract_tests.rs"]
 mod contract_tests;

@@ -43,6 +43,8 @@ use crate::markdown_text_merge::DecodedTextMerge;
 use crate::render::highlight::foreground_style_for_scopes;
 use crate::render::highlight::highlight_code_to_lines;
 use crate::render::line_utils::line_to_static;
+use crate::style::app_accent_style;
+use crate::style::app_accent_underlined_style;
 use crate::style::table_separator_style;
 use crate::terminal_hyperlinks::HyperlinkLine;
 use crate::terminal_hyperlinks::annotate_web_urls_in_line;
@@ -103,6 +105,7 @@ struct MarkdownStyles {
 
 impl Default for MarkdownStyles {
     fn default() -> Self {
+        let accent = app_accent_style();
         Self {
             h1: Style::new().bold().underlined(),
             h2: Style::new().bold(),
@@ -110,14 +113,14 @@ impl Default for MarkdownStyles {
             h4: Style::new().italic(),
             h5: Style::new().italic(),
             h6: Style::new().italic(),
-            code: Style::new().cyan(),
+            code: accent,
             emphasis: Style::new().italic(),
             strong: Style::new().bold(),
             strikethrough: Style::new().crossed_out(),
-            ordered_list_marker: Style::new().light_blue(),
-            unordered_list_marker: Style::new(),
-            link: Style::new().cyan().underlined(),
-            blockquote: Style::new().green(),
+            ordered_list_marker: accent,
+            unordered_list_marker: accent,
+            link: app_accent_underlined_style(),
+            blockquote: accent,
         }
     }
 }

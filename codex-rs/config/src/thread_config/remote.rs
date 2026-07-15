@@ -289,6 +289,9 @@ fn proto_string_map(values: HashMap<String, String>) -> proto::StringMap {
 fn proto_wire_api(wire_api: WireApi) -> proto::WireApi {
     match wire_api {
         WireApi::Responses => proto::WireApi::Responses,
+        // The cloud thread-config protocol predates the local-only chat and
+        // messages wire APIs and cannot express them.
+        WireApi::Chat | WireApi::Messages => proto::WireApi::Unspecified,
     }
 }
 

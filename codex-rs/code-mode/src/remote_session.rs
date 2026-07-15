@@ -516,7 +516,16 @@ fn resolve_host_program(
     if let Ok(current_exe) = current_exe
         && let Some(parent) = current_exe.parent()
     {
-        return parent.join(executable_name);
+        let adjacent_host = parent.join(executable_name);
+        if adjacent_host.is_file() {
+            return adjacent_host;
+        }
+        if let Ok(resolved_exe) = current_exe.canonicalize()
+            && let Some(resolved_parent) = resolved_exe.parent()
+        {
+            return resolved_parent.join(executable_name);
+        }
+        return adjacent_host;
     }
     PathBuf::from(executable_name)
 }

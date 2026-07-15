@@ -2,7 +2,8 @@
 source: tui/src/bottom_pane/command_popup.rs
 expression: commands
 ---
-/model - choose what model and reasoning effort to use
+/model - choose provider, model, reasoning effort, and harness
+/harness - choose the tool harness for the current model
 /ide - include current selection, open files, and other context from your IDE
 /permissions - choose what Codex is allowed to do
 /keymap - remap TUI shortcuts
@@ -11,7 +12,7 @@ expression: commands
 /approve - approve one retry of a recent auto-review denial
 /memories - configure memory use and generation
 /skills - use skills to improve how Codex performs specific tasks
-/import - import setup, this project, and recent chats from Claude Code
+/import - import setup, this project, and recent chats from another coding agent
 /hooks - view and manage lifecycle hooks
 /review - review my current changes and find issues
 /rename - rename the current thread

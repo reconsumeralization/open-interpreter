@@ -1,4 +1,5 @@
 use codex_features::FEATURES;
+use codex_product_info::Product;
 use codex_protocol::account::PlanType;
 use lazy_static::lazy_static;
 use rand::Rng;
@@ -39,6 +40,10 @@ lazy_static! {
         tips.extend(experimental_tooltips());
         tips
     };
+    static ref OPEN_INTERPRETER_TOOLTIPS: Vec<String> = TOOLTIPS
+        .iter()
+        .filter_map(|tip| productize_open_interpreter_tooltip(tip))
+        .collect();
 }
 
 fn experimental_tooltips() -> Vec<&'static str> {
@@ -51,6 +56,11 @@ fn experimental_tooltips() -> Vec<&'static str> {
 /// Pick a random tooltip to show to the user when starting Codex.
 pub(crate) fn get_tooltip(plan: Option<PlanType>, fast_mode_enabled: bool) -> Option<String> {
     let mut rng = rand::rng();
+    let product = Product::current();
+
+    if product == Product::OpenInterpreter {
+        return pick_open_interpreter_tooltip(&mut rng);
+    }
 
     if let Some(announcement) = announcement::fetch_announcement_tip(plan) {
         return Some(announcement);
@@ -118,6 +128,41 @@ fn pick_tooltip<R: Rng + ?Sized>(rng: &mut R) -> Option<&'static str> {
             .get(rng.random_range(0..ALL_TOOLTIPS.len()))
             .copied()
     }
+}
+
+fn pick_open_interpreter_tooltip<R: Rng + ?Sized>(rng: &mut R) -> Option<String> {
+    if OPEN_INTERPRETER_TOOLTIPS.is_empty() {
+        None
+    } else {
+        OPEN_INTERPRETER_TOOLTIPS
+            .get(rng.random_range(0..OPEN_INTERPRETER_TOOLTIPS.len()))
+            .cloned()
+    }
+}
+
+pub(crate) fn productize_open_interpreter_tooltip(tip: &str) -> Option<String> {
+    if open_interpreter_excludes_tip(tip) {
+        return None;
+    }
+
+    Some(
+        tip.replace("OpenAI Codex", Product::OpenInterpreter.display_name())
+            .replace("Codex", Product::OpenInterpreter.display_name())
+            .replace("`codex ", "`interpreter ")
+            .replace("~/.codex/config.toml", "~/.openinterpreter/config.toml"),
+    )
+}
+
+fn open_interpreter_excludes_tip(tip: &str) -> bool {
+    let lower = tip.to_lowercase();
+    lower.contains("codex app")
+        || lower.contains("codex desktop")
+        || lower.contains("openai")
+        || lower.contains("gpt")
+        || lower.contains("chatgpt.com/codex")
+        || lower.contains("discord.gg/openai")
+        || lower.contains("community.openai.com/c/codex")
+        || lower.contains("codex keymap documentation")
 }
 
 pub(crate) mod announcement {
@@ -344,6 +389,71 @@ mod tests {
 
         let mut rng = StdRng::seed_from_u64(7);
         assert_eq!(expected, pick_tooltip(&mut rng));
+    }
+
+    #[test]
+    fn open_interpreter_tooltips_keep_generic_product_tips() {
+        assert_eq!(
+            productize_open_interpreter_tooltip(
+                "Switch models or reasoning effort quickly with /model."
+            ),
+            Some("Switch models or reasoning effort quickly with /model.".to_string())
+        );
+        assert_eq!(
+            productize_open_interpreter_tooltip(
+                "Use /permissions to control when Codex asks for confirmation."
+            ),
+            Some(
+                "Use /permissions to control when Open Interpreter asks for confirmation."
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            productize_open_interpreter_tooltip(
+                "[tui.keymap] in ~/.codex/config.toml lets you rebind supported shortcuts."
+            ),
+            Some(
+                "[tui.keymap] in ~/.openinterpreter/config.toml lets you rebind supported shortcuts."
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            productize_open_interpreter_tooltip(
+                "You can resume a previous conversation by running `codex resume`"
+            ),
+            Some(
+                "You can resume a previous conversation by running `interpreter resume`"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn open_interpreter_tooltips_filter_openai_specific_promos() {
+        for tip in [
+            "Try our new GPT model.",
+            "Run `codex app` to open Codex Desktop.",
+            "Use the OpenAI docs MCP for API questions.",
+            "Join the OpenAI community Discord: http://discord.gg/openai",
+            "Visit the Codex community forum: https://community.openai.com/c/codex/37",
+            "See the Codex keymap documentation for supported actions and examples.",
+        ] {
+            assert_eq!(productize_open_interpreter_tooltip(tip), None);
+        }
+    }
+
+    #[test]
+    fn open_interpreter_tooltip_pool_has_vetted_normal_tips() {
+        assert!(
+            OPEN_INTERPRETER_TOOLTIPS
+                .iter()
+                .any(|tip| tip.contains("/model"))
+        );
+        assert!(
+            !OPEN_INTERPRETER_TOOLTIPS
+                .iter()
+                .any(|tip| open_interpreter_excludes_tip(tip))
+        );
     }
 
     #[test]

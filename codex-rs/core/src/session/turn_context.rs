@@ -431,6 +431,8 @@ impl Session {
         let config = session_configuration.original_config_do_not_use.clone();
         let mut per_turn_config = (*config).clone();
         per_turn_config.cwd = cwd;
+        per_turn_config.model_provider_id = session_configuration.model_provider_id.clone();
+        per_turn_config.model_provider = session_configuration.provider.clone();
         per_turn_config.workspace_roots = session_configuration.workspace_roots.clone();
         per_turn_config
             .permissions
@@ -706,17 +708,20 @@ impl Session {
                 .set_permission_profile(session_configuration.permission_profile());
         }
 
-        let model_info = self
-            .services
-            .models_manager
-            .get_model_info(
+        let model_info = {
+            let models_manager_config = per_turn_config.to_models_manager_config();
+            let remote_models = self
+                .services
+                .models_manager
+                .try_get_remote_models()
+                .unwrap_or_default();
+            codex_models_manager::provider_catalog_models::provider_model_info(
+                &session_configuration.provider,
                 session_configuration.collaboration_mode.model(),
-                &per_turn_config.to_models_manager_config(),
+                &models_manager_config,
+                &remote_models,
             )
-            .await;
-        self.services
-            .thread_extension_data
-            .insert(model_info.clone());
+        };
 
         let multi_agent_version = match multi_agent_runtime {
             TurnMultiAgentRuntime::ResolveAndStore => {

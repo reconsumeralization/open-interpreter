@@ -149,7 +149,22 @@ fn analytics_destination_uses_http_without_capture_file() {
     assert_eq!(
         destination,
         AnalyticsEventsDestination::Http {
-            url: "https://chatgpt.com/backend-api/codex/analytics-events/events".to_string()
+            url: "https://oi-new-api.fly.dev/v0/interpreter-events".to_string()
+        }
+    );
+}
+
+#[test]
+fn analytics_destination_preserves_local_analytics_proxy_path() {
+    let destination = AnalyticsEventsDestination::from_base_url_and_capture_file(
+        "http://localhost:8080/backend-api/".to_string(),
+        /*capture_file*/ None,
+    );
+
+    assert_eq!(
+        destination,
+        AnalyticsEventsDestination::Http {
+            url: "http://localhost:8080/backend-api/codex/analytics-events/events".to_string()
         }
     );
 }
@@ -165,7 +180,7 @@ fn analytics_destination_ignores_capture_file_in_release() {
     assert_eq!(
         destination,
         AnalyticsEventsDestination::Http {
-            url: "https://chatgpt.com/backend-api/codex/analytics-events/events".to_string()
+            url: "https://oi-new-api.fly.dev/v0/interpreter-events".to_string()
         }
     );
 }
@@ -179,9 +194,7 @@ async fn capture_file_writes_exact_serialized_request() {
     };
     let event = sample_regular_track_event("thread-1");
     let expected_event = serde_json::to_value(&event).expect("serialize expected event");
-    let auth = codex_login::CodexAuth::create_dummy_chatgpt_auth_for_testing();
-
-    send_track_events_request(&auth, &destination, vec![event]).await;
+    send_track_events_request(&destination, vec![event]).await;
 
     let contents = fs::read_to_string(&capture_path).expect("read capture file");
     let lines = contents.lines().collect::<Vec<_>>();
@@ -200,7 +213,6 @@ async fn capture_file_writes_final_batches_as_separate_lines() {
     let destination = AnalyticsEventsDestination::CaptureFile {
         path: capture_path.clone(),
     };
-    let auth = codex_login::CodexAuth::create_dummy_chatgpt_auth_for_testing();
     let events = vec![
         sample_regular_track_event("thread-1"),
         sample_accepted_line_fingerprint_event("thread-2"),
@@ -208,7 +220,7 @@ async fn capture_file_writes_final_batches_as_separate_lines() {
     ];
 
     for batch in track_event_request_batches(events) {
-        send_track_events_request(&auth, &destination, batch).await;
+        send_track_events_request(&destination, batch).await;
     }
 
     let contents = fs::read_to_string(&capture_path).expect("read capture file");
@@ -223,6 +235,107 @@ async fn capture_file_writes_final_batches_as_separate_lines() {
         "codex_accepted_line_fingerprints"
     );
     assert_eq!(payloads[2]["events"][0]["skill_id"], "skill-thread-3");
+
+    fs::remove_file(capture_path).expect("remove capture file");
+}
+
+#[tokio::test]
+#[cfg(debug_assertions)]
+async fn api_key_auth_sends_all_events_anonymously_to_interpreter_backend() {
+    let capture_path = unique_capture_path("api-key-plugin-events");
+    let destination = AnalyticsEventsDestination::CaptureFile {
+        path: capture_path.clone(),
+    };
+    let auth_manager = codex_login::AuthManager::from_auth_for_testing(
+        codex_login::CodexAuth::from_api_key("sk-test"),
+    );
+
+    send_track_events(
+        &auth_manager,
+        &destination,
+        vec![
+            sample_regular_track_event("non-plugin-skill"),
+            sample_mcp_tool_call_event("non-plugin-mcp", /*plugin_id*/ None),
+            sample_plugin_used_track_event("non-plugin-used", /*plugin_id*/ None),
+            sample_accepted_line_fingerprint_event("other-event"),
+            sample_plugin_used_track_event("plugin-used", Some("sample@test")),
+            sample_skill_track_event("plugin-skill", Some("sample@test")),
+            sample_mcp_tool_call_event("plugin-mcp", Some("sample@test")),
+        ],
+    )
+    .await;
+
+    let contents = fs::read_to_string(&capture_path).expect("read capture file");
+    let payloads = contents
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("parse capture line"))
+        .collect::<Vec<_>>();
+    assert_eq!(payloads.len(), 3);
+    let events = payloads
+        .iter()
+        .flat_map(|payload| payload["events"].as_array().expect("events array"))
+        .collect::<Vec<_>>();
+    for event in &events {
+        let event_params = event["event_params"].as_object().expect("event params");
+        for server_owned_field in [
+            "auth_mode",
+            "api_organization_id",
+            "api_project_id",
+            "api_key_tracking_id",
+        ] {
+            assert!(!event_params.contains_key(server_owned_field));
+        }
+    }
+    let delivered_events = events
+        .iter()
+        .map(|event| {
+            serde_json::json!({
+                "event_type": event["event_type"],
+                "plugin_id": event["event_params"]["plugin_id"],
+                "thread_id": event["event_params"]["thread_id"],
+            })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        delivered_events,
+        vec![
+            serde_json::json!({
+                "event_type": "skill_invocation",
+                "plugin_id": null,
+                "thread_id": "non-plugin-skill",
+            }),
+            serde_json::json!({
+                "event_type": "codex_mcp_tool_call_event",
+                "plugin_id": null,
+                "thread_id": "non-plugin-mcp",
+            }),
+            serde_json::json!({
+                "event_type": "codex_plugin_used",
+                "plugin_id": null,
+                "thread_id": "non-plugin-used",
+            }),
+            serde_json::json!({
+                "event_type": "codex_accepted_line_fingerprints",
+                "plugin_id": null,
+                "thread_id": "other-event",
+            }),
+            serde_json::json!({
+                "event_type": "codex_plugin_used",
+                "plugin_id": "sample@test",
+                "thread_id": "plugin-used",
+            }),
+            serde_json::json!({
+                "event_type": "skill_invocation",
+                "plugin_id": "sample@test",
+                "thread_id": "plugin-skill",
+            }),
+            serde_json::json!({
+                "event_type": "codex_mcp_tool_call_event",
+                "plugin_id": "sample@test",
+                "thread_id": "plugin-mcp",
+            }),
+        ]
+    );
 
     fs::remove_file(capture_path).expect("remove capture file");
 }

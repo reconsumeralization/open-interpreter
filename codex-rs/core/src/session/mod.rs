@@ -600,9 +600,13 @@ impl Codex {
         // 1. config.base_instructions override
         // 2. conversation history => session_meta.base_instructions
         // 3. base_instructions for current model
-        let model_info = models_manager
-            .get_model_info(model.as_str(), &config.to_models_manager_config())
-            .await;
+        let remote_models = models_manager.get_remote_models().await;
+        let model_info = codex_models_manager::provider_catalog_models::provider_model_info(
+            &config.model_provider,
+            model.as_str(),
+            &config.to_models_manager_config(),
+            &remote_models,
+        );
         let multi_agent_version =
             resolve_multi_agent_version(&conversation_history, inherited_multi_agent_version);
         let history_mode = conversation_history.get_history_mode(
@@ -642,6 +646,7 @@ impl Codex {
         let service_tier =
             get_service_tier(config.service_tier.clone(), fast_mode_enabled, &model_info);
         let session_configuration = SessionConfiguration {
+            model_provider_id: config.model_provider_id.clone(),
             provider: config.model_provider.clone(),
             collaboration_mode,
             model_reasoning_summary: config.model_reasoning_summary,

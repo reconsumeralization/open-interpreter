@@ -35,6 +35,7 @@ use codex_protocol::protocol::RolloutItem;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::SubAgentSource;
 use codex_protocol::protocol::ThreadSource;
+use codex_protocol::protocol::TokenUsageInfo;
 use codex_protocol::protocol::TurnEnvironmentSelection;
 use codex_protocol::user_input::UserInput;
 use codex_thread_store::ReadThreadParams;
@@ -321,6 +322,37 @@ impl AgentControl {
             return None;
         };
         Some(thread.config_snapshot().await)
+    }
+
+    pub(crate) async fn get_agent_token_usage_info(
+        &self,
+        agent_id: ThreadId,
+    ) -> Option<TokenUsageInfo> {
+        let Ok(state) = self.upgrade() else {
+            return None;
+        };
+        let Ok(thread) = state.get_thread(agent_id).await else {
+            return None;
+        };
+        thread.token_usage_info().await
+    }
+
+    pub(crate) async fn get_agent_rollout_items(
+        &self,
+        agent_id: ThreadId,
+    ) -> Option<Vec<RolloutItem>> {
+        let Ok(state) = self.upgrade() else {
+            return None;
+        };
+        let Ok(thread) = state.get_thread(agent_id).await else {
+            return None;
+        };
+        let _ = thread.flush_rollout().await;
+        thread
+            .load_history(/*include_archived*/ true)
+            .await
+            .ok()
+            .map(|history| history.items)
     }
 
     pub(crate) async fn resolve_agent_reference(

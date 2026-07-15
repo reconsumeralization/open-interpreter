@@ -251,8 +251,16 @@ fn ensure_supported_platform() -> Result<()> {
 #[cfg(not(unix))]
 fn ensure_supported_platform() -> Result<()> {
     Err(anyhow!(
-        "codex app-server daemon lifecycle is only supported on Unix platforms"
+        "{} app-server daemon lifecycle is only supported on Unix platforms",
+        codex_product_info::Product::current().command_name()
     ))
+}
+
+fn unmanaged_app_server_message() -> String {
+    format!(
+        "app server is running but is not managed by {} app-server daemon",
+        codex_product_info::Product::current().command_name()
+    )
 }
 
 struct Daemon {
@@ -342,9 +350,7 @@ impl Daemon {
         if client::probe(&self.socket_path).await.is_ok()
             && self.running_backend(&settings).await?.is_none()
         {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
 
         self.ensure_managed_codex_bin()?;
@@ -396,9 +402,7 @@ impl Daemon {
                 }
             }
         } else if client::probe(&self.socket_path).await.is_ok() {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         } else {
             RestartIfRunningOutcome::NotRunning
         };
@@ -425,9 +429,7 @@ impl Daemon {
         }
 
         if client::probe(&self.socket_path).await.is_ok() {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
 
         Ok(self
@@ -540,9 +542,7 @@ impl Daemon {
         let backend = self.running_backend_instance(&previous_settings).await?;
 
         if backend.is_none() && client::probe(&self.socket_path).await.is_ok() {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
 
         if settings.remote_control_enabled == remote_control_enabled {
@@ -598,9 +598,7 @@ impl Daemon {
         if client::probe(&self.socket_path).await.is_ok()
             && self.running_backend(&settings).await?.is_none()
         {
-            return Err(anyhow!(
-                "app server is running but is not managed by codex app-server daemon"
-            ));
+            return Err(anyhow!(unmanaged_app_server_message()));
         }
         settings.save(&self.settings_file).await?;
 
@@ -675,11 +673,12 @@ impl Daemon {
         }
 
         let managed_codex_path = self.managed_codex_bin.display();
+        let install_command = codex_product_info::Product::current().install_command();
         Err(anyhow!(
             "managed standalone Codex install not found at {managed_codex_path}\n\n\
-             This command requires the standalone install managed by the Codex installer, because \
-             the daemon starts and updates app-server from that fixed path.\n\n\
-             Install it with:\n  curl -fsSL https://chatgpt.com/codex/install.sh | sh\n\n\
+             This command requires the standalone install managed by the product installer, because \
+             the daemon starts and updates app-server from the resolved managed binary path.\n\n\
+             Install it with:\n  {install_command}\n\n\
              Then rerun the command you just tried."
         ))
     }

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -142,6 +144,7 @@ fn spawn_cell_actor_harness_with_host_and_failure_handler<H: CellHost>(
             runtime_tx,
             runtime_control_tx,
             runtime_terminate_handle,
+            cancellation_token: cell_state.cancellation_token(),
             cell_state,
         },
         event_rx,

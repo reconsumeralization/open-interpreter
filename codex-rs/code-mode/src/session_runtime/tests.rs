@@ -1,8 +1,11 @@
+#[cfg(feature = "v8-runtime")]
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
+#[cfg(feature = "v8-runtime")]
 use std::task::Context;
 use std::task::Poll;
+#[cfg(feature = "v8-runtime")]
 use std::task::Waker;
 use std::time::Duration;
 
@@ -11,6 +14,7 @@ use serde_json::Value as JsonValue;
 use tokio_util::sync::CancellationToken;
 
 use super::*;
+#[cfg(feature = "v8-runtime")]
 use crate::cell_actor::CompletionCommit;
 
 struct RecordingDelegate;
@@ -63,6 +67,7 @@ impl SessionRuntimeDelegate for PanickingClosedDelegate {
     }
 }
 
+#[cfg(feature = "v8-runtime")]
 #[tokio::test]
 async fn reports_cell_actor_panics_to_the_owner() {
     let (failure_tx, mut failure_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -95,6 +100,7 @@ async fn reports_cell_actor_panics_to_the_owner() {
     assert!(failure.contains("code-mode cell 1 task failed"));
 }
 
+#[cfg(feature = "v8-runtime")]
 #[tokio::test]
 async fn termination_rejects_a_waiting_store_commit_before_the_next_cell_can_load_it() {
     let runtime = SessionRuntime::new(Arc::new(RecordingDelegate));
@@ -235,6 +241,7 @@ async fn shutdown_rejects_cell_admission_queued_before_the_registry_lock() {
     assert_eq!(shutdown.await, Ok(()));
 }
 
+#[cfg(feature = "v8-runtime")]
 #[tokio::test]
 async fn drop_terminates_cells_when_the_registry_is_locked() {
     let runtime = SessionRuntime::new(Arc::new(RecordingDelegate));

@@ -1,3 +1,4 @@
+#[cfg(feature = "v8-runtime")]
 use std::sync::OnceLock;
 
 /// Controls whether V8 may generate executable code at runtime.
@@ -8,11 +9,13 @@ pub enum V8JitMode {
     Disabled,
 }
 
+#[cfg(feature = "v8-runtime")]
 struct V8Initialization {
     _platform: v8::SharedRef<v8::Platform>,
     jit_mode: V8JitMode,
 }
 
+#[cfg(feature = "v8-runtime")]
 static V8_INITIALIZATION: OnceLock<Result<V8Initialization, String>> = OnceLock::new();
 
 /// Initializes the process-wide V8 platform with the requested JIT mode.
@@ -21,6 +24,7 @@ static V8_INITIALIZATION: OnceLock<Result<V8Initialization, String>> = OnceLock:
 /// V8 cannot change JIT mode after initialization, so a later call requesting
 /// a different mode returns an error. Code mode initializes V8 with JIT enabled
 /// by default when this function has not been called explicitly.
+#[cfg(feature = "v8-runtime")]
 pub fn initialize_v8(jit_mode: V8JitMode) -> Result<(), String> {
     match V8_INITIALIZATION.get_or_init(|| initialize_v8_with_mode(jit_mode)) {
         Ok(initialization) if initialization.jit_mode == jit_mode => Ok(()),
@@ -32,6 +36,15 @@ pub fn initialize_v8(jit_mode: V8JitMode) -> Result<(), String> {
     }
 }
 
+#[cfg(not(feature = "v8-runtime"))]
+pub fn initialize_v8(_jit_mode: V8JitMode) -> Result<(), String> {
+    Err(
+        "code mode execution requires the V8 runtime (rebuild with --features codex-code-mode/v8-runtime)"
+            .to_string(),
+    )
+}
+
+#[cfg(feature = "v8-runtime")]
 pub(crate) fn ensure_v8_initialized() -> Result<(), String> {
     match V8_INITIALIZATION.get_or_init(|| initialize_v8_with_mode(V8JitMode::Enabled)) {
         Ok(_) => Ok(()),
@@ -39,6 +52,7 @@ pub(crate) fn ensure_v8_initialized() -> Result<(), String> {
     }
 }
 
+#[cfg(feature = "v8-runtime")]
 fn initialize_v8_with_mode(jit_mode: V8JitMode) -> Result<V8Initialization, String> {
     v8::icu::set_common_data_77(deno_core_icudata::ICU_DATA)
         .map_err(|error_code| format!("failed to initialize ICU data: {error_code}"))?;
@@ -55,6 +69,7 @@ fn initialize_v8_with_mode(jit_mode: V8JitMode) -> Result<V8Initialization, Stri
     })
 }
 
+#[cfg(feature = "v8-runtime")]
 impl V8JitMode {
     fn description(self) -> &'static str {
         match self {

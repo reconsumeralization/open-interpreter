@@ -2,13 +2,19 @@
 
 set -eu
 
-RELEASE="${CODEX_RELEASE:-latest}"
-NON_INTERACTIVE="${CODEX_NON_INTERACTIVE:-false}"
+RELEASE="${OPEN_INTERPRETER_RELEASE:-${CODEX_RELEASE:-latest}}"
+NON_INTERACTIVE="${OPEN_INTERPRETER_NONINTERACTIVE:-${CODEX_NON_INTERACTIVE:-false}}"
+GITHUB_REPO="${OPEN_INTERPRETER_GITHUB_REPO:-${CODEX_GITHUB_REPO:-openinterpreter/openinterpreter}}"
+PRODUCT_NAME="${CODEX_INSTALL_PRODUCT_NAME:-Open Interpreter}"
+PACKAGE_ASSET_STEM="${CODEX_PACKAGE_ASSET_STEM:-open-interpreter-package}"
+COMMAND_NAME="${CODEX_COMMAND_NAME:-interpreter}"
+ALIAS_COMMAND_NAMES="${CODEX_ALIAS_COMMAND_NAMES:-i}"
+RELEASE_TAG_PREFIX="${CODEX_RELEASE_TAG_PREFIX:-rust-v}"
 
-BIN_DIR="${CODEX_INSTALL_DIR:-$HOME/.local/bin}"
-BIN_PATH="$BIN_DIR/codex"
+BIN_DIR="${OPEN_INTERPRETER_INSTALL_DIR:-${CODEX_INSTALL_DIR:-$HOME/.local/bin}}"
+BIN_PATH="$BIN_DIR/$COMMAND_NAME"
 CODE_MODE_HOST_BIN_PATH="$BIN_DIR/codex-code-mode-host"
-CODEX_HOME_DIR="${CODEX_HOME:-$HOME/.codex}"
+CODEX_HOME_DIR="${INTERPRETER_HOME:-${CODEX_HOME:-$HOME/.openinterpreter}}"
 STANDALONE_ROOT="$CODEX_HOME_DIR/packages/standalone"
 RELEASES_DIR="$STANDALONE_ROOT/releases"
 CURRENT_LINK="$STANDALONE_ROOT/current"
@@ -19,7 +25,6 @@ LOCK_STALE_AFTER_SECS=600
 path_action="already"
 path_profile=""
 conflict_manager=""
-conflict_path=""
 lock_kind=""
 tmp_dir=""
 
@@ -56,7 +61,7 @@ validate_version() {
   fi
 
   if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)(\.[0-9]+)?)?$'; then
-    echo "Invalid Codex release version: $version. Expected latest or x.y.z[-alpha[.N]|-beta[.N]]." >&2
+    echo "Invalid $PRODUCT_NAME release version: $version. Expected latest or x.y.z[-alpha[.N]|-beta[.N]]." >&2
     exit 1
   fi
 }
@@ -105,7 +110,7 @@ download_file() {
     return
   fi
 
-  echo "curl or wget is required to install Codex." >&2
+  echo "curl or wget is required to install $PRODUCT_NAME." >&2
   exit 1
 }
 
@@ -122,7 +127,7 @@ download_text() {
     return
   fi
 
-  echo "curl or wget is required to install Codex." >&2
+  echo "curl or wget is required to install $PRODUCT_NAME." >&2
   exit 1
 }
 
@@ -237,50 +242,13 @@ release_url_for_asset() {
   asset="$1"
   resolved_version="$2"
 
-  printf 'https://github.com/openai/codex/releases/download/rust-v%s/%s\n' "$resolved_version" "$asset"
+  printf 'https://github.com/%s/releases/download/%s%s/%s\n' "$GITHUB_REPO" "$RELEASE_TAG_PREFIX" "$resolved_version" "$asset"
 }
 
 release_metadata_url() {
   resolved_version="$1"
 
-  printf 'https://api.github.com/repos/openai/codex/releases/tags/rust-v%s\n' "$resolved_version"
-}
-
-resolve_release() {
-  normalized_version="$(normalize_version "$RELEASE")"
-  validate_version "$normalized_version"
-
-  if [ "$normalized_version" = "latest" ]; then
-    requested_release="latest"
-    metadata_url="https://api.github.com/repos/openai/codex/releases/latest"
-  else
-    resolved_version="$normalized_version"
-    requested_release="$resolved_version"
-    metadata_url="$(release_metadata_url "$resolved_version")"
-  fi
-
-  if ! release_json="$(download_text "$metadata_url")"; then
-    echo "Could not fetch GitHub release metadata for Codex $requested_release. GitHub API may be unavailable or rate limited." >&2
-    exit 1
-  fi
-
-  if ! release_metadata="$(printf '%s\n' "$release_json" | parse_release_metadata)"; then
-    echo "Could not parse GitHub release metadata for Codex $requested_release." >&2
-    exit 1
-  fi
-
-  if [ "$normalized_version" = "latest" ]; then
-    release_tag="$(printf '%s\n' "$release_metadata" | awk -F '\t' '$1 == "tag_name" { print $2; exit }')"
-    case "$release_tag" in
-      rust-v*) resolved_version="${release_tag#rust-v}" ;;
-      *) resolved_version="" ;;
-    esac
-    if [ -z "$resolved_version" ]; then
-      echo "Failed to resolve the latest Codex release version." >&2
-      exit 1
-    fi
-    validate_version "$resolved_version"
-  fi
+  printf 'https://api.github.com/repos/%s/releases/tags/%s%s\n' "$GITHUB_REPO" "$RELEASE_TAG_PREFIX" "$resolved_version"
 }
 
 release_asset_digest_or_empty() {
@@ -339,7 +307,7 @@ package_archive_digest() {
   ' "$manifest_path" 2>/dev/null || true)"
 
   if [ -z "$digest" ]; then
-    echo "Could not find SHA-256 digest for $asset in codex-package_SHA256SUMS." >&2
+    echo "Could not find SHA-256 digest for $asset in $checksum_asset." >&2
     exit 1
   fi
 
@@ -364,7 +332,7 @@ file_sha256() {
     return
   fi
 
-  echo "sha256sum, shasum, or openssl is required to verify the Codex download." >&2
+  echo "sha256sum, shasum, or openssl is required to verify the $PRODUCT_NAME download." >&2
   exit 1
 }
 
@@ -374,7 +342,7 @@ verify_archive_digest() {
   actual_digest="$(file_sha256 "$archive_path")"
 
   if [ "$actual_digest" != "$expected_digest" ]; then
-    echo "Downloaded Codex archive checksum did not match expected digest." >&2
+    echo "Downloaded $PRODUCT_NAME archive checksum did not match expected digest." >&2
     echo "expected: $expected_digest" >&2
     echo "actual:   $actual_digest" >&2
     exit 1
@@ -383,9 +351,68 @@ verify_archive_digest() {
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
-    echo "$1 is required to install Codex." >&2
+    echo "$1 is required to install $PRODUCT_NAME." >&2
     exit 1
   fi
+}
+
+resolve_version() {
+  normalized_version="$(normalize_version "$RELEASE")"
+  validate_version "$normalized_version"
+
+  if [ "$normalized_version" != "latest" ]; then
+    printf '%s\n' "$normalized_version"
+    return
+  fi
+
+  if [ -z "$RELEASE_TAG_PREFIX" ]; then
+    release_json="$(download_text "https://api.github.com/repos/$GITHUB_REPO/releases/latest")"
+  else
+    release_json="$(download_text "https://api.github.com/repos/$GITHUB_REPO/releases?per_page=100")"
+  fi
+  tag="$(printf '%s\n' "$release_json" |
+    awk -v prefix="$RELEASE_TAG_PREFIX" '
+      /"tag_name":[[:space:]]*"[^"]+"/ {
+        tag = $0
+        sub(/^.*"tag_name":[[:space:]]*"/, "", tag)
+        sub(/".*$/, "", tag)
+      }
+
+      /"draft":[[:space:]]*(true|false)/ {
+        draft = $0
+        sub(/^.*"draft":[[:space:]]*/, "", draft)
+        sub(/[,[:space:]].*$/, "", draft)
+      }
+
+      /"prerelease":[[:space:]]*(true|false)/ {
+        prerelease = $0
+        sub(/^.*"prerelease":[[:space:]]*/, "", prerelease)
+        sub(/[,[:space:]].*$/, "", prerelease)
+      }
+
+      tag != "" && draft != "" && prerelease != "" {
+        if (draft == "false" && prerelease == "false" && index(tag, prefix) == 1) {
+          print tag
+          exit
+        }
+        tag = ""
+        draft = ""
+        prerelease = ""
+      }
+    ' | head -n 1)"
+  if [ -z "$tag" ]; then
+    echo "Failed to resolve the latest $PRODUCT_NAME release version." >&2
+    exit 1
+  fi
+  resolved="$(normalize_version "$tag")"
+
+  if [ -z "$resolved" ] || [ "$resolved" = "latest" ]; then
+    echo "Failed to resolve the latest $PRODUCT_NAME release version." >&2
+    exit 1
+  fi
+
+  validate_version "$resolved"
+  printf '%s\n' "$resolved"
 }
 
 pick_profile() {
@@ -424,8 +451,8 @@ add_to_path() {
 
   profile="$(pick_profile)"
   path_profile="$profile"
-  begin_marker="# >>> Codex installer >>>"
-  end_marker="# <<< Codex installer <<<"
+  begin_marker="# >>> $PRODUCT_NAME installer >>>"
+  end_marker="# <<< $PRODUCT_NAME installer <<<"
   path_line="export PATH=\"$BIN_DIR:\$PATH\""
 
   if [ -f "$profile" ] && grep -F "$begin_marker" "$profile" >/dev/null 2>&1; then
@@ -570,7 +597,10 @@ cleanup_stale_install_artifacts() {
   find "$STANDALONE_ROOT" -mindepth 1 -maxdepth 1 -name '.current.*' -exec rm -f {} +
 
   if [ -d "$BIN_DIR" ]; then
-    find "$BIN_DIR" -mindepth 1 -maxdepth 1 -name '.codex.*' -exec rm -f {} +
+    find "$BIN_DIR" -mindepth 1 -maxdepth 1 -name ".$COMMAND_NAME.*" -exec rm -f {} +
+    for alias_name in $ALIAS_COMMAND_NAMES; do
+      find "$BIN_DIR" -mindepth 1 -maxdepth 1 -name ".$alias_name.*" -exec rm -f {} +
+    done
   fi
 }
 
@@ -605,13 +635,13 @@ version_from_binary() {
 }
 
 current_installed_version() {
-  version="$(version_from_binary "$CURRENT_LINK/bin/codex" || true)"
+  version="$(version_from_binary "$CURRENT_LINK/bin/$COMMAND_NAME" || true)"
   if [ -n "$version" ]; then
     printf '%s\n' "$version"
     return 0
   fi
 
-  version="$(version_from_binary "$CURRENT_LINK/codex" || true)"
+  version="$(version_from_binary "$CURRENT_LINK/$COMMAND_NAME" || true)"
   if [ -n "$version" ]; then
     printf '%s\n' "$version"
     return 0
@@ -689,37 +719,47 @@ prompt_yes_no() {
 }
 
 print_launch_instructions() {
+  if [ "$COMMAND_NAME" = "interpreter" ]; then
+    start_command="i or interpreter"
+  else
+    start_command="$COMMAND_NAME"
+  fi
+
   case "$path_action" in
     added)
-      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" && codex"
-      step "Future terminals: open a new terminal and run: codex"
+      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" then run: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       step "PATH was added to $path_profile"
       ;;
     updated)
-      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" && codex"
-      step "Future terminals: open a new terminal and run: codex"
+      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" then run: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       step "PATH was updated in $path_profile"
       ;;
     configured)
-      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" && codex"
-      step "Future terminals: open a new terminal and run: codex"
+      step "Current terminal: export PATH=\"$BIN_DIR:\$PATH\" then run: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       step "PATH is already configured in $path_profile"
       ;;
     *)
-      step "Current terminal: codex"
-      step "Future terminals: open a new terminal and run: codex"
+      step "Current terminal: $start_command"
+      step "Future terminals: open a new terminal and run: $start_command"
       ;;
   esac
 }
 
-maybe_launch_codex_now() {
-  if prompt_yes_no "Start Codex now?"; then
-    step "Launching Codex"
+maybe_launch_command_now() {
+  if prompt_yes_no "Start $PRODUCT_NAME now?"; then
+    step "Launching $PRODUCT_NAME"
     "$BIN_PATH"
   fi
 }
 
 detect_conflicting_install() {
+  if [ "$COMMAND_NAME" != "codex" ]; then
+    return
+  fi
+
   existing_path="$(resolve_existing_codex)"
   manager="$(classify_existing_codex "$existing_path" || true)"
 
@@ -728,7 +768,6 @@ detect_conflicting_install() {
   fi
 
   conflict_manager="$manager"
-  conflict_path="$existing_path"
   step "Detected existing $manager-managed Codex at $existing_path"
   warn "Multiple managed Codex installs can be ambiguous because PATH order decides which one runs."
 }
@@ -769,15 +808,11 @@ install_package_release() {
   rm -rf "$stage_release"
   mkdir -p "$stage_release"
   tar -xzf "$archive_path" -C "$stage_release"
-  chmod 0755 \
-    "$stage_release/bin/codex" \
-    "$stage_release/bin/codex-code-mode-host" \
-    "$stage_release/codex-path/rg"
+  find "$stage_release/bin" -mindepth 1 -maxdepth 1 -type f -exec chmod 0755 {} +
+  chmod 0755 "$stage_release/codex-path/rg"
   if [ -f "$stage_release/codex-resources/bwrap" ]; then
     chmod 0755 "$stage_release/codex-resources/bwrap"
   fi
-  ln -sf "bin/codex" "$stage_release/codex"
-
   if [ -e "$release_dir" ] || [ -L "$release_dir" ]; then
     rm -rf "$release_dir"
   fi
@@ -824,9 +859,8 @@ release_dir_is_complete() {
   case "$layout" in
     package)
       [ -f "$release_dir/codex-package.json" ] &&
-        [ -x "$release_dir/bin/codex" ] &&
+        [ -x "$release_dir/$(package_entrypoint_relative_path "$release_dir")" ] &&
         [ -x "$release_dir/bin/codex-code-mode-host" ] &&
-        [ -x "$release_dir/codex" ] &&
         [ -x "$release_dir/codex-path/rg" ] ||
         return 1
       ;;
@@ -853,29 +887,40 @@ update_current_link() {
   replace_path_with_symlink "$CURRENT_LINK" "$release_dir" "$tmp_link"
 }
 
-release_codex_relative_path() {
+package_entrypoint_relative_path() {
   release_dir="$1"
+  entrypoint="$(awk -F '"' '/"entrypoint":[[:space:]]*"/ { print $4; exit }' "$release_dir/codex-package.json" 2>/dev/null || true)"
+  if [ -n "$entrypoint" ] && [ -x "$release_dir/$entrypoint" ]; then
+    printf '%s\n' "$entrypoint"
+    return
+  fi
 
-  if [ -x "$release_dir/bin/codex" ]; then
-    printf 'bin/codex\n'
+  if [ -x "$release_dir/bin/$COMMAND_NAME" ]; then
+    printf 'bin/%s\n' "$COMMAND_NAME"
   else
-    printf 'codex\n'
+    printf '%s\n' "$COMMAND_NAME"
   fi
 }
 
 update_visible_command() {
   release_dir="$1"
   mkdir -p "$BIN_DIR"
-  tmp_link="$BIN_DIR/.codex.$$"
-  codex_relative_path="$(release_codex_relative_path "$release_dir")"
+  tmp_link="$BIN_DIR/.$COMMAND_NAME.$$"
+  command_relative_path="$(package_entrypoint_relative_path "$release_dir")"
 
-  replace_path_with_symlink "$BIN_PATH" "$CURRENT_LINK/$codex_relative_path" "$tmp_link"
+  replace_path_with_symlink "$BIN_PATH" "$CURRENT_LINK/$command_relative_path" "$tmp_link"
+
+  for alias_name in $ALIAS_COMMAND_NAMES; do
+    tmp_alias_link="$BIN_DIR/.$alias_name.$$"
+    replace_path_with_symlink "$BIN_DIR/$alias_name" "$CURRENT_LINK/$command_relative_path" "$tmp_alias_link"
+  done
 
   if [ "$os" = "darwin" ] && [ -x "$release_dir/bin/codex-code-mode-host" ]; then
+    tmp_host_link="$BIN_DIR/.codex-code-mode-host.$$"
     replace_path_with_symlink \
       "$CODE_MODE_HOST_BIN_PATH" \
       "$CURRENT_LINK/bin/codex-code-mode-host" \
-      "$tmp_link"
+      "$tmp_host_link"
   elif [ "$(readlink "$CODE_MODE_HOST_BIN_PATH" 2>/dev/null || true)" = \
     "$CURRENT_LINK/bin/codex-code-mode-host" ]; then
     rm -f "$CODE_MODE_HOST_BIN_PATH"
@@ -884,6 +929,9 @@ update_visible_command() {
 
 verify_visible_command() {
   "$BIN_PATH" --version >/dev/null
+  for alias_name in $ALIAS_COMMAND_NAMES; do
+    "$BIN_DIR/$alias_name" --version >/dev/null
+  done
   if [ "$os" = "darwin" ] && [ "$install_layout" = "package" ]; then
     [ -x "$CODE_MODE_HOST_BIN_PATH" ]
   fi
@@ -948,18 +996,27 @@ else
   fi
 fi
 
-resolve_release
-package_asset="codex-package-$vendor_target.tar.gz"
+resolved_version="$(resolve_version)"
+if ! release_json="$(download_text "$(release_metadata_url "$resolved_version")")"; then
+  echo "Could not fetch GitHub release metadata for $PRODUCT_NAME $resolved_version. GitHub API may be unavailable or rate limited." >&2
+  exit 1
+fi
+if ! release_metadata="$(printf '%s\n' "$release_json" | parse_release_metadata)"; then
+  echo "Could not parse GitHub release metadata for $PRODUCT_NAME $resolved_version." >&2
+  exit 1
+fi
+package_asset="$PACKAGE_ASSET_STEM-$vendor_target.tar.gz"
 checksum_asset="codex-package_SHA256SUMS"
 if release_asset_exists "$package_asset" &&
   release_asset_exists "$checksum_asset"; then
   install_layout="package"
   asset="$package_asset"
-elif release_asset_exists "codex-npm-$npm_tag-$resolved_version.tgz"; then
+elif [ "$PACKAGE_ASSET_STEM" = "codex-package" ] &&
+  release_asset_exists "codex-npm-$npm_tag-$resolved_version.tgz"; then
   install_layout="legacy-platform-npm"
   asset="codex-npm-$npm_tag-$resolved_version.tgz"
 else
-  echo "Could not find Codex package or platform npm release assets for Codex $resolved_version." >&2
+  echo "Could not find $PRODUCT_NAME release assets for $resolved_version." >&2
   exit 1
 fi
 download_url="$(release_url_for_asset "$asset" "$resolved_version")"
@@ -969,11 +1026,11 @@ release_dir="$RELEASES_DIR/$release_name"
 current_version="$(current_installed_version)"
 
 if [ -n "$current_version" ] && [ "$current_version" != "$resolved_version" ]; then
-  step "Updating Codex CLI from $current_version to $resolved_version"
+  step "Updating $PRODUCT_NAME from $current_version to $resolved_version"
 elif [ -n "$current_version" ]; then
-  step "Updating Codex CLI"
+  step "Updating $PRODUCT_NAME"
 else
-  step "Installing Codex CLI"
+  step "Installing $PRODUCT_NAME"
 fi
 step "Detected platform: $platform_label"
 step "Resolved version: $resolved_version"
@@ -1000,7 +1057,7 @@ if ! release_dir_is_complete "$release_dir" "$resolved_version" "$vendor_target"
   archive_path="$tmp_dir/$asset"
   checksum_path="$tmp_dir/$checksum_asset"
 
-  step "Downloading Codex CLI"
+  step "Downloading $PRODUCT_NAME"
   if [ "$install_layout" = "package" ]; then
     checksum_digest="$(release_asset_digest "$checksum_asset")"
     download_file "$checksum_url" "$checksum_path"
@@ -1042,5 +1099,5 @@ case "$path_action" in
     ;;
 esac
 
-printf 'Codex CLI %s installed successfully.\n' "$resolved_version"
-maybe_launch_codex_now
+printf '%s %s installed successfully.\n' "$PRODUCT_NAME" "$resolved_version"
+maybe_launch_command_now

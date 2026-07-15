@@ -31,14 +31,24 @@ class PackageVariant:
     name: str
     cargo_bin: str
     executable_stem: str
+    alias_stems: tuple[str, ...] = ()
+    managed_codex_required: bool = False
+    v8_runtime_required: bool = False
 
     def entrypoint_name(self, spec: TargetSpec) -> str:
         return f"{self.executable_stem}{spec.exe_suffix}"
+
+    def alias_names(self, spec: TargetSpec) -> tuple[str, ...]:
+        return tuple(f"{alias}{spec.exe_suffix}" for alias in self.alias_stems)
+
+    def managed_codex_name(self, spec: TargetSpec) -> str:
+        return f"codex{spec.exe_suffix}"
 
 
 @dataclass(frozen=True)
 class PackageInputs:
     entrypoint_bin: Path
+    managed_codex_bin: Path | None
     code_mode_host_bin: Path
     rg_bin: Path
     zsh_bin: Path | None
@@ -57,6 +67,12 @@ PACKAGE_VARIANTS: dict[str, PackageVariant] = {
         name="codex-app-server",
         cargo_bin="codex-app-server",
         executable_stem="codex-app-server",
+    ),
+    "open-interpreter": PackageVariant(
+        name="open-interpreter",
+        cargo_bin="codex",
+        executable_stem="interpreter",
+        alias_stems=("i",),
     ),
 }
 

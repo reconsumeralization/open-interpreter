@@ -31,6 +31,8 @@ use codex_app_server_protocol::ReviewTarget as ApiReviewTarget;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ServerRequest;
 use codex_app_server_protocol::Thread as AppServerThread;
+use codex_app_server_protocol::ThreadCompactStartParams;
+use codex_app_server_protocol::ThreadCompactStartResponse;
 use codex_app_server_protocol::ThreadItem as AppServerThreadItem;
 use codex_app_server_protocol::ThreadListParams;
 use codex_app_server_protocol::ThreadListResponse;
@@ -168,6 +170,7 @@ enum InitialOperation {
         items: Vec<UserInput>,
         output_schema: Option<Value>,
     },
+    Compact,
     Review {
         review_request: ReviewRequest,
     },
@@ -570,7 +573,9 @@ pub async fn run_main(cli: Cli, arg0_paths: Arg0DispatchPaths) -> anyhow::Result
         session_source: SessionSource::Exec,
         enable_codex_api_key_env: true,
         client_name: "codex_exec".to_string(),
-        client_version: env!("CARGO_PKG_VERSION").to_string(),
+        client_version: codex_product_info::Product::current()
+            .codex_compatibility_version()
+            .to_string(),
         experimental_api: true,
         mcp_server_openai_form_elicitation: false,
         opt_out_notification_methods: Vec::new(),
@@ -752,13 +757,15 @@ async fn run_exec_session(args: ExecRunArgs) -> anyhow::Result<()> {
                 text_elements: Vec::new(),
             });
             let output_schema = load_output_schema(output_schema_path.clone());
-            (
+            let operation = if is_exact_compact_prompt(&prompt_text) && items.len() == 1 {
+                InitialOperation::Compact
+            } else {
                 InitialOperation::UserTurn {
                     items,
                     output_schema,
-                },
-                prompt_text,
-            )
+                }
+            };
+            (operation, prompt_text)
         }
         (None, root_prompt, imgs) => {
             let prompt_text = resolve_root_prompt(root_prompt);
@@ -772,13 +779,15 @@ async fn run_exec_session(args: ExecRunArgs) -> anyhow::Result<()> {
                 text_elements: Vec::new(),
             });
             let output_schema = load_output_schema(output_schema_path);
-            (
+            let operation = if is_exact_compact_prompt(&prompt_text) && items.len() == 1 {
+                InitialOperation::Compact
+            } else {
                 InitialOperation::UserTurn {
                     items,
                     output_schema,
-                },
-                prompt_text,
-            )
+                }
+            };
+            (operation, prompt_text)
         }
     };
 
@@ -885,6 +894,10 @@ async fn run_exec_session(args: ExecRunArgs) -> anyhow::Result<()> {
         }
     });
 
+    // Track whether a fatal error was reported by the server so we can
+    // exit with a non-zero status for automation-friendly signaling.
+    let mut error_seen = false;
+
     let task_id = match initial_operation {
         InitialOperation::UserTurn {
             items,
@@ -925,6 +938,25 @@ async fn run_exec_session(args: ExecRunArgs) -> anyhow::Result<()> {
             info!("Sent prompt with event ID: {task_id}");
             task_id
         }
+        InitialOperation::Compact => {
+            let _: ThreadCompactStartResponse = send_request_with_response(
+                &client,
+                ClientRequest::ThreadCompactStart {
+                    request_id: request_ids.next(),
+                    params: ThreadCompactStartParams {
+                        thread_id: primary_thread_id_for_span.clone(),
+                    },
+                },
+                "thread/compact/start",
+            )
+            .await
+            .map_err(anyhow::Error::msg)?;
+            let task_id =
+                wait_for_turn_started(&mut client, &primary_thread_id_for_span, &mut error_seen)
+                    .await?;
+            info!("Sent compact request with event ID: {task_id}");
+            task_id
+        }
         InitialOperation::Review { review_request } => {
             let response: ReviewStartResponse = send_request_with_response(
                 &client,
@@ -954,9 +986,6 @@ async fn run_exec_session(args: ExecRunArgs) -> anyhow::Result<()> {
     exec_span.record("turn.id", task_id.as_str());
 
     // Run the loop until the task is complete.
-    // Track whether a fatal error was reported by the server so we can
-    // exit with a non-zero status for automation-friendly signaling.
-    let mut error_seen = false;
     let mut interrupt_channel_open = true;
     let primary_thread_id_for_requests = primary_thread_id.to_string();
     loop {
@@ -1795,6 +1824,42 @@ async fn handle_server_request(
     }
 }
 
+async fn wait_for_turn_started(
+    client: &mut InProcessAppServerClient,
+    thread_id: &str,
+    error_seen: &mut bool,
+) -> anyhow::Result<String> {
+    while let Some(server_event) = client.next_event().await {
+        match server_event {
+            InProcessServerEvent::ServerRequest(request) => {
+                handle_server_request(client, request, error_seen).await;
+            }
+            InProcessServerEvent::ServerNotification(notification) => {
+                if let ServerNotification::Error(payload) = &notification
+                    && payload.thread_id == thread_id
+                    && !payload.will_retry
+                {
+                    *error_seen = true;
+                    return Err(anyhow::anyhow!("{}", payload.error.message));
+                }
+                if let ServerNotification::TurnStarted(payload) = notification
+                    && payload.thread_id == thread_id
+                {
+                    return Ok(payload.turn.id);
+                }
+            }
+            InProcessServerEvent::Lagged { skipped } => {
+                return Err(anyhow::anyhow!(
+                    "server event stream lagged while waiting for compact turn start; skipped {skipped} events"
+                ));
+            }
+        }
+    }
+    Err(anyhow::anyhow!(
+        "server closed before compact turn started for thread {thread_id}"
+    ))
+}
+
 fn load_output_schema(path: Option<PathBuf>) -> Option<Value> {
     let path = path?;
 
@@ -1978,6 +2043,10 @@ fn resolve_root_prompt(prompt_arg: Option<String>) -> String {
         }
         maybe_dash => resolve_prompt(maybe_dash),
     }
+}
+
+fn is_exact_compact_prompt(prompt: &str) -> bool {
+    prompt.trim() == "/compact"
 }
 
 fn build_review_request(args: &ReviewArgs) -> anyhow::Result<ReviewRequest> {

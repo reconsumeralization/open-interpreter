@@ -1166,6 +1166,7 @@ impl UnifiedExecProcessManager {
             #[cfg(unix)]
             additional_permissions_preapproved: request.additional_permissions_preapproved,
             justification: request.justification.clone(),
+            capture_policy: request.capture_policy,
             exec_approval_requirement,
         };
         let tool_ctx = ToolCtx {

@@ -1,10 +1,7 @@
 name: python-sdk-release
 
 on:
-  push:
-    tags:
-      - "python-v*"
-
+  workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false

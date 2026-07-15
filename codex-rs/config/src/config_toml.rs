@@ -160,6 +160,12 @@ pub struct ConfigToml {
     /// Provider to use from the model_providers map.
     pub model_provider: Option<String>,
 
+    /// Optional default harness family to emulate, such as `claude-code`.
+    pub harness: Option<String>,
+
+    /// Whether to include Open Interpreter guidance for the selected harness.
+    pub harness_guidance: Option<bool>,
+
     /// Size of the context window for the model, in tokens.
     pub model_context_window: Option<i64>,
 

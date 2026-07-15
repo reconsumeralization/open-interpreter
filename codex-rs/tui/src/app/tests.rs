@@ -5685,53 +5685,65 @@ async fn thread_rollback_response_discards_queued_active_thread_events() {
     assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
 }
 
-#[tokio::test]
-async fn new_session_requests_shutdown_for_previous_conversation() {
-    Box::pin(async {
-        let (mut app, mut app_event_rx, mut op_rx) = Box::pin(make_test_app_with_channels()).await;
+#[test]
+fn new_session_requests_shutdown_for_previous_conversation() {
+    std::thread::Builder::new()
+        .name("new-session-shutdown-test".to_string())
+        .stack_size(32 * 1024 * 1024)
+        .spawn(|| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("tokio runtime");
+            runtime.block_on(Box::pin(async {
+                let (mut app, mut app_event_rx, mut op_rx) =
+                    Box::pin(make_test_app_with_channels()).await;
 
-        let thread_id = ThreadId::new();
-        let event = crate::session_state::ThreadSessionState {
-            thread_id,
-            forked_from_id: None,
-            fork_parent_title: None,
-            thread_name: None,
-            model: "gpt-test".to_string(),
-            model_provider_id: "test-provider".to_string(),
-            service_tier: None,
-            approval_policy: AskForApproval::Never,
-            approvals_reviewer: ApprovalsReviewer::User,
-            permission_profile: PermissionProfile::read_only(),
-            active_permission_profile: None,
-            cwd: test_path_buf("/home/user/project").abs(),
-            runtime_workspace_roots: Vec::new(),
-            instruction_source_paths: Vec::new(),
-            reasoning_effort: None,
-            collaboration_mode: None,
-            personality: None,
-            message_history: None,
-            network_proxy: None,
-            rollout_path: Some(PathBuf::new()),
-        };
+                let thread_id = ThreadId::new();
+                let event = crate::session_state::ThreadSessionState {
+                    thread_id,
+                    forked_from_id: None,
+                    fork_parent_title: None,
+                    thread_name: None,
+                    model: "gpt-test".to_string(),
+                    model_provider_id: "test-provider".to_string(),
+                    service_tier: None,
+                    approval_policy: AskForApproval::Never,
+                    approvals_reviewer: ApprovalsReviewer::User,
+                    permission_profile: PermissionProfile::read_only(),
+                    active_permission_profile: None,
+                    cwd: test_path_buf("/home/user/project").abs(),
+                    runtime_workspace_roots: Vec::new(),
+                    instruction_source_paths: Vec::new(),
+                    reasoning_effort: None,
+                    collaboration_mode: None,
+                    personality: None,
+                    message_history: None,
+                    network_proxy: None,
+                    rollout_path: Some(PathBuf::new()),
+                };
 
-        app.chat_widget.handle_thread_session(event);
+                app.chat_widget.handle_thread_session(event);
 
-        while app_event_rx.try_recv().is_ok() {}
-        while op_rx.try_recv().is_ok() {}
+                while app_event_rx.try_recv().is_ok() {}
+                while op_rx.try_recv().is_ok() {}
 
-        let mut app_server = Box::pin(crate::start_embedded_app_server_for_picker(
-            app.chat_widget.config_ref(),
-        ))
-        .await
-        .expect("embedded app server");
-        Box::pin(app.shutdown_current_thread(&mut app_server)).await;
+                let mut app_server = Box::pin(crate::start_embedded_app_server_for_picker(
+                    app.chat_widget.config_ref(),
+                ))
+                .await
+                .expect("embedded app server");
+                Box::pin(app.shutdown_current_thread(&mut app_server)).await;
 
-        assert!(
-            op_rx.try_recv().is_err(),
-            "shutdown should not submit Op::Shutdown"
-        );
-    })
-    .await;
+                assert!(
+                    op_rx.try_recv().is_err(),
+                    "shutdown should not submit Op::Shutdown"
+                );
+            }));
+        })
+        .expect("spawn test thread")
+        .join()
+        .expect("test thread should not panic");
 }
 
 #[tokio::test]

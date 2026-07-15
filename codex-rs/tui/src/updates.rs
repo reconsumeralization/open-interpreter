@@ -4,6 +4,7 @@ use crate::legacy_core::config::Config;
 use crate::npm_registry;
 use crate::npm_registry::NpmPackageInfo;
 use crate::update_action;
+use crate::update_action::ProductUpdateSource;
 use crate::update_action::UpdateAction;
 use crate::update_versions::extract_version_from_latest_tag;
 use crate::update_versions::is_newer;
@@ -11,6 +12,7 @@ use crate::update_versions::is_source_build_version;
 use crate::updates_cache::VersionInfo;
 use crate::updates_cache::read_version_info;
 use crate::updates_cache::version_filepath;
+use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use codex_login::default_client::create_client;
@@ -30,10 +32,7 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
     let version_file = version_filepath(config);
     let info = read_version_info(&version_file).ok();
 
-    if match &info {
-        None => true,
-        Some(info) => info.last_checked_at < Utc::now() - Duration::hours(20),
-    } {
+    if should_check_for_update(info.as_ref(), Utc::now()) {
         // Refresh the cached latest version in the background so TUI startup
         // isn’t blocked by a network call. The UI reads the previously cached
         // value (if any) for this run; the next run shows the banner if needed.
@@ -53,9 +52,15 @@ pub fn get_upgrade_version(config: &Config) -> Option<String> {
     })
 }
 
+fn should_check_for_update(info: Option<&VersionInfo>, now: DateTime<Utc>) -> bool {
+    let Some(info) = info else {
+        return true;
+    };
+    info.last_checked_at < now - Duration::hours(20)
+}
+
 // We use the latest version from the cask if installation is via homebrew - homebrew does not immediately pick up the latest release and can lag behind.
 const HOMEBREW_CASK_API_URL: &str = "https://formulae.brew.sh/api/cask/codex.json";
-const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/openai/codex/releases/latest";
 
 #[derive(Deserialize, Debug, Clone)]
 struct ReleaseInfo {
@@ -82,7 +87,8 @@ async fn check_for_update(version_file: &Path, action: Option<UpdateAction>) -> 
         Some(UpdateAction::NpmGlobalLatest)
         | Some(UpdateAction::BunGlobalLatest)
         | Some(UpdateAction::PnpmGlobalLatest) => {
-            let latest_version = fetch_latest_github_release_version().await?;
+            let latest_version =
+                fetch_latest_github_release_version(ProductUpdateSource::Codex).await?;
             let package_info = create_client()
                 .get(npm_registry::PACKAGE_URL)
                 .send()
@@ -94,7 +100,7 @@ async fn check_for_update(version_file: &Path, action: Option<UpdateAction>) -> 
             latest_version
         }
         Some(UpdateAction::StandaloneUnix) | Some(UpdateAction::StandaloneWindows) | None => {
-            fetch_latest_github_release_version().await?
+            fetch_latest_github_release_version(ProductUpdateSource::current()).await?
         }
     };
 
@@ -114,11 +120,13 @@ async fn check_for_update(version_file: &Path, action: Option<UpdateAction>) -> 
     Ok(())
 }
 
-async fn fetch_latest_github_release_version() -> anyhow::Result<String> {
+async fn fetch_latest_github_release_version(
+    source: ProductUpdateSource,
+) -> anyhow::Result<String> {
     let ReleaseInfo {
         tag_name: latest_tag_name,
     } = create_client()
-        .get(LATEST_RELEASE_URL)
+        .get(source.latest_release_url())
         .send()
         .await?
         .error_for_status()?
@@ -143,4 +151,29 @@ pub fn get_upgrade_version_for_popup(config: &Config) -> Option<String> {
         return None;
     }
     Some(latest)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_check_uses_upstream_twenty_hour_throttle() {
+        let now = Utc::now();
+        let info = |checked| VersionInfo {
+            latest_version: CODEX_CLI_VERSION.to_string(),
+            last_checked_at: checked,
+            dismissed_version: None,
+        };
+
+        assert!(should_check_for_update(None, now));
+        assert!(!should_check_for_update(
+            Some(&info(now - Duration::hours(1))),
+            now
+        ));
+        assert!(should_check_for_update(
+            Some(&info(now - Duration::hours(21))),
+            now
+        ));
+    }
 }

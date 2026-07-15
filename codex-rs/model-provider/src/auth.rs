@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -10,10 +11,13 @@ use codex_api::SharedAuthProvider;
 use codex_login::AuthHeaders;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
+use codex_login::KIMI_CODE_PROVIDER_ID;
 use codex_login::auth::AgentIdentityAuth;
-use codex_login::auth::AgentIdentityAuthError;
 use codex_login::auth::AgentIdentityAuthPolicy;
+use codex_login::kimi_code;
+use codex_login::kimi_code::KimiCodeAuthError;
 use codex_model_provider_info::ModelProviderInfo;
+use codex_model_provider_info::bundled_provider_catalog_entry_for_base_url;
 use codex_protocol::error::CodexErr;
 use codex_protocol::protocol::SessionSource;
 use http::HeaderMap;
@@ -176,9 +180,10 @@ pub(crate) fn auth_manager_for_provider(
     }
 }
 
-pub(crate) fn resolve_provider_auth(
+pub(crate) async fn resolve_provider_auth(
     auth: Option<&CodexAuth>,
     provider: &ModelProviderInfo,
+    codex_home: Option<&Path>,
 ) -> codex_protocol::error::Result<SharedAuthProvider> {
     if matches!(auth, Some(CodexAuth::BedrockApiKey(_))) {
         return Err(CodexErr::UnsupportedOperation(
@@ -186,8 +191,17 @@ pub(crate) fn resolve_provider_auth(
         ));
     }
 
-    if let Some(auth) = bearer_auth_for_provider(provider)? {
-        return Ok(Arc::new(auth));
+    match bearer_auth_for_provider(provider) {
+        Ok(Some(auth)) => return Ok(Arc::new(auth)),
+        Ok(None) => {}
+        Err(err) => {
+            // The Kimi Code provider can authenticate with stored OAuth
+            // credentials when no API key is available in the environment.
+            return match kimi_code_bearer_token(provider, codex_home).await? {
+                Some(token) => Ok(Arc::new(BearerAuthProvider::new(token))),
+                None => Err(err),
+            };
+        }
     }
 
     Ok(match auth {
@@ -202,80 +216,104 @@ pub(crate) async fn resolve_provider_auth_for_scope(
     provider: &ModelProviderInfo,
     scope: ProviderAuthScope,
 ) -> codex_protocol::error::Result<ResolvedProviderAuth> {
-    let ProviderAuthScope {
-        agent_identity_policy,
-        session_source,
-        agent_identity_session_fallback,
-    } = scope;
-    if let Some(CodexAuth::AgentIdentity(agent_identity_auth)) = auth {
-        return Ok(ResolvedProviderAuth::for_agent_identity(
-            agent_identity_auth.clone(),
+    if matches!(auth, Some(CodexAuth::BedrockApiKey(_))) {
+        return Err(CodexErr::UnsupportedOperation(
+            BEDROCK_API_KEY_UNSUPPORTED_MESSAGE.to_string(),
         ));
     }
 
-    if !should_bootstrap_chatgpt_agent_identity(agent_identity_policy, auth)
-        || agent_identity_session_fallback.is_engaged()
-    {
-        return resolve_provider_auth(auth, provider).map(ResolvedProviderAuth::new);
+    match bearer_auth_for_provider(provider) {
+        Ok(Some(auth)) => return Ok(ResolvedProviderAuth::new(Arc::new(auth))),
+        Ok(None) => {}
+        Err(err) => return Err(err),
     }
 
-    let Some(auth_manager) = auth_manager else {
-        return resolve_provider_auth(auth, provider).map(ResolvedProviderAuth::new);
-    };
+    if !scope.agent_identity_session_fallback.is_engaged() {
+        if let Some(CodexAuth::AgentIdentity(auth)) = auth {
+            return Ok(ResolvedProviderAuth::for_agent_identity(auth.clone()));
+        }
 
-    match auth_manager
-        .agent_identity_auth(agent_identity_policy, session_source)
-        .await
-    {
-        Ok(Some(agent_identity_auth)) => Ok(ResolvedProviderAuth::for_agent_identity(
-            agent_identity_auth,
-        )),
-        Ok(None) => resolve_provider_auth(auth, provider).map(ResolvedProviderAuth::new),
-        Err(err) => {
-            if let Some(AgentIdentityAuthError::BootstrapUnavailable {
-                operation,
-                attempts,
-                message,
-            }) = err
-                .get_ref()
-                .and_then(|source| source.downcast_ref::<AgentIdentityAuthError>())
+        if let Some(auth_manager) = auth_manager.as_ref() {
+            match auth_manager
+                .agent_identity_auth(scope.agent_identity_policy, scope.session_source)
+                .await
             {
-                let newly_engaged = agent_identity_session_fallback.engage();
-                tracing::warn!(
-                    operation,
-                    attempts = *attempts,
-                    error = %message,
-                    newly_engaged,
-                    "agent identity bootstrap unavailable; using ChatGPT bearer auth for this session"
-                );
-                resolve_provider_auth(auth, provider).map(ResolvedProviderAuth::new)
-            } else {
-                Err(err.into())
+                Ok(Some(auth)) => return Ok(ResolvedProviderAuth::for_agent_identity(auth)),
+                Ok(None) => {}
+                Err(err) => {
+                    if scope.agent_identity_policy == AgentIdentityAuthPolicy::ChatGptAuth
+                        && scope.agent_identity_session_fallback.engage()
+                    {
+                        return resolve_provider_auth(auth, provider, /*codex_home*/ None)
+                            .await
+                            .map(ResolvedProviderAuth::new);
+                    }
+                    return Err(CodexErr::Fatal(format!(
+                        "Agent Identity authentication failed: {err}"
+                    )));
+                }
             }
         }
     }
+
+    resolve_provider_auth(auth, provider, /*codex_home*/ None)
+        .await
+        .map(ResolvedProviderAuth::new)
 }
 
-fn should_bootstrap_chatgpt_agent_identity(
-    agent_identity_policy: AgentIdentityAuthPolicy,
-    auth: Option<&CodexAuth>,
-) -> bool {
-    agent_identity_policy == AgentIdentityAuthPolicy::ChatGptAuth
-        && matches!(auth, Some(CodexAuth::Chatgpt(_)))
+/// Resolves the stored Kimi Code OAuth access token for the `kimi-for-coding`
+/// provider, refreshing it first when it is stale.
+///
+/// Returns `Ok(None)` when the provider is not Kimi Code, no Codex home is
+/// available, or no credentials have been stored by the device login flow.
+async fn kimi_code_bearer_token(
+    provider: &ModelProviderInfo,
+    codex_home: Option<&Path>,
+) -> codex_protocol::error::Result<Option<String>> {
+    if !is_kimi_code_provider(provider) {
+        return Ok(None);
+    }
+    let Some(codex_home) = codex_home else {
+        return Ok(None);
+    };
+    match kimi_code::resolve_access_token(codex_home).await {
+        Ok(token) => Ok(Some(token)),
+        Err(KimiCodeAuthError::MissingCredentials) => Ok(None),
+        Err(err) => Err(CodexErr::Fatal(format!(
+            "Kimi Code authentication failed: {err}"
+        ))),
+    }
+}
+
+fn is_kimi_code_provider(provider: &ModelProviderInfo) -> bool {
+    provider.base_url.as_deref().is_some_and(|base_url| {
+        bundled_provider_catalog_entry_for_base_url(base_url)
+            .is_some_and(|entry| entry.id == KIMI_CODE_PROVIDER_ID)
+    })
 }
 
 fn bearer_auth_for_provider(
     provider: &ModelProviderInfo,
 ) -> codex_protocol::error::Result<Option<BearerAuthProvider>> {
     if let Some(api_key) = provider.api_key()? {
-        return Ok(Some(BearerAuthProvider::new(api_key)));
+        return Ok(Some(provider_auth_token(api_key, provider)));
     }
 
     if let Some(token) = provider.experimental_bearer_token.clone() {
-        return Ok(Some(BearerAuthProvider::new(token)));
+        return Ok(Some(provider_auth_token(token, provider)));
     }
 
     Ok(None)
+}
+
+fn provider_auth_token(token: String, provider: &ModelProviderInfo) -> BearerAuthProvider {
+    BearerAuthProvider {
+        token: Some(token),
+        account_id: None,
+        is_fedramp_account: false,
+        token_header_name: provider.is_anthropic_provider().then_some("x-api-key"),
+        use_bearer_prefix: !provider.is_anthropic_provider(),
+    }
 }
 
 /// Builds request-header auth for a first-party Codex auth snapshot.
@@ -293,6 +331,8 @@ pub fn auth_provider_from_auth(auth: &CodexAuth) -> SharedAuthProvider {
             token: auth.get_token().ok(),
             account_id: auth.get_account_id(),
             is_fedramp_account: auth.is_fedramp_account(),
+            token_header_name: None,
+            use_bearer_prefix: true,
         }),
     }
 }
@@ -438,13 +478,33 @@ mod tests {
             .await;
     }
 
-    #[test]
-    fn unauthenticated_auth_provider_adds_no_headers() {
+    #[tokio::test]
+    async fn unauthenticated_auth_provider_adds_no_headers() {
         let provider =
             create_oss_provider_with_base_url("http://localhost:11434/v1", WireApi::Responses);
-        let auth = resolve_provider_auth(/*auth*/ None, &provider).expect("auth should resolve");
+        let auth = resolve_provider_auth(/*auth*/ None, &provider, /*codex_home*/ None)
+            .await
+            .expect("auth should resolve");
 
         assert!(auth.to_auth_headers().is_empty());
+    }
+
+    #[test]
+    fn kimi_for_coding_provider_is_detected_by_base_url() {
+        let provider = ModelProviderInfo {
+            name: "Kimi For Coding".to_string(),
+            base_url: Some("https://api.kimi.com/coding/v1".to_string()),
+            env_key: Some("KIMI_API_KEY".to_string()),
+            wire_api: WireApi::Chat,
+            requires_openai_auth: false,
+            ..Default::default()
+        };
+
+        assert!(is_kimi_code_provider(&provider));
+        assert!(!is_kimi_code_provider(&create_oss_provider_with_base_url(
+            "http://localhost:11434/v1",
+            WireApi::Responses,
+        )));
     }
 
     #[test]
@@ -462,15 +522,15 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    #[test]
-    fn openai_provider_rejects_bedrock_api_key_auth() {
+    #[tokio::test]
+    async fn openai_provider_rejects_bedrock_api_key_auth() {
         let provider = ModelProviderInfo::create_openai_provider(/*base_url*/ None);
         let auth = CodexAuth::BedrockApiKey(BedrockApiKeyAuth {
             api_key: "bedrock-api-key-test".to_string(),
             region: "us-east-1".to_string(),
         });
 
-        match resolve_provider_auth(Some(&auth), &provider) {
+        match resolve_provider_auth(Some(&auth), &provider, /*codex_home*/ None).await {
             Err(CodexErr::UnsupportedOperation(message)) => {
                 assert_eq!(message, BEDROCK_API_KEY_UNSUPPORTED_MESSAGE);
             }

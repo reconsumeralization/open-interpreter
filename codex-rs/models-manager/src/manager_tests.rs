@@ -720,6 +720,8 @@ async fn refresh_available_models_refetches_when_cache_stale() {
     // Rewrite cache with an old timestamp so it is treated as stale.
     manager
         .cache_manager
+        .as_ref()
+        .expect("cached model manager")
         .manipulate_cache_for_test(|fetched_at| {
             *fetched_at = Utc::now() - chrono::Duration::hours(1);
         })
@@ -759,6 +761,8 @@ async fn refresh_available_models_refetches_when_version_mismatch() {
 
     manager
         .cache_manager
+        .as_ref()
+        .expect("cached model manager")
         .mutate_cache_for_test(|cache| {
             let client_version = crate::client_version_to_whole();
             cache.client_version = Some(format!("{client_version}-mismatch"));
@@ -796,7 +800,11 @@ async fn refresh_available_models_drops_removed_remote_models() {
     )];
     let endpoint = TestModelsEndpoint::new(vec![initial_models, refreshed_models]);
     let mut manager = openai_manager_for_tests(codex_home.path().to_path_buf(), endpoint.clone());
-    manager.cache_manager.set_ttl(Duration::ZERO);
+    manager
+        .cache_manager
+        .as_mut()
+        .expect("cached model manager")
+        .set_ttl(Duration::ZERO);
 
     manager
         .refresh_available_models(

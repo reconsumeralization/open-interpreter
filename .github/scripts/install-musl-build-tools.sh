@@ -16,21 +16,29 @@ if [[ -n "${APT_INSTALL_ARGS:-}" ]]; then
   apt_install_args=(${APT_INSTALL_ARGS})
 fi
 
-sudo apt-get update "${apt_update_args[@]}"
-sudo apt-get install -y "${apt_install_args[@]}" ca-certificates curl musl-tools pkg-config libcap-dev g++ clang libc++-dev libc++abi-dev lld xz-utils
-
 case "${TARGET}" in
   x86_64-unknown-linux-musl)
     arch="x86_64"
+    linux_header_arch_dirs=(
+      "/usr/include/x86_64-linux-gnu/asm"
+      "/usr/x86_64-linux-gnu/include/asm"
+    )
     ;;
   aarch64-unknown-linux-musl)
     arch="aarch64"
+    linux_header_arch_dirs=(
+      "/usr/aarch64-linux-gnu/include/asm"
+      "/usr/include/aarch64-linux-gnu/asm"
+    )
     ;;
   *)
     echo "Unexpected musl target: ${TARGET}" >&2
     exit 1
     ;;
 esac
+
+sudo apt-get update "${apt_update_args[@]}"
+sudo apt-get install -y "${apt_install_args[@]}" ca-certificates curl musl-tools pkg-config libcap-dev linux-libc-dev g++ clang libc++-dev libc++abi-dev lld xz-utils
 
 libcap_version="2.75"
 libcap_sha256="de4e7e064c9ba451d5234dd46e897d7c71c96a9ebf9a0c445bc04f4742d83632"
@@ -56,6 +64,16 @@ libcap_root="${tool_root}/libcap-${libcap_version}"
 libcap_src_root="${libcap_root}/src"
 libcap_prefix="${libcap_root}/prefix"
 libcap_pkgconfig_dir="${libcap_prefix}/lib/pkgconfig"
+
+copy_header_tree() {
+  local from="$1"
+  local to="$2"
+
+  if [[ -d "${from}" ]]; then
+    mkdir -p "${to}"
+    cp -a "${from}/." "${to}/"
+  fi
+}
 
 if [[ ! -f "${libcap_prefix}/lib/libcap.a" ]]; then
   mkdir -p "${libcap_src_root}" "${libcap_prefix}/lib" "${libcap_prefix}/include/sys" "${libcap_prefix}/include/linux" "${libcap_pkgconfig_dir}"
@@ -89,8 +107,16 @@ Cflags: -I\${includedir}
 EOF
 fi
 
+copy_header_tree "/usr/include/linux" "${libcap_prefix}/include/linux"
+copy_header_tree "/usr/include/asm-generic" "${libcap_prefix}/include/asm-generic"
+for linux_header_arch_dir in "${linux_header_arch_dirs[@]}"; do
+  copy_header_tree "${linux_header_arch_dir}" "${libcap_prefix}/include/asm"
+done
+
 sysroot=""
+using_zig=0
 if command -v zig >/dev/null; then
+  using_zig=1
   zig_bin="$(command -v zig)"
   cc="${tool_root}/zigcc"
   cxx="${tool_root}/zigcxx"
@@ -237,7 +263,7 @@ fi
 
 cflags="-pthread"
 cxxflags="-pthread"
-if [[ "${TARGET}" == "aarch64-unknown-linux-musl" ]]; then
+if [[ "${TARGET}" == "aarch64-unknown-linux-musl" && "${using_zig}" -eq 1 ]]; then
   # BoringSSL enables -Wframe-larger-than=25344 under clang and treats warnings as errors.
   cflags="${cflags} -Wno-error=frame-larger-than"
   cxxflags="${cxxflags} -Wno-error=frame-larger-than"

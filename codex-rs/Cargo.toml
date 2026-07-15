@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "acp-server",
     "aws-auth",
     "analytics",
     "agent-graph-store",
@@ -20,6 +21,7 @@ members = [
     "features",
     "install-context",
     "codex-backend-openapi-models",
+    "chat-wire-compat",
     "code-mode",
     "code-mode-host",
     "code-mode-protocol",
@@ -76,6 +78,7 @@ members = [
     "network-proxy",
     "ollama",
     "process-hardening",
+    "product-info",
     "protocol",
     "realtime-webrtc",
     "prompts",
@@ -130,7 +133,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.144.4"
+version = "0.0.25"
 # Track the edition for all workspace crates in one place. Individual
 # crates can still override this value, but keeping it here means new
 # crates created with `cargo new -w ...` automatically inherit the 2024
@@ -141,6 +144,7 @@ license = "Apache-2.0"
 [workspace.dependencies]
 # Internal
 app_test_support = { path = "app-server/tests/common" }
+codex-acp-server = { path = "acp-server" }
 codex-analytics = { path = "analytics" }
 codex-agent-graph-store = { path = "agent-graph-store" }
 codex-agent-identity = { path = "agent-identity" }
@@ -158,6 +162,7 @@ codex-arg0 = { path = "arg0" }
 codex-async-utils = { path = "async-utils" }
 codex-backend-client = { path = "backend-client" }
 codex-chatgpt = { path = "chatgpt" }
+codex-chat-wire-compat = { path = "chat-wire-compat" }
 codex-cli = { path = "cli" }
 codex-client = { path = "codex-client" }
 codex-collaboration-mode-templates = { path = "collaboration-mode-templates" }
@@ -217,6 +222,7 @@ codex-otel = { path = "otel" }
 codex-plugin = { path = "plugin" }
 codex-model-provider = { path = "model-provider" }
 codex-process-hardening = { path = "process-hardening" }
+codex-product-info = { path = "product-info" }
 codex-protocol = { path = "protocol" }
 codex-prompts = { path = "prompts" }
 codex-responses-api-proxy = { path = "responses-api-proxy" }
@@ -268,6 +274,7 @@ mcp_test_support = { path = "mcp-server/tests/common" }
 # External
 age = "0.11.1"
 allocative = "0.3.3"
+agent-client-protocol = { version = "=0.12.1", features = ["unstable"] }
 ansi-to-tui = "7.0.0"
 anyhow = "1"
 arboard = { version = "3", features = ["wayland-data-control"] }
@@ -378,8 +385,8 @@ rcgen = { version = "0.14.7", default-features = false, features = [
 ] }
 regex = "1.12.3"
 regex-lite = "0.1.8"
-reqwest = { version = "0.12", features = ["cookies"] }
-rmcp = { version = "1.8.0", default-features = false }
+reqwest = { version = "0.12", features = ["brotli", "cookies"] }
+rmcp = { version = "1.7.0", default-features = false }
 runfiles = { git = "https://github.com/dzbarsky/rules_rust", rev = "b56cbaa8465e74127f1ea216f813cd377295ad81" }
 rustls = { version = "0.23", default-features = false, features = [
     "aws_lc_rs",
@@ -548,8 +555,10 @@ lto = false
 strip = false
 
 [profile.ci-test]
-# Reduce binary size to reduce disk pressure.
-debug = "limited"
+# Nextest archives duplicate the compiled binaries while packing them. Keep CI
+# test binaries free of debug sections so hosted runners have room to archive
+# the full workspace, including the V8-backed code-mode host.
+debug = 0
 inherits = "test"
 opt-level = 0
 

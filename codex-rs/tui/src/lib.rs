@@ -142,6 +142,7 @@ mod markdown_stream;
 mod markdown_text_merge;
 mod mention_codec;
 mod model_catalog;
+mod model_display;
 mod model_migration;
 mod motion;
 mod multi_agents;
@@ -397,7 +398,9 @@ async fn connect_remote_app_server(
     let app_server = RemoteAppServerClient::connect(RemoteAppServerConnectArgs {
         endpoint,
         client_name: "codex-tui".to_string(),
-        client_version: env!("CARGO_PKG_VERSION").to_string(),
+        client_version: codex_product_info::Product::current()
+            .codex_compatibility_version()
+            .to_string(),
         experimental_api: true,
         mcp_server_openai_form_elicitation: false,
         opt_out_notification_methods: Vec::new(),
@@ -561,7 +564,9 @@ where
             .unwrap_or_else(|err| panic!("cli session source should deserialize: {err}")),
         enable_codex_api_key_env: false,
         client_name: "codex-tui".to_string(),
-        client_version: env!("CARGO_PKG_VERSION").to_string(),
+        client_version: codex_product_info::Product::current()
+            .codex_compatibility_version()
+            .to_string(),
         experimental_api: true,
         mcp_server_openai_form_elicitation: false,
         opt_out_notification_methods: Vec::new(),
@@ -1848,13 +1853,20 @@ impl Drop for TerminalRestoreGuard {
 /// - Otherwise, respect the `tui.alternate_screen` config setting:
 ///   - `always`: Use alternate screen
 ///   - `never`: Inline mode only, preserves scrollback
-///   - `auto` (default): Use alternate screen
+///   - `auto` (default): Use alternate screen for Codex; Open Interpreter
+///     deliberately starts inline to preserve terminal scrollback
 fn determine_alt_screen_mode(no_alt_screen: bool, tui_alternate_screen: AltScreenMode) -> bool {
     if no_alt_screen {
         return false;
     }
 
-    tui_alternate_screen != AltScreenMode::Never
+    match tui_alternate_screen {
+        AltScreenMode::Always => true,
+        AltScreenMode::Never => false,
+        AltScreenMode::Auto => {
+            codex_product_info::Product::current() != codex_product_info::Product::OpenInterpreter
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

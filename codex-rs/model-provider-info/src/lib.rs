@@ -5,6 +5,14 @@
 //!   2. User-defined entries inside `~/.codex/config.toml` under the `model_providers`
 //!      key. These override or extend the defaults at runtime.
 
+mod bundled_provider_catalog;
+
+pub use bundled_provider_catalog::BundledProviderCatalogEntry;
+pub use bundled_provider_catalog::BundledProviderModelEntry;
+pub use bundled_provider_catalog::bundled_provider_catalog;
+pub use bundled_provider_catalog::bundled_provider_catalog_entry;
+pub use bundled_provider_catalog::bundled_provider_catalog_entry_for_base_url;
+
 use codex_api::Provider as ApiProvider;
 use codex_api::RetryConfig as ApiRetryConfig;
 use codex_api::is_azure_responses_provider;
@@ -47,7 +55,7 @@ pub const AMAZON_BEDROCK_DEFAULT_BASE_URL: &str =
     "https://bedrock-mantle.us-east-1.api.aws/openai/v1";
 const AMAZON_BEDROCK_MANTLE_CLIENT_AGENT_HEADER: &str = "x-amzn-mantle-client-agent";
 const AMAZON_BEDROCK_MANTLE_CLIENT_AGENT_VALUE: &str = "codex";
-const CHAT_WIRE_API_REMOVED_ERROR: &str = "`wire_api = \"chat\"` is no longer supported.\nHow to fix: set `wire_api = \"responses\"` in your provider config.\nMore info: https://github.com/openai/codex/discussions/7782";
+const ANTHROPIC_API_VERSION: &str = "2023-06-01";
 pub const LEGACY_OLLAMA_CHAT_PROVIDER_ID: &str = "ollama-chat";
 pub const OLLAMA_CHAT_PROVIDER_REMOVED_ERROR: &str = "`ollama-chat` is no longer supported.\nHow to fix: replace `ollama-chat` with `ollama` in `model_provider`, `oss_provider`, or `--local-provider`.\nMore info: https://github.com/openai/codex/discussions/7782";
 
@@ -58,12 +66,18 @@ pub enum WireApi {
     /// The Responses API exposed by OpenAI at `/v1/responses`.
     #[default]
     Responses,
+    /// OpenAI-compatible Chat Completions exposed at `/v1/chat/completions`.
+    Chat,
+    /// Anthropic Messages exposed at `/v1/messages`.
+    Messages,
 }
 
 impl fmt::Display for WireApi {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
             Self::Responses => "responses",
+            Self::Chat => "chat",
+            Self::Messages => "messages",
         };
         f.write_str(value)
     }
@@ -77,8 +91,12 @@ impl<'de> Deserialize<'de> for WireApi {
         let value = String::deserialize(deserializer)?;
         match value.as_str() {
             "responses" => Ok(Self::Responses),
-            "chat" => Err(serde::de::Error::custom(CHAT_WIRE_API_REMOVED_ERROR)),
-            _ => Err(serde::de::Error::unknown_variant(&value, &["responses"])),
+            "chat" => Ok(Self::Chat),
+            "messages" => Ok(Self::Messages),
+            _ => Err(serde::de::Error::unknown_variant(
+                &value,
+                &["responses", "chat", "messages"],
+            )),
         }
     }
 }
@@ -138,6 +156,70 @@ pub struct ModelProviderInfo {
     /// Whether this provider supports the Responses API WebSocket transport.
     #[serde(default)]
     pub supports_websockets: bool,
+}
+
+/// Returns the native harness that should be used by default for a provider/model selection.
+pub fn default_harness_for_provider_model(
+    provider_id: &str,
+    provider: &ModelProviderInfo,
+    model: Option<&str>,
+) -> Option<&'static str> {
+    let provider_id = provider_id.to_ascii_lowercase();
+    let provider_name = provider.name.to_ascii_lowercase();
+    let base_url = provider
+        .base_url
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let model = model.unwrap_or_default().to_ascii_lowercase();
+
+    if matches!(provider.wire_api, WireApi::Messages)
+        || model.contains("anthropic/")
+        || model.contains("claude")
+        || provider_id.contains("anthropic")
+        || provider_name.contains("anthropic")
+        || base_url.contains("api.anthropic.com")
+    {
+        return Some("claude-code");
+    }
+
+    if model.contains("kimi")
+        || model.contains("moonshot")
+        || provider_id.contains("kimi")
+        || provider_id.contains("moonshot")
+        || provider_name.contains("kimi")
+        || provider_name.contains("moonshot")
+        || base_url.contains("api.kimi.com")
+        || base_url.contains("api.moonshot.ai")
+        || base_url.contains("api.moonshot.cn")
+    {
+        return Some("kimi-cli");
+    }
+
+    if model.contains("qwen")
+        || model.starts_with("qwq")
+        || model.contains("/qwq")
+        || provider_id.contains("qwen")
+        || provider_id.contains("dashscope")
+        || provider_name.contains("qwen")
+        || provider_name.contains("dashscope")
+        || base_url.contains("dashscope.aliyuncs.com/compatible-mode")
+        || base_url.contains("dashscope-intl.aliyuncs.com/compatible-mode")
+    {
+        return Some("qwen-code");
+    }
+
+    if model.contains("deepseek")
+        || provider_id.contains("deepseek")
+        || provider_name.contains("deepseek")
+        || base_url.contains("api.deepseek.com")
+    {
+        // Product decision: claude-code-bare gets the best results out of
+        // DeepSeek models; deepseek-tui remains selectable via /harness.
+        return Some("claude-code-bare");
+    }
+
+    None
 }
 
 /// AWS SigV4 auth configuration for a model provider.
@@ -233,6 +315,13 @@ impl ModelProviderInfo {
                     headers.insert(name, value);
                 }
             }
+        }
+
+        if self.is_anthropic_provider() {
+            headers.insert(
+                HeaderName::from_static("anthropic-version"),
+                HeaderValue::from_static(ANTHROPIC_API_VERSION),
+            );
         }
 
         Ok(headers)
@@ -338,9 +427,14 @@ impl ModelProviderInfo {
             wire_api: WireApi::Responses,
             query_params: None,
             http_headers: Some(
-                [("version".to_string(), env!("CARGO_PKG_VERSION").to_string())]
-                    .into_iter()
-                    .collect(),
+                [(
+                    "version".to_string(),
+                    codex_product_info::Product::current()
+                        .codex_compatibility_version()
+                        .to_string(),
+                )]
+                .into_iter()
+                .collect(),
             ),
             env_http_headers: Some(
                 [
@@ -411,6 +505,14 @@ impl ModelProviderInfo {
         self.name == AMAZON_BEDROCK_PROVIDER_NAME
     }
 
+    pub fn is_anthropic_provider(&self) -> bool {
+        self.name.eq_ignore_ascii_case("anthropic")
+            || self
+                .base_url
+                .as_deref()
+                .is_some_and(|base_url| base_url.contains("api.anthropic.com"))
+    }
+
     pub fn supports_remote_compaction(&self) -> bool {
         self.is_openai() || is_azure_responses_provider(&self.name, self.base_url.as_deref())
     }
@@ -431,16 +533,15 @@ pub fn built_in_model_providers(
     openai_base_url: Option<String>,
 ) -> HashMap<String, ModelProviderInfo> {
     use ModelProviderInfo as P;
-    let openai_provider = P::create_openai_provider(openai_base_url);
-    let amazon_bedrock_provider = P::create_amazon_bedrock_provider(/*aws*/ None);
-
-    // We do not want to be in the business of adjucating which third-party
-    // providers are bundled with Codex CLI, so we only include the OpenAI and
-    // open source ("oss") providers by default. Users are encouraged to add to
-    // `model_providers` in config.toml to add their own providers.
-    [
-        (OPENAI_PROVIDER_ID, openai_provider),
-        (AMAZON_BEDROCK_PROVIDER_ID, amazon_bedrock_provider),
+    let mut providers: HashMap<String, ModelProviderInfo> = [
+        (
+            OPENAI_PROVIDER_ID,
+            P::create_openai_provider(openai_base_url),
+        ),
+        (
+            AMAZON_BEDROCK_PROVIDER_ID,
+            P::create_amazon_bedrock_provider(/*aws*/ None),
+        ),
         (
             OLLAMA_OSS_PROVIDER_ID,
             create_oss_provider(DEFAULT_OLLAMA_PORT, WireApi::Responses),
@@ -452,7 +553,25 @@ pub fn built_in_model_providers(
     ]
     .into_iter()
     .map(|(k, v)| (k.to_string(), v))
-    .collect()
+    .collect();
+
+    for entry in bundled_provider_catalog() {
+        providers
+            .entry(entry.id.clone())
+            .or_insert_with(|| provider_from_bundled_catalog_entry(entry));
+    }
+
+    providers
+}
+
+fn provider_from_bundled_catalog_entry(entry: &BundledProviderCatalogEntry) -> ModelProviderInfo {
+    ModelProviderInfo {
+        name: entry.name.clone(),
+        base_url: Some(entry.base_url.clone()),
+        env_key: entry.env_key.clone(),
+        wire_api: entry.wire_api,
+        ..Default::default()
+    }
 }
 
 /// Merge configured providers into the built-in provider catalog.
