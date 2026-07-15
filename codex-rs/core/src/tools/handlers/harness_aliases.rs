@@ -3962,7 +3962,6 @@ mod tests {
             current.environment_id,
             current.environment,
             workspace_root.clone().into(),
-            vec![workspace_root.clone().into()],
             current.shell,
         );
         let file_system_sandbox_policy =
@@ -4843,8 +4842,6 @@ mod tests {
                 codex_protocol::protocol::TurnCompleteEvent {
                     turn_id: "turn-1".to_string(),
                     last_agent_message: Some("done".to_string()),
-                    error: None,
-                    started_at: None,
                     completed_at: None,
                     duration_ms: Some(12_345),
                     time_to_first_token_ms: None,
