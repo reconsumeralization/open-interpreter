@@ -1,17 +1,17 @@
 <h1 align="center">Open Interpreter</h1>
 
-<p align="center">A coding agent optimized for low-cost models. <a href="https://www.openinterpreter.com/blog/open-interpreter"><strong>Blog post ↗</strong></a></p>
+<p align="center">A coding agent optimized for low-cost models. <a href="https://www.openinterpreter.com/blog/open-interpreter?utm_source=github&amp;utm_medium=referral&amp;utm_campaign=readme&amp;utm_content=hero_text"><strong>Blog post ↗</strong></a></p>
 
 <p align="center">
   <a href="https://discord.gg/Hvz9Axh84z"><img alt="Discord" src="https://img.shields.io/discord/1146610656779440188?style=flat-square&label=Discord" /></a>
-  <a href="https://www.openinterpreter.com/docs/terminal"><img alt="Documentation" src="https://img.shields.io/badge/Documentation-white?style=flat-square" /></a>
+  <a href="https://www.openinterpreter.com/docs/terminal?utm_source=github&amp;utm_medium=referral&amp;utm_campaign=readme&amp;utm_content=docs_badge"><img alt="Documentation" src="https://img.shields.io/badge/Documentation-white?style=flat-square" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-white?style=flat-square" /></a>
 </p>
 
 <br>
 
 <p align="center">
-  <a href="https://www.openinterpreter.com/blog/open-interpreter">
+  <a href="https://www.openinterpreter.com/blog/open-interpreter?utm_source=github&amp;utm_medium=referral&amp;utm_campaign=readme&amp;utm_content=hero_image">
     <img alt="Open Interpreter running in a terminal" src="https://openinterpreter.com/blog/open-interpreter/blog-hero-1.jpg" width="100%" />
   </a>
 </p>
@@ -52,7 +52,7 @@ swe-agent
 minimal
 ```
 
-Read more in the [harness docs](https://www.openinterpreter.com/docs/terminal/harness) and [model provider docs](https://www.openinterpreter.com/docs/terminal/providers).
+Read more in the [harness docs](https://www.openinterpreter.com/docs/terminal/harness?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=harness_docs) and [model provider docs](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=model_provider_docs).
 
 ### Computer Use
 
@@ -70,14 +70,14 @@ Open Interpreter ships with a QA skill that lets any model operate and test inte
 
 ### Documentation
 
-- [Terminal docs](https://www.openinterpreter.com/docs/terminal)
-- [Quickstart](https://www.openinterpreter.com/docs/terminal/quickstart)
-- [Install guide](https://www.openinterpreter.com/docs/terminal/install)
-- [Configuration](https://www.openinterpreter.com/docs/terminal/config)
-- [CLI reference](https://www.openinterpreter.com/docs/terminal/cli-reference)
-- [Harnesses](https://www.openinterpreter.com/docs/terminal/harness)
-- [Model providers](https://www.openinterpreter.com/docs/terminal/providers)
-- [Sandbox & approvals](https://www.openinterpreter.com/docs/terminal/sandbox)
+- [Terminal docs](https://www.openinterpreter.com/docs/terminal?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=terminal_docs)
+- [Quickstart](https://www.openinterpreter.com/docs/terminal/quickstart?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=quickstart)
+- [Install guide](https://www.openinterpreter.com/docs/terminal/install?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=install_guide)
+- [Configuration](https://www.openinterpreter.com/docs/terminal/config?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=configuration)
+- [CLI reference](https://www.openinterpreter.com/docs/terminal/cli-reference?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=cli_reference)
+- [Harnesses](https://www.openinterpreter.com/docs/terminal/harness?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=harnesses)
+- [Model providers](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=model_providers)
+- [Sandbox & approvals](https://www.openinterpreter.com/docs/terminal/sandbox?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=sandbox_approvals)
 
 
 > [!NOTE]
