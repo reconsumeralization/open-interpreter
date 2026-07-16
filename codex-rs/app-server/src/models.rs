@@ -47,6 +47,7 @@ pub async fn supported_models_for_provider(
     let mut provider_config = config.clone();
     provider_config.model_provider_id = provider_id.to_string();
     provider_config.model_provider = provider;
+    provider_config.codex_home = config.codex_home.join("models-cache").join(provider_id);
     let models_manager = build_models_manager(&provider_config, auth_manager);
     models_from_presets(
         models_manager
