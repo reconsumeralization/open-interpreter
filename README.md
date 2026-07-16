@@ -45,12 +45,17 @@ native
 claude-code
 claude-code-bare
 zcode
+kimi-code
 kimi-cli
 qwen-code
 deepseek-tui
 swe-agent
 minimal
 ```
+
+Kimi and Moonshot models use the current `kimi-code` harness by default.
+`kimi-cli` remains available for compatibility with the retired Python CLI
+profile.
 
 Read more in the [harness docs](https://www.openinterpreter.com/docs/terminal/harness?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=harness_docs) and [model provider docs](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=model_provider_docs).
 
@@ -78,6 +83,13 @@ Open Interpreter ships with a QA skill that lets any model operate and test inte
 - [Harnesses](https://www.openinterpreter.com/docs/terminal/harness?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=harnesses)
 - [Model providers](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=model_providers)
 - [Sandbox & approvals](https://www.openinterpreter.com/docs/terminal/sandbox?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=sandbox_approvals)
+
+Provider and model membership is generated, not maintained as Rust lists. From
+`codex-rs`, refresh all hosted providers with
+`python3 scripts/write_provider_catalog.py`, or repeat
+`--provider <provider-id>` to update only selected provider entries. Live model
+sources require the provider credentials documented in the
+[provider docs](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=provider_catalog_generation).
 
 
 > [!NOTE]

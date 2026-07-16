@@ -193,7 +193,7 @@ pub fn default_harness_for_provider_model(
         || base_url.contains("api.moonshot.ai")
         || base_url.contains("api.moonshot.cn")
     {
-        return Some("kimi-cli");
+        return Some("kimi-code");
     }
 
     if model.contains("qwen")

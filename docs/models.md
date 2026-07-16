@@ -123,7 +123,7 @@ Some model families get a default harness when no explicit harness is set:
 | Model/provider family | Default harness |
 | --- | --- |
 | Claude/Anthropic/Messages | `claude-code` |
-| Kimi/Moonshot | `kimi-cli` |
+| Kimi/Moonshot | `kimi-code` |
 | Qwen/QwQ/DashScope | `qwen-code` |
 | DeepSeek | `deepseek-tui` |
 

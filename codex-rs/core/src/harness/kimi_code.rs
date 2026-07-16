@@ -15,8 +15,15 @@ use std::sync::Mutex;
 
 const KIMI_CODE_SYSTEM_PROMPT: &str = include_str!("kimi_code_system_prompt.md");
 const KIMI_CODE_TOOLS: &str = include_str!("kimi_code_tools.json");
-const KIMI_CODE_AUTO_PERMISSION_REMINDER: &str = "<system-reminder>\nAuto permission mode is active. Tool approvals will be handled automatically while this mode remains enabled.\n  - Continue normally without pausing for approval prompts.\n  - Do NOT call AskUserQuestion while auto mode is active. Make a reasonable decision and continue without asking the user.\n</system-reminder>";
-const KIMI_CODE_BUILTIN_SKILLS: &str = "DISREGARD any earlier skill listings. Current available skills:\n### Built-in\n- update-config: Inspect or edit kimi-code's own config — `config.toml` (model, provider, permission, hooks) and `tui.toml` (theme, editor, notifications, auto-update). Use when the user asks what a setting does or wants to change one.\n  Path: builtin://update-config";
+const KIMI_CODE_AUTO_PERMISSION_REMINDER: &str = "<system-reminder>\nAuto permission mode is active. Tool approvals will be handled automatically while this mode remains enabled.\n  - Continue normally without pausing for approval prompts.\n  - Do NOT call AskUserQuestion while auto mode is active. Make a reasonable decision and continue without asking the user.\n  - ExitPlanMode is also approved automatically, without the user reviewing the plan. An auto-approved plan is NOT a signal from the user to start executing — follow the user's original instructions on whether to proceed.\n</system-reminder>";
+const KIMI_CODE_BUILTIN_SKILLS: &str = r#"DISREGARD any earlier skill listings. Current available skills:
+### Built-in
+- check-kimi-code-docs: Answer questions about the Kimi Code product using the official documentation — CLI usage, configuration, slash commands, features, membership and quota, API onboarding, third-party tool setup, and error codes. Use when the user asks how Kimi Code w…
+  Path: builtin://check-kimi-code-docs
+- update-config: Inspect or edit kimi-code's own config — `config.toml` (model, provider, permission, hooks) and `tui.toml` (theme, editor, notifications, auto-update). Use when the user asks what a setting does or wants to change one.
+  Path: builtin://update-config
+- write-goal: Help the user craft a well-specified `/goal` objective for goal mode — turn a rough intention into a completion contract with a clear finish line, proof, boundaries, and stop rule. Use when the user asks for help writing, refining, or improving a go…
+  Path: builtin://write-goal"#;
 static KIMI_CODE_SYSTEM_PROMPT_CACHE: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -60,8 +67,8 @@ pub(crate) fn build_request(
             "tools": tools,
             "thinking": {
                 "type": "enabled",
+                "keep": "all",
             },
-            "reasoning_effort": "high",
         }),
         tool_kinds,
     ))
@@ -138,6 +145,8 @@ fn build_system_prompt(prompt: &Prompt, skills: &str) -> String {
         .replace("{{ KIMI_ADDITIONAL_DIRS_INFO }}", "")
         .replace("{{ KIMI_AGENTS_MD }}", "")
         .replace("{{ KIMI_SKILLS }}", skills)
+        .replace("{% if KIMI_SKILLS %}\n", "\n")
+        .replace("{% endif %}\n", "\n")
 }
 
 fn kimi_os_label() -> &'static str {
@@ -279,10 +288,96 @@ mod tests {
             .as_str()
             .expect("system content");
         assert!(system.contains("DISREGARD any earlier skill listings"));
+        assert!(system.contains("- check-kimi-code-docs:"));
         assert!(system.contains("- update-config: Inspect or edit kimi-code's own config"));
         assert!(system.contains("Path: builtin://update-config"));
+        assert!(system.contains("- write-goal:"));
         assert!(!system.contains("{{ KIMI_SKILLS }}"));
+        assert!(!system.contains("{% if KIMI_SKILLS %}"));
         assert!(!system.contains("<skills_instructions>"));
+    }
+
+    #[test]
+    fn kimi_code_request_matches_current_kimi_k3_transport_options_and_tools() {
+        let prompt = Prompt {
+            input: vec![ResponseItem::Message {
+                id: Some(std::convert::identity("user".to_string())),
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText {
+                    text: "Inspect the project".to_string(),
+                }],
+                phase: None,
+                internal_chat_message_metadata_passthrough: None,
+            }],
+            cwd: Some(std::env::temp_dir()),
+            ..Prompt::default()
+        };
+
+        let (request, _) = build_request(
+            &prompt,
+            &test_model_info(),
+            "kimi-code-current-request-conversation",
+        )
+        .expect("build request");
+
+        assert_eq!(
+            request["thinking"],
+            json!({
+                "type": "enabled",
+                "keep": "all",
+            })
+        );
+        assert_eq!(request["max_completion_tokens"], json!(32768));
+        assert!(request.get("reasoning_effort").is_none());
+
+        let tool_names = request["tools"]
+            .as_array()
+            .expect("tools array")
+            .iter()
+            .map(|tool| {
+                tool["function"]["name"]
+                    .as_str()
+                    .expect("tool name")
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            tool_names,
+            [
+                "Agent",
+                "AgentSwarm",
+                "AskUserQuestion",
+                "Bash",
+                "CreateGoal",
+                "CronCreate",
+                "CronDelete",
+                "CronList",
+                "Edit",
+                "EnterPlanMode",
+                "ExitPlanMode",
+                "FetchURL",
+                "GetGoal",
+                "Glob",
+                "Grep",
+                "Read",
+                "ReadMediaFile",
+                "SetGoalBudget",
+                "Skill",
+                "TaskList",
+                "TaskOutput",
+                "TaskStop",
+                "TodoList",
+                "UpdateGoal",
+                "Write",
+            ]
+        );
+
+        let messages = request["messages"].as_array().expect("messages array");
+        assert!(messages.iter().any(|message| {
+            message["content"].as_str().is_some_and(|content| {
+                content.contains("ExitPlanMode is also approved automatically")
+            })
+        }));
     }
 
     #[test]

@@ -73,6 +73,15 @@ Anthropic-style API-key auth uses the `x-api-key` header and automatically adds
 `anthropic-version: 2023-06-01`. Other API-key providers use
 `Authorization: Bearer ...`.
 
+Kimi has two distinct provider paths:
+
+- `kimi-for-coding` uses `https://api.kimi.com/coding/v1` and supports the
+  built-in Kimi sign-in flow for an eligible Kimi Code subscription. It can
+  also read a compatible token from `KIMI_API_KEY`.
+- `moonshotai` uses `https://api.moonshot.ai/v1` with a Moonshot Platform API
+  key from `MOONSHOT_API_KEY`. A Moonshot Platform key is not a Kimi Code
+  subscription token.
+
 Command-backed auth example:
 
 ```toml
@@ -109,7 +118,7 @@ Common generated providers include:
 | `perplexity-agent` | Perplexity Agent | `chat` | `PERPLEXITY_API_KEY` | 18 |
 | `requesty` | Requesty | `chat` | `REQUESTY_API_KEY` | 37 |
 | `deepseek` | DeepSeek | `chat` | `DEEPSEEK_API_KEY` | 4 |
-| `moonshotai` | Moonshot AI | `chat` | `MOONSHOT_API_KEY` | 16 |
+| `moonshotai` | Moonshot AI | `chat` | `MOONSHOT_API_KEY` | 17 |
 | `moonshotai-cn` | Moonshot AI (China) | `chat` | `MOONSHOT_API_KEY` | 7 |
 | `zhipuai` | Zhipu AI | `chat` | `ZHIPU_API_KEY` | 12 |
 | `zai` | Z.AI | `chat` | `ZAI_API_KEY` | 14 |
@@ -161,7 +170,7 @@ Common generated providers include:
 | `inference` | Inference | `chat` | `INFERENCE_API_KEY` | 8 |
 | `io-net` | IO.NET | `chat` | `IOINTELLIGENCE_API_KEY` | 17 |
 | `kilo` | Kilo Gateway | `chat` | `KILO_API_KEY` | 258 |
-| `kimi-for-coding` | Kimi For Coding | `chat` | `KIMI_API_KEY` | 3 |
+| `kimi-for-coding` | Kimi For Coding | `chat` | `KIMI_API_KEY` | 6 |
 | `kuae-cloud-coding-plan` | KUAE Cloud Coding Plan | `chat` | `KUAE_API_KEY` | 1 |
 | `lilac` | Lilac | `chat` | `LILAC_API_KEY` | 4 |
 | `llmgateway` | LLM Gateway | `chat` | `LLMGATEWAY_API_KEY` | 156 |
@@ -225,7 +234,7 @@ harness mode from the provider/model family:
 | Match | Default harness |
 | --- | --- |
 | `wire_api = "messages"`, Anthropic provider/name/base URL, or `claude` model ids | `claude-code` |
-| `kimi`, `moonshot`, `api.kimi.com`, `api.moonshot.ai`, or `api.moonshot.cn` | `kimi-cli` |
+| `kimi`, `moonshot`, `api.kimi.com`, `api.moonshot.ai`, or `api.moonshot.cn` | `kimi-code` |
 | `qwen`, `qwq`, `dashscope`, or DashScope compatible-mode base URLs | `qwen-code` |
 | `deepseek` or `api.deepseek.com` | `deepseek-tui` |
 
@@ -239,6 +248,15 @@ Run this from `codex-rs` when provider source data changes:
 ```bash
 python3 scripts/write_provider_catalog.py
 python3 scripts/write_model_compatibility_catalog.py
+```
+
+To refresh only selected hosted providers while preserving every other
+generated entry, repeat `--provider` as needed:
+
+```bash
+python3 scripts/write_provider_catalog.py \
+  --provider moonshotai \
+  --provider kimi-for-coding
 ```
 
 Live sources require their documented provider auth environment variables. For

@@ -200,6 +200,7 @@ pub(super) struct MessageBuildOptions {
     pub omitted_reasoning_placeholder: Option<&'static str>,
     pub compact_function_arguments: bool,
     pub merge_assistant_text_with_following_tool_calls: bool,
+    pub preserve_empty_reasoning_content: bool,
     pub preserve_empty_tool_output: bool,
     pub trim_user_message_trailing_newlines: bool,
     pub tool_call_id_format: ToolCallIdFormat,
@@ -217,6 +218,7 @@ impl MessageBuildOptions {
             omitted_reasoning_placeholder: None,
             compact_function_arguments: false,
             merge_assistant_text_with_following_tool_calls: false,
+            preserve_empty_reasoning_content: false,
             preserve_empty_tool_output: false,
             trim_user_message_trailing_newlines: true,
             tool_call_id_format: ToolCallIdFormat::Preserve,
@@ -228,6 +230,7 @@ impl MessageBuildOptions {
             omitted_reasoning_placeholder: None,
             compact_function_arguments: true,
             merge_assistant_text_with_following_tool_calls: false,
+            preserve_empty_reasoning_content: true,
             preserve_empty_tool_output: false,
             trim_user_message_trailing_newlines: false,
             tool_call_id_format: ToolCallIdFormat::KimiCodeUnderscore,
@@ -239,6 +242,7 @@ impl MessageBuildOptions {
             omitted_reasoning_placeholder: Some("(reasoning omitted)"),
             compact_function_arguments: true,
             merge_assistant_text_with_following_tool_calls: true,
+            preserve_empty_reasoning_content: false,
             preserve_empty_tool_output: true,
             trim_user_message_trailing_newlines: true,
             tool_call_id_format: ToolCallIdFormat::Preserve,
@@ -284,6 +288,7 @@ pub(super) fn build_messages_with_options(
                                 &mut messages,
                                 &mut pending_assistant_content,
                                 &mut pending_reasoning_content,
+                                options.preserve_empty_reasoning_content,
                             );
                             pending_assistant_content = Some(message_content);
                             continue;
@@ -292,12 +297,17 @@ pub(super) fn build_messages_with_options(
                             &mut messages,
                             &mut pending_assistant_content,
                             &mut pending_reasoning_content,
+                            options.preserve_empty_reasoning_content,
                         );
                         let mut message = json!({
                             "role": "assistant",
                             "content": message_content,
                         });
-                        attach_reasoning_content(&mut message, &mut pending_reasoning_content);
+                        attach_reasoning_content(
+                            &mut message,
+                            &mut pending_reasoning_content,
+                            options.preserve_empty_reasoning_content,
+                        );
                         messages.push(message);
                     }
                 }
@@ -316,6 +326,7 @@ pub(super) fn build_messages_with_options(
                         &mut messages,
                         &mut pending_assistant_content,
                         &mut pending_reasoning_content,
+                        options.preserve_empty_reasoning_content,
                     );
                     pending_reasoning_content.clear();
                     if let Some(message_content) = convert_user_message_content(content, options) {
@@ -335,6 +346,7 @@ pub(super) fn build_messages_with_options(
                         &mut messages,
                         &mut pending_assistant_content,
                         &mut pending_reasoning_content,
+                        options.preserve_empty_reasoning_content,
                     );
                     pending_reasoning_content.clear();
                 }
@@ -351,6 +363,7 @@ pub(super) fn build_messages_with_options(
                         &mut messages,
                         &mut pending_assistant_content,
                         &mut pending_reasoning_content,
+                        options.preserve_empty_reasoning_content,
                     );
                 }
                 let call_id = format_tool_call_id(call_id, options.tool_call_id_format);
@@ -378,6 +391,7 @@ pub(super) fn build_messages_with_options(
                         &mut messages,
                         &mut pending_assistant_content,
                         &mut pending_reasoning_content,
+                        options.preserve_empty_reasoning_content,
                     );
                 }
                 let call_id = format_tool_call_id(call_id, options.tool_call_id_format);
@@ -402,6 +416,7 @@ pub(super) fn build_messages_with_options(
                         &mut messages,
                         &mut pending_assistant_content,
                         &mut pending_reasoning_content,
+                        options.preserve_empty_reasoning_content,
                     );
                 }
                 let call_id = call_id
@@ -442,6 +457,7 @@ pub(super) fn build_messages_with_options(
                     &mut pending_reasoning_content,
                     &format_tool_call_id(call_id, options.tool_call_id_format),
                     kimi_tool_output_content(output, options),
+                    options.preserve_empty_reasoning_content,
                 );
             }
             ResponseItem::CustomToolCallOutput {
@@ -455,6 +471,7 @@ pub(super) fn build_messages_with_options(
                     &mut pending_reasoning_content,
                     &format_tool_call_id(call_id, options.tool_call_id_format),
                     kimi_tool_output_content(output, options),
+                    options.preserve_empty_reasoning_content,
                 );
             }
             ResponseItem::Reasoning { content, .. } => {
@@ -481,6 +498,7 @@ pub(super) fn build_messages_with_options(
         &mut messages,
         &mut pending_assistant_content,
         &mut pending_reasoning_content,
+        options.preserve_empty_reasoning_content,
     );
     discard_unanswered_tool_calls(
         &mut pending_tool_calls,
@@ -519,6 +537,7 @@ fn flush_pending_tool_calls(
     pending_tool_calls: &mut Vec<Value>,
     awaiting_tool_call_ids: &mut Vec<String>,
     pending_reasoning_content: &mut String,
+    preserve_empty_reasoning_content: bool,
 ) {
     if pending_tool_calls.is_empty() {
         return;
@@ -533,7 +552,11 @@ fn flush_pending_tool_calls(
         "role": "assistant",
         "tool_calls": std::mem::take(pending_tool_calls),
     });
-    attach_reasoning_content(&mut message, pending_reasoning_content);
+    attach_reasoning_content(
+        &mut message,
+        pending_reasoning_content,
+        preserve_empty_reasoning_content,
+    );
     messages.push(message);
 }
 
@@ -543,6 +566,7 @@ fn flush_pending_tool_calls_with_content(
     awaiting_tool_call_ids: &mut Vec<String>,
     pending_reasoning_content: &mut String,
     content: Value,
+    preserve_empty_reasoning_content: bool,
 ) {
     if pending_tool_calls.is_empty() {
         return;
@@ -558,7 +582,11 @@ fn flush_pending_tool_calls_with_content(
         "content": content,
         "tool_calls": std::mem::take(pending_tool_calls),
     });
-    attach_reasoning_content(&mut message, pending_reasoning_content);
+    attach_reasoning_content(
+        &mut message,
+        pending_reasoning_content,
+        preserve_empty_reasoning_content,
+    );
     messages.push(message);
 }
 
@@ -576,6 +604,7 @@ fn push_pending_assistant_content(
     messages: &mut Vec<Value>,
     pending_assistant_content: &mut Option<Value>,
     pending_reasoning_content: &mut String,
+    preserve_empty_reasoning_content: bool,
 ) {
     let Some(content) = pending_assistant_content.take() else {
         return;
@@ -584,7 +613,11 @@ fn push_pending_assistant_content(
         "role": "assistant",
         "content": content,
     });
-    attach_reasoning_content(&mut message, pending_reasoning_content);
+    attach_reasoning_content(
+        &mut message,
+        pending_reasoning_content,
+        preserve_empty_reasoning_content,
+    );
     messages.push(message);
 }
 
@@ -596,6 +629,7 @@ fn push_tool_output_if_expected(
     pending_reasoning_content: &mut String,
     call_id: &str,
     content: Value,
+    preserve_empty_reasoning_content: bool,
 ) {
     if let Some(content) = pending_assistant_content.take() {
         flush_pending_tool_calls_with_content(
@@ -604,6 +638,7 @@ fn push_tool_output_if_expected(
             awaiting_tool_call_ids,
             pending_reasoning_content,
             content,
+            preserve_empty_reasoning_content,
         );
     } else {
         flush_pending_tool_calls(
@@ -611,6 +646,7 @@ fn push_tool_output_if_expected(
             pending_tool_calls,
             awaiting_tool_call_ids,
             pending_reasoning_content,
+            preserve_empty_reasoning_content,
         );
     }
     if let Some(index) = awaiting_tool_call_ids
@@ -692,8 +728,12 @@ fn compact_json_whitespace_preserving_order(input: &str) -> String {
     out
 }
 
-fn attach_reasoning_content(message: &mut Value, pending_reasoning_content: &mut String) {
-    if pending_reasoning_content.is_empty() {
+fn attach_reasoning_content(
+    message: &mut Value,
+    pending_reasoning_content: &mut String,
+    preserve_empty_reasoning_content: bool,
+) {
+    if pending_reasoning_content.is_empty() && !preserve_empty_reasoning_content {
         return;
     }
     if let Some(message_object) = message.as_object_mut() {
@@ -1419,6 +1459,56 @@ mod tests {
                 "role": "user",
                 "content": "hello\n",
             })]
+        );
+    }
+
+    #[test]
+    fn kimi_code_preserves_empty_reasoning_content_on_assistant_messages() {
+        let items = vec![
+            ResponseItem::FunctionCall {
+                id: Some(std::convert::identity("fc-1".to_string())),
+                name: "GetGoal".to_string(),
+                namespace: None,
+                arguments: "{}".to_string(),
+                call_id: "GetGoal:0".to_string(),
+
+                internal_chat_message_metadata_passthrough: None,
+            },
+            ResponseItem::FunctionCallOutput {
+                id: None,
+                call_id: "GetGoal:0".to_string(),
+                output: FunctionCallOutputPayload::from_text("{}".to_string()),
+
+                internal_chat_message_metadata_passthrough: None,
+            },
+        ];
+
+        let messages =
+            super::build_messages_with_options(&items, super::MessageBuildOptions::kimi_code())
+                .expect("build messages")
+                .collect::<Vec<_>>();
+
+        assert_eq!(
+            messages,
+            vec![
+                json!({
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "type": "function",
+                        "id": "GetGoal_0",
+                        "function": {
+                            "name": "GetGoal",
+                            "arguments": "{}",
+                        },
+                    }],
+                    "reasoning_content": "",
+                }),
+                json!({
+                    "role": "tool",
+                    "content": "{}",
+                    "tool_call_id": "GetGoal_0",
+                }),
+            ]
         );
     }
 

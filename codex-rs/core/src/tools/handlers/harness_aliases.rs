@@ -112,6 +112,7 @@ pub enum HarnessAliasHandler {
     Grep,
     GrepLower,
     AskUserQuestion,
+    TaskList,
     TaskOutput,
     TaskStop,
     ChecklistAdd,
@@ -158,6 +159,7 @@ impl ToolExecutor<ToolInvocation> for HarnessAliasHandler {
             Self::Grep => "Grep",
             Self::GrepLower => "grep",
             Self::AskUserQuestion => "AskUserQuestion",
+            Self::TaskList => "TaskList",
             Self::TaskOutput => "TaskOutput",
             Self::TaskStop => "TaskStop",
             Self::ChecklistAdd => "checklist_add",
@@ -216,6 +218,7 @@ impl HarnessAliasHandler {
             Self::Glob | Self::GlobLower => handle_glob(invocation).await,
             Self::Grep | Self::GrepLower => handle_grep(invocation).await,
             Self::AskUserQuestion => handle_ask_user_question(invocation).await,
+            Self::TaskList => handle_task_list(invocation).await,
             Self::TaskOutput => handle_task_output(invocation).await,
             Self::TaskStop => handle_task_stop(invocation).await,
             Self::ChecklistAdd => handle_checklist_add(invocation).await,
@@ -291,6 +294,9 @@ async fn handle_agent(
     if is_zcode {
         return handle_zcode_agent(invocation, args).await;
     }
+    if is_kimi_code(&invocation) && !args.run_in_background {
+        return handle_kimi_code_foreground_agent(invocation, args).await;
+    }
     let fork_turns = "all";
     let task_name = args.description.clone();
     let mut translated = json!({
@@ -326,6 +332,96 @@ async fn handle_agent(
             ..invocation
         })
         .await
+}
+
+async fn handle_kimi_code_foreground_agent(
+    invocation: ToolInvocation,
+    args: ClaudeAgentArgs,
+) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
+    let ToolInvocation {
+        session,
+        turn,
+        call_id,
+        ..
+    } = invocation;
+    let role_name = args
+        .subagent_type
+        .as_deref()
+        .map(str::trim)
+        .filter(|subagent_type| !subagent_type.is_empty())
+        .unwrap_or("coder");
+    let task_name = zcode_task_name(&args.description);
+    let child_depth = next_thread_spawn_depth(&turn.session_source);
+    let mut config =
+        build_agent_spawn_config(&session.get_base_instructions().await, turn.as_ref())?;
+    apply_requested_spawn_agent_model_overrides(
+        &session,
+        turn.as_ref(),
+        &mut config,
+        args.model.as_deref(),
+        /*requested_reasoning_effort*/ None,
+    )
+    .await?;
+    apply_role_to_config(&mut config, Some(role_name))
+        .await
+        .map_err(FunctionCallError::RespondToModel)?;
+    apply_spawn_agent_service_tier(
+        &session,
+        &mut config,
+        turn.config.service_tier.as_deref(),
+        /*requested_service_tier*/ None,
+    )
+    .await?;
+    apply_spawn_agent_runtime_overrides(&mut config, turn.as_ref())?;
+
+    let parent_thread_id = session.thread_id();
+    let spawn_source = thread_spawn_source(
+        parent_thread_id,
+        &turn.session_source,
+        child_depth,
+        Some(role_name),
+        Some(task_name),
+    )?;
+    let spawned = Box::pin(session.services.agent_control.spawn_agent_with_metadata(
+        config,
+        vec![UserInput::Text {
+            text: args.prompt,
+            text_elements: Vec::new(),
+        }],
+        Some(spawn_source),
+        SpawnAgentOptions {
+            fork_parent_spawn_call_id: Some(call_id),
+            parent_thread_id: Some(parent_thread_id),
+            environments: Some(turn.environments.to_selections()),
+            ..Default::default()
+        },
+    ))
+    .await
+    .map_err(collab_spawn_error)?;
+    let status = wait_for_agent_final_status(&session.services.agent_control, spawned.thread_id)
+        .await
+        .unwrap_or(spawned.status);
+    let result = match status {
+        AgentStatus::Completed(Some(message)) => message,
+        AgentStatus::Completed(None) => String::new(),
+        AgentStatus::Errored(message) => return Err(FunctionCallError::RespondToModel(message)),
+        AgentStatus::Interrupted
+        | AgentStatus::NotFound
+        | AgentStatus::PendingInit
+        | AgentStatus::Running
+        | AgentStatus::Shutdown => {
+            return Err(FunctionCallError::RespondToModel(format!(
+                "Agent ended with status {status:?}"
+            )));
+        }
+    };
+    Ok(boxed_tool_output(FunctionToolOutput::from_text(
+        format!(
+            "agent_id: {}\nactual_subagent_type: {role_name}\nstatus: completed\n\n[summary]\n{result}",
+            spawned.thread_id
+        ),
+        Some(true),
+    )))
 }
 
 async fn handle_zcode_agent(
@@ -616,6 +712,15 @@ fn is_claude_code(invocation: &ToolInvocation) -> bool {
         .harness
         .as_deref()
         .is_some_and(|harness| matches!(harness, "claude-code" | "claude-code-bare"))
+}
+
+fn is_kimi_code(invocation: &ToolInvocation) -> bool {
+    invocation
+        .turn
+        .config
+        .harness
+        .as_deref()
+        .is_some_and(|harness| harness == "kimi-code")
 }
 
 fn is_deepseek_tui(invocation: &ToolInvocation) -> bool {
@@ -941,18 +1046,54 @@ fn normalize_task_output(output: &str) -> String {
 #[derive(Deserialize)]
 struct TaskOutputArgs {
     task_id: String,
-    #[serde(default = "default_task_output_block")]
-    block: bool,
-    #[serde(default = "default_task_output_timeout")]
-    timeout: u64,
+    block: Option<bool>,
+    timeout: Option<u64>,
 }
 
-fn default_task_output_block() -> bool {
+#[derive(Deserialize)]
+struct TaskListArgs {
+    #[serde(default = "default_task_list_active_only")]
+    active_only: bool,
+    #[serde(default = "default_task_list_limit")]
+    limit: usize,
+}
+
+fn default_task_list_active_only() -> bool {
     true
 }
 
-fn default_task_output_timeout() -> u64 {
-    30_000
+fn default_task_list_limit() -> usize {
+    20
+}
+
+async fn handle_task_list(
+    invocation: ToolInvocation,
+) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
+    let arguments = function_arguments(&invocation.payload)?;
+    let args: TaskListArgs = parse_arguments(arguments)?;
+    let tasks = CLAUDE_TASKS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut entries = tasks.iter().collect::<Vec<_>>();
+    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+    entries.truncate(args.limit.clamp(1, 100));
+    let mut lines = vec![format!("background_tasks: {}", entries.len())];
+    for (task_id, task) in entries {
+        lines.extend([
+            format!("task_id: {task_id}"),
+            format!("description: {}", task.description),
+            "status: running".to_string(),
+            "detached: true".to_string(),
+            "kind: process".to_string(),
+            format!("command: {}", task.command),
+            format!("pid: {}", task.process_id),
+        ]);
+    }
+    let _ = args.active_only;
+    Ok(boxed_tool_output(FunctionToolOutput::from_text(
+        lines.join("\n"),
+        Some(true),
+    )))
 }
 
 async fn handle_task_output(
@@ -961,7 +1102,15 @@ async fn handle_task_output(
     let arguments = function_arguments(&invocation.payload)?;
     let args: TaskOutputArgs = parse_arguments(arguments)?;
     let task_state = claude_task_state(&args.task_id)?;
-    let yield_time_ms = if args.block { args.timeout } else { 100 };
+    let kimi_code = is_kimi_code(&invocation);
+    let block = args.block.unwrap_or(!kimi_code);
+    let timeout = args.timeout.unwrap_or(if kimi_code { 30 } else { 30_000 });
+    let timeout_ms = if kimi_code {
+        timeout.saturating_mul(1_000)
+    } else {
+        timeout
+    };
+    let yield_time_ms = if block { timeout_ms } else { 100 };
     let payload = ToolPayload::Function {
         arguments: json!({
             "session_id": task_state.process_id,
@@ -2658,6 +2807,12 @@ async fn handle_zcode_skill(
                 base_dir.display()
             ),
             Some(true),
+        )));
+    }
+    if is_kimi_code(&invocation) {
+        return Ok(boxed_tool_output(FunctionToolOutput::from_text(
+            format!("Skill \"{skill}\" not found in the current skill listing."),
+            Some(false),
         )));
     }
     Ok(boxed_tool_output(FunctionToolOutput::from_text(
