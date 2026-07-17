@@ -203,6 +203,31 @@ async fn probe(configure_turn: impl FnOnce(&mut TurnContext)) -> ToolPlanProbe {
     probe_with(configure_turn, ToolPlanInputs::default()).await
 }
 
+#[tokio::test]
+async fn kimi_code_registers_an_executor_for_every_emulated_tool() {
+    let probe = probe(|turn| {
+        update_config(turn, |config| {
+            config.harness = Some("kimi-code".to_string());
+        });
+    })
+    .await;
+    let tools: serde_json::Value =
+        serde_json::from_str(include_str!("../harness/kimi_code_tools.json"))
+            .expect("Kimi Code tool fixture should be valid JSON");
+    let tool_names = tools
+        .as_array()
+        .expect("Kimi Code tool fixture should be an array")
+        .iter()
+        .map(|tool| {
+            tool["function"]["name"]
+                .as_str()
+                .expect("Kimi Code tool should have a function name")
+        })
+        .collect::<Vec<_>>();
+
+    probe.assert_registered_contains(&tool_names);
+}
+
 fn set_feature(turn: &mut TurnContext, feature: Feature, enabled: bool) {
     let mut config = (*turn.config).clone();
     if enabled {

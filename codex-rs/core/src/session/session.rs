@@ -1095,6 +1095,15 @@ impl Session {
                 guardian_rejections: Mutex::new(HashMap::new()),
                 guardian_rejection_circuit_breaker: Mutex::new(Default::default()),
                 runtime_handle: tokio::runtime::Handle::current(),
+                kimi_cron: crate::kimi_cron::KimiCronService::new(
+                    config
+                        .codex_home
+                        .join("cron")
+                        .join(thread_id.to_string())
+                        .to_path_buf(),
+                    Arc::clone(&time_provider),
+                    thread_id,
+                ),
                 skills_service,
                 agents_md_manager,
                 plugins_manager: Arc::clone(&plugins_manager),
@@ -1175,6 +1184,7 @@ impl Session {
                 services,
                 next_internal_sub_id: AtomicU64::new(0),
             });
+            sess.services.kimi_cron.start(Arc::downgrade(&sess)).await;
             if let Some(network_policy_decider_session) = network_policy_decider_session {
                 let mut guard = network_policy_decider_session.write().await;
                 *guard = Arc::downgrade(&sess);
