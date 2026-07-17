@@ -8,6 +8,11 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-white?style=flat-square" /></a>
 </p>
 
+> [!NOTE]
+> **Kimi K3 is supported today.** Open Interpreter natively emulates the
+> current Kimi Code harness to maximize provider-recommended performance in a
+> familiar Codex TUI.
+
 <br>
 
 <p align="center">
@@ -59,6 +64,20 @@ profile.
 
 Read more in the [harness docs](https://www.openinterpreter.com/docs/terminal/harness?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=harness_docs) and [model provider docs](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=model_provider_docs).
 
+### Editors and the Codex SDK
+
+Open Interpreter works in [ACP-compatible editors and clients](https://agentclientprotocol.com/get-started/clients). Configure the client to launch `interpreter acp`; see the [ACP guide](https://www.openinterpreter.com/docs/terminal/acp) for examples.
+
+Already building with OpenAI's Codex SDK? Keep the SDK and make a one-line
+binary override:
+
+```diff
+-const codex = new Codex();
++const codex = new Codex({ codexPathOverride: "interpreter" });
+```
+
+Open Interpreter speaks the same Codex exec protocol. See the [SDK guide](https://www.openinterpreter.com/docs/terminal/sdk) and run `scripts/test-codex-sdk-compat.sh` for a local, provider-free compatibility check.
+
 ### Computer Use
 
 Open Interpreter ships with a QA skill that lets any model operate and test interfaces. It can drive web apps in a real browser with [agent-browser](https://github.com/vercel-labs/agent-browser), or operate and test native apps with [trycua](https://github.com/trycua/cua).
@@ -82,6 +101,8 @@ Open Interpreter ships with a QA skill that lets any model operate and test inte
 - [CLI reference](https://www.openinterpreter.com/docs/terminal/cli-reference?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=cli_reference)
 - [Harnesses](https://www.openinterpreter.com/docs/terminal/harness?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=harnesses)
 - [Model providers](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=model_providers)
+- [Agent Client Protocol](https://www.openinterpreter.com/docs/terminal/acp)
+- [Codex SDK](https://www.openinterpreter.com/docs/terminal/sdk)
 - [Sandbox & approvals](https://www.openinterpreter.com/docs/terminal/sandbox?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=sandbox_approvals)
 
 Provider and model membership is generated, not maintained as Rust lists. From
