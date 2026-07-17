@@ -6,7 +6,9 @@ on:
     paths:
       - docs/**
       - docs.json
+      - docs.zh.json
       - docs-site/**
+      - scripts/check-doc-locales.mjs
       - codex-rs/core/config.schema.json
   workflow_dispatch:
 
