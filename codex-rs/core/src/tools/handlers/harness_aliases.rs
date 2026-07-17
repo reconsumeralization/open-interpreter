@@ -1346,33 +1346,7 @@ async fn handle_read(invocation: ToolInvocation) -> Result<Box<dyn ToolOutput>, 
 async fn handle_read_media_file(
     invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
-    let arguments = function_arguments(&invocation.payload)?;
-    let args: ReadArgs = parse_arguments(arguments)?;
-    let path = harness_fs::checked_read_path(&invocation, &args.path, "ReadMediaFile")?;
-    let Some(mime_type) = image_mime_type(&path) else {
-        return Err(FunctionCallError::RespondToModel(format!(
-            "ReadMediaFile failed: `{}` is not a supported image file",
-            display_model_path(&invocation, &path)
-        )));
-    };
-    let data = std::fs::read(&path)
-        .map_err(|err| FunctionCallError::RespondToModel(format!("ReadMediaFile failed: {err}")))?;
-    let image_url = format!("data:{mime_type};base64,{}", BASE64_STANDARD.encode(data));
-    Ok(boxed_tool_output(FunctionToolOutput::from_content(
-        vec![
-            FunctionCallOutputContentItem::InputText {
-                text: format!(
-                    "<system>Read media file `{}` as {mime_type}.</system>",
-                    display_model_path(&invocation, &path)
-                ),
-            },
-            FunctionCallOutputContentItem::InputImage {
-                image_url,
-                detail: None,
-            },
-        ],
-        Some(true),
-    )))
+    super::kimi_code_media::handle(invocation).await
 }
 
 async fn poll_claude_task_output(
@@ -4848,13 +4822,20 @@ mod tests {
     #[tokio::test]
     async fn kimi_read_media_file_alias_returns_image_payload() {
         let workspace = tempfile::tempdir().expect("workspace temp dir");
-        std::fs::write(workspace.path().join("red.png"), b"png-bytes").expect("write image file");
+        let image_path = workspace.path().join("red.png");
+        image::DynamicImage::new_rgb8(1, 1)
+            .save(&image_path)
+            .expect("write image file");
 
         let response_item = handle_response_item(
             &workspace,
             HarnessAliasHandler::ReadMediaFile,
             "ReadMediaFile",
-            json!({ "path": "red.png" }),
+            json!({
+                "path": "red.png",
+                "region": { "x": 0, "y": 0, "width": 1, "height": 1 },
+                "full_resolution": true,
+            }),
         )
         .await
         .expect("read media file succeeds");
@@ -4872,14 +4853,82 @@ mod tests {
         assert_eq!(
             items[0],
             FunctionCallOutputContentItem::InputText {
-                text: "<system>Read media file `red.png` as image/png.</system>".to_string(),
+                text: format!(
+                    "<image path=\"{}\">",
+                    dunce::canonicalize(&image_path)
+                        .expect("canonical image path")
+                        .display()
+                ),
             }
         );
         let FunctionCallOutputContentItem::InputImage { image_url, detail } = &items[1] else {
             panic!("expected image item");
         };
         assert!(image_url.starts_with("data:image/png;base64,"));
-        assert_eq!(*detail, None);
+        assert_eq!(*detail, Some(codex_protocol::models::ImageDetail::Original));
+        assert_eq!(
+            items[2],
+            FunctionCallOutputContentItem::InputText {
+                text: "</image>".to_string(),
+            }
+        );
+        let FunctionCallOutputContentItem::InputText { text } = &items[3] else {
+            panic!("expected media note");
+        };
+        assert!(text.contains("Original dimensions: 1x1 pixels."));
+        assert!(text.contains("Showing region (x=0, y=0, width=1, height=1)"));
+    }
+
+    #[tokio::test]
+    async fn kimi_read_media_file_accepts_all_provider_image_formats() {
+        let workspace = tempfile::tempdir().expect("workspace temp dir");
+        let image = image::DynamicImage::new_rgb8(2, 2);
+        for (filename, format) in [
+            ("sample.png", image::ImageFormat::Png),
+            ("sample.jpg", image::ImageFormat::Jpeg),
+            ("sample.webp", image::ImageFormat::WebP),
+        ] {
+            image
+                .save_with_format(workspace.path().join(filename), format)
+                .expect("write image fixture");
+        }
+        std::fs::write(
+            workspace.path().join("sample.gif"),
+            b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b",
+        )
+        .expect("write GIF fixture");
+
+        for (filename, mime_type) in [
+            ("sample.png", "image/png"),
+            ("sample.jpg", "image/jpeg"),
+            ("sample.gif", "image/gif"),
+            ("sample.webp", "image/webp"),
+        ] {
+            let response_item = handle_response_item(
+                &workspace,
+                HarnessAliasHandler::ReadMediaFile,
+                "ReadMediaFile",
+                json!({ "path": filename }),
+            )
+            .await
+            .expect("read media file succeeds");
+            let codex_protocol::models::ResponseInputItem::FunctionCallOutput { output, .. } =
+                response_item
+            else {
+                panic!("expected function call output");
+            };
+            let codex_protocol::models::FunctionCallOutputBody::ContentItems(items) = output.body
+            else {
+                panic!("expected content items");
+            };
+            let FunctionCallOutputContentItem::InputImage { image_url, .. } = &items[1] else {
+                panic!("expected image item");
+            };
+            assert!(
+                image_url.starts_with(format!("data:{mime_type};base64,").as_str()),
+                "unexpected image URL for {filename}: {image_url}"
+            );
+        }
     }
 
     #[test]
