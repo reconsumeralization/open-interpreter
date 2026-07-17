@@ -305,7 +305,11 @@ fn prepare_image(
         });
     }
 
-    let resized = decoded.resize(MAX_IMAGE_EDGE, MAX_IMAGE_EDGE, FilterType::Triangle);
+    let resized = if original_width > MAX_IMAGE_EDGE || original_height > MAX_IMAGE_EDGE {
+        decoded.resize(MAX_IMAGE_EDGE, MAX_IMAGE_EDGE, FilterType::Triangle)
+    } else {
+        decoded
+    };
     let (bytes, output_mime, width, height) = encode_with_read_budget(resized, format)?;
     Ok(PreparedImage {
         bytes,
@@ -442,4 +446,42 @@ fn media_note(
         "If you generate or edit images or videos via commands or scripts, read the result back immediately before continuing.".to_string(),
     );
     format!("<system>{}</system>", parts.join(" "))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::ImageBuffer;
+    use image::Rgb;
+
+    #[test]
+    fn byte_budget_compression_never_upscales_an_image() {
+        let width = 800;
+        let height = 400;
+        let image = DynamicImage::ImageRgb8(ImageBuffer::from_fn(width, height, |x, y| {
+            Rgb([
+                x.wrapping_mul(73).wrapping_add(y.wrapping_mul(151)) as u8,
+                x.wrapping_mul(197).wrapping_add(y.wrapping_mul(31)) as u8,
+                x.wrapping_mul(17).wrapping_add(y.wrapping_mul(229)) as u8,
+            ])
+        }));
+        let data = encode_png(&image).expect("encode oversized PNG fixture");
+        assert!(data.len() > READ_IMAGE_BYTE_BUDGET);
+
+        let prepared = prepare_image(
+            &ReadMediaArgs {
+                path: "fixture.png".to_string(),
+                region: None,
+                full_resolution: false,
+            },
+            data,
+            image,
+            ImageFormat::Png,
+            "image/png",
+        )
+        .expect("compress image within read budget");
+
+        assert_eq!((prepared.width, prepared.height), (width, height));
+        assert!(prepared.bytes.len() <= READ_IMAGE_BYTE_BUDGET);
+    }
 }
