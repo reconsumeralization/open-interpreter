@@ -161,15 +161,18 @@ async fn handle_fetch_url(
 }
 
 fn extract_page_text(html: &str) -> String {
-    let without_scripts = Regex::new("(?is)<(script|style)[^>]*>.*?</(script|style)>")
-        .expect("valid script/style regex")
-        .replace_all(html, " ");
-    let with_breaks = Regex::new("(?i)</?(p|div|h[1-6]|li|br|article|section)[^>]*>")
-        .expect("valid block regex")
-        .replace_all(&without_scripts, "\n");
-    let without_tags = Regex::new("(?s)<[^>]+>")
-        .expect("valid tag regex")
-        .replace_all(&with_breaks, " ");
+    let Ok(script_regex) = Regex::new("(?is)<(script|style)[^>]*>.*?</(script|style)>") else {
+        return html.to_string();
+    };
+    let Ok(block_regex) = Regex::new("(?i)</?(p|div|h[1-6]|li|br|article|section)[^>]*>") else {
+        return html.to_string();
+    };
+    let Ok(tag_regex) = Regex::new("(?s)<[^>]+>") else {
+        return html.to_string();
+    };
+    let without_scripts = script_regex.replace_all(html, " ");
+    let with_breaks = block_regex.replace_all(&without_scripts, "\n");
+    let without_tags = tag_regex.replace_all(&with_breaks, " ");
     let decoded = without_tags
         .replace("&nbsp;", " ")
         .replace("&amp;", "&")

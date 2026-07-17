@@ -419,15 +419,12 @@ pub(super) fn build_messages_with_options(
                         options.preserve_empty_reasoning_content,
                     );
                 }
-                let call_id = call_id
-                    .clone()
-                    .or_else(|| id.clone().map(String::from))
-                    .ok_or_else(|| {
-                        serde_json::Error::io(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "local_shell history item missing call id",
-                        ))
-                    })?;
+                let call_id = call_id.clone().or_else(|| id.clone()).ok_or_else(|| {
+                    serde_json::Error::io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "local_shell history item missing call id",
+                    ))
+                })?;
                 let call_id = format_tool_call_id(&call_id, options.tool_call_id_format);
                 let arguments = match action {
                     LocalShellAction::Exec(exec) => json!({
@@ -455,8 +452,10 @@ pub(super) fn build_messages_with_options(
                     &mut awaiting_tool_call_ids,
                     &mut pending_assistant_content,
                     &mut pending_reasoning_content,
-                    &format_tool_call_id(call_id, options.tool_call_id_format),
-                    kimi_tool_output_content(output, options),
+                    ToolOutputMessage {
+                        call_id: format_tool_call_id(call_id, options.tool_call_id_format),
+                        content: kimi_tool_output_content(output, options),
+                    },
                     options.preserve_empty_reasoning_content,
                 );
             }
@@ -469,8 +468,10 @@ pub(super) fn build_messages_with_options(
                     &mut awaiting_tool_call_ids,
                     &mut pending_assistant_content,
                     &mut pending_reasoning_content,
-                    &format_tool_call_id(call_id, options.tool_call_id_format),
-                    kimi_tool_output_content(output, options),
+                    ToolOutputMessage {
+                        call_id: format_tool_call_id(call_id, options.tool_call_id_format),
+                        content: kimi_tool_output_content(output, options),
+                    },
                     options.preserve_empty_reasoning_content,
                 );
             }
@@ -621,16 +622,21 @@ fn push_pending_assistant_content(
     messages.push(message);
 }
 
+struct ToolOutputMessage {
+    call_id: String,
+    content: Value,
+}
+
 fn push_tool_output_if_expected(
     messages: &mut Vec<Value>,
     pending_tool_calls: &mut Vec<Value>,
     awaiting_tool_call_ids: &mut Vec<String>,
     pending_assistant_content: &mut Option<Value>,
     pending_reasoning_content: &mut String,
-    call_id: &str,
-    content: Value,
+    output: ToolOutputMessage,
     preserve_empty_reasoning_content: bool,
 ) {
+    let ToolOutputMessage { call_id, content } = output;
     if let Some(content) = pending_assistant_content.take() {
         flush_pending_tool_calls_with_content(
             messages,
@@ -651,7 +657,7 @@ fn push_tool_output_if_expected(
     }
     if let Some(index) = awaiting_tool_call_ids
         .iter()
-        .position(|awaiting_call_id| awaiting_call_id == call_id)
+        .position(|awaiting_call_id| awaiting_call_id == &call_id)
     {
         awaiting_tool_call_ids.remove(index);
         messages.push(json!({

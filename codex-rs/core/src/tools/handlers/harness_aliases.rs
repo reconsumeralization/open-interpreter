@@ -1075,7 +1075,7 @@ async fn handle_task_list(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut entries = tasks.iter().collect::<Vec<_>>();
-    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+    entries.sort_by_key(|(task_id, _)| *task_id);
     entries.truncate(args.limit.clamp(1, 100));
     let mut lines = vec![format!("background_tasks: {}", entries.len())];
     for (task_id, task) in entries {
