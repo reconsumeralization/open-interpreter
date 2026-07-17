@@ -7236,19 +7236,20 @@
           "priority": 1000
         },
         {
-          "id": "kimi-k2-thinking-turbo",
-          "display_name": "Kimi K2 Thinking Turbo",
-          "description": "kimi-thinking \u2022 Reasoning \u2022 Tool calling",
+          "id": "kimi-k2.7-code",
+          "display_name": "Kimi K2.7 Code",
+          "description": "kimi-k2 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
           "reasoning": true,
           "input_modalities": [
-            "text"
+            "text",
+            "image"
           ],
           "context_window": 262144,
           "priority": 1
         },
         {
-          "id": "kimi-k2.7-code",
-          "display_name": "Kimi K2.7 Code",
+          "id": "kimi-k2.7-code-highspeed",
+          "display_name": "Kimi K2.7 Code HighSpeed",
           "description": "kimi-k2 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
           "reasoning": true,
           "input_modalities": [
@@ -7259,6 +7260,19 @@
           "priority": 2
         },
         {
+          "id": "kimi-k3",
+          "display_name": "Kimi K3",
+          "description": "kimi-k3 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 1048576,
+          "priority": -1,
+          "thinking_toggle": true
+        },
+        {
           "id": "kimi-k2-thinking",
           "display_name": "Kimi K2 Thinking",
           "description": "kimi-thinking \u2022 Reasoning \u2022 Tool calling",
@@ -7267,42 +7281,7 @@
             "text"
           ],
           "context_window": 262144,
-          "priority": 3
-        },
-        {
-          "id": "kimi-k2-0711-preview",
-          "display_name": "Kimi K2 0711",
-          "description": "kimi-k2 \u2022 Tool calling",
-          "reasoning": false,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 131072,
           "priority": 4
-        },
-        {
-          "id": "kimi-k2-turbo-preview",
-          "display_name": "Kimi K2 Turbo",
-          "description": "kimi-k2 \u2022 Tool calling",
-          "reasoning": false,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 262144,
-          "priority": 5
-        },
-        {
-          "id": "kimi-k2.5",
-          "display_name": "Kimi K2.5",
-          "description": "kimi-k2 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
-          "reasoning": true,
-          "input_modalities": [
-            "text",
-            "image"
-          ],
-          "context_window": 262144,
-          "priority": 6,
-          "thinking_toggle": true
         },
         {
           "id": "kimi-k2.6",
@@ -7317,8 +7296,19 @@
           "priority": -1
         },
         {
-          "id": "kimi-k2.7-code-highspeed",
-          "display_name": "Kimi K2.7 Code HighSpeed",
+          "id": "kimi-k2-turbo-preview",
+          "display_name": "Kimi K2 Turbo",
+          "description": "kimi-k2 \u2022 Tool calling",
+          "reasoning": false,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 262144,
+          "priority": 6
+        },
+        {
+          "id": "kimi-k2.5",
+          "display_name": "Kimi K2.5",
           "description": "kimi-k2 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
           "reasoning": true,
           "input_modalities": [
@@ -7326,29 +7316,30 @@
             "image"
           ],
           "context_window": 262144,
+          "priority": 7,
+          "thinking_toggle": true
+        },
+        {
+          "id": "kimi-k2-0711-preview",
+          "display_name": "Kimi K2 0711",
+          "description": "kimi-k2 \u2022 Tool calling",
+          "reasoning": false,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 131072,
           "priority": 8
         },
         {
-          "id": "moonshot-v1-8k",
-          "display_name": "Moonshot V1 8K",
-          "description": "Live provider model",
-          "reasoning": false,
+          "id": "kimi-k2-thinking-turbo",
+          "display_name": "Kimi K2 Thinking Turbo",
+          "description": "kimi-thinking \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
           "input_modalities": [
             "text"
           ],
-          "context_window": null,
+          "context_window": 262144,
           "priority": 9
-        },
-        {
-          "id": "moonshot-v1-128k",
-          "display_name": "Moonshot V1 128K",
-          "description": "Live provider model",
-          "reasoning": false,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": null,
-          "priority": 10
         },
         {
           "id": "moonshot-v1-auto",
@@ -7359,29 +7350,18 @@
             "text"
           ],
           "context_window": null,
+          "priority": 10
+        },
+        {
+          "id": "moonshot-v1-8k",
+          "display_name": "Moonshot V1 8K",
+          "description": "Live provider model",
+          "reasoning": false,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": null,
           "priority": 11
-        },
-        {
-          "id": "moonshot-v1-8k-vision-preview",
-          "display_name": "Moonshot V1 8K Vision Preview",
-          "description": "Live provider model",
-          "reasoning": false,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": null,
-          "priority": 12
-        },
-        {
-          "id": "moonshot-v1-32k",
-          "display_name": "Moonshot V1 32K",
-          "description": "Live provider model",
-          "reasoning": false,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": null,
-          "priority": 13
         },
         {
           "id": "moonshot-v1-128k-vision-preview",
@@ -7392,7 +7372,40 @@
             "text"
           ],
           "context_window": null,
+          "priority": 12
+        },
+        {
+          "id": "moonshot-v1-8k-vision-preview",
+          "display_name": "Moonshot V1 8K Vision Preview",
+          "description": "Live provider model",
+          "reasoning": false,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": null,
+          "priority": 13
+        },
+        {
+          "id": "moonshot-v1-32k",
+          "display_name": "Moonshot V1 32K",
+          "description": "Live provider model",
+          "reasoning": false,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": null,
           "priority": 14
+        },
+        {
+          "id": "moonshot-v1-128k",
+          "display_name": "Moonshot V1 128K",
+          "description": "Live provider model",
+          "reasoning": false,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": null,
+          "priority": 15
         },
         {
           "id": "moonshot-v1-32k-vision-preview",
@@ -7403,7 +7416,7 @@
             "text"
           ],
           "context_window": null,
-          "priority": 15
+          "priority": 16
         }
       ]
     },
@@ -26261,6 +26274,18 @@
       "sort_priority": 100,
       "models": [
         {
+          "id": "k2p5",
+          "display_name": "Kimi K2.5",
+          "description": "kimi-thinking \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 262144,
+          "priority": 0
+        },
+        {
           "id": "k2p7",
           "display_name": "Kimi K2.7 Code",
           "description": "kimi-k2 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
@@ -26270,7 +26295,7 @@
             "image"
           ],
           "context_window": 262144,
-          "priority": 0
+          "priority": 1
         },
         {
           "id": "kimi-k2-thinking",
@@ -26281,19 +26306,32 @@
             "text"
           ],
           "context_window": 262144,
-          "priority": 1
+          "priority": 2
         },
         {
-          "id": "k2p5",
-          "display_name": "Kimi K2.5",
-          "description": "kimi-thinking \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
+          "id": "kimi-for-coding-highspeed",
+          "display_name": "Kimi For Coding HighSpeed",
+          "description": "kimi-k2 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
           "reasoning": true,
           "input_modalities": [
             "text",
             "image"
           ],
           "context_window": 262144,
-          "priority": 2
+          "priority": 3
+        },
+        {
+          "id": "k3",
+          "display_name": "Kimi K3",
+          "description": "kimi-k3 \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 1048576,
+          "priority": -1,
+          "thinking_toggle": true
         },
         {
           "id": "k2p6",
@@ -26305,7 +26343,7 @@
             "image"
           ],
           "context_window": 262144,
-          "priority": 3
+          "priority": 5
         }
       ]
     },

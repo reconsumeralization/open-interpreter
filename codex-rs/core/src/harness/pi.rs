@@ -137,15 +137,12 @@ pub(crate) fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde
                 action,
                 ..
             } => {
-                let call_id = call_id
-                    .clone()
-                    .or_else(|| id.clone().map(String::from))
-                    .ok_or_else(|| {
-                        serde_json::Error::io(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "local_shell history item missing call id",
-                        ))
-                    })?;
+                let call_id = call_id.clone().or_else(|| id.clone()).ok_or_else(|| {
+                    serde_json::Error::io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "local_shell history item missing call id",
+                    ))
+                })?;
                 let arguments = match action {
                     LocalShellAction::Exec(exec) => json!({
                         "command": exec.command,

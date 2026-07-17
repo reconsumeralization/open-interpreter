@@ -41,6 +41,10 @@
   },
   "provider_model_metadata_overrides": {
     "moonshotai": {
+      "kimi-k3": {
+        "thinking_toggle": true,
+        "priority": -1
+      },
       "kimi-k2.5": {
         "thinking_toggle": true
       },
@@ -54,6 +58,12 @@
       },
       "kimi-k2-0905-preview": {
         "priority": 1000
+      }
+    },
+    "kimi-for-coding": {
+      "k3": {
+        "thinking_toggle": true,
+        "priority": -1
       }
     },
     "moonshotai-cn": {

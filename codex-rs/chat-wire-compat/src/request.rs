@@ -190,12 +190,11 @@ pub(crate) fn convert_request(
                 action,
                 ..
             } => {
-                let call_id = call_id
-                    .clone()
-                    .or_else(|| id.clone().map(String::from))
-                    .ok_or_else(|| ApiError::InvalidRequest {
+                let call_id = call_id.clone().or_else(|| id.clone()).ok_or_else(|| {
+                    ApiError::InvalidRequest {
                         message: "local_shell history item missing call id".to_string(),
-                    })?;
+                    }
+                })?;
                 let arguments = match action {
                     LocalShellAction::Exec(exec) => json!({
                         "command": exec.command,

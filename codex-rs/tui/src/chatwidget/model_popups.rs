@@ -1175,6 +1175,7 @@ fn harness_choices_for_provider_model(
         "",
         "claude-code",
         "claude-code-bare",
+        "kimi-code",
         "kimi-cli",
         "qwen-code",
         "deepseek-tui",
@@ -1205,6 +1206,7 @@ fn harness_choice(harness: &str, is_recommended: bool) -> HarnessChoice {
         "" => native_harness_label(Product::current()),
         "claude-code" => "Claude Code",
         "claude-code-bare" => "Claude Code Bare",
+        "kimi-code" => "Kimi Code",
         "kimi-cli" => "Kimi CLI",
         "qwen-code" => "Qwen Code",
         "deepseek-tui" => "DeepSeek TUI",
@@ -1233,6 +1235,7 @@ fn harness_choice(harness: &str, is_recommended: bool) -> HarnessChoice {
         }
         "claude-code" => "Use the Claude Code-style tool harness.",
         "claude-code-bare" => "Use the lean Claude Code-style harness.",
+        "kimi-code" => "Use the current Kimi Code-style tool harness.",
         "kimi-cli" => "Use the Kimi CLI-style tool harness.",
         "qwen-code" => "Use the Qwen Code-style tool harness.",
         "deepseek-tui" => "Use the DeepSeek TUI-style tool harness.",
@@ -1288,6 +1291,7 @@ mod tests {
                 "Codex (recommended)",
                 "Claude Code",
                 "Claude Code Bare",
+                "Kimi Code",
                 "Kimi CLI",
                 "Qwen Code",
                 "DeepSeek TUI",
@@ -1297,6 +1301,47 @@ mod tests {
                 "Terminus 2",
                 "Minimal",
             ]
+        );
+    }
+
+    #[test]
+    fn kimi_providers_recommend_current_kimi_code_harness() {
+        let provider = ModelProviderInfo {
+            name: "Kimi For Coding".to_string(),
+            base_url: Some("https://api.kimi.com/coding/v1".to_string()),
+            wire_api: WireApi::Chat,
+            ..Default::default()
+        };
+
+        let choices = harness_choices_for_provider_model(
+            "kimi-for-coding",
+            Some(&provider),
+            "k3",
+            /*include_all_harnesses*/ false,
+        );
+
+        assert_eq!(choices[0].label, "Kimi Code (recommended)");
+        assert_eq!(choices[0].stored.as_deref(), Some("kimi-code"));
+        insta::assert_snapshot!(
+            choices
+                .iter()
+                .map(|choice| format!("{}  {}", choice.label, choice.description))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            @r###"
+        Kimi Code (recommended)  Use the current Kimi Code-style tool harness.
+        Codex  Use the native Codex tool harness.
+        Claude Code  Use the Claude Code-style tool harness.
+        Claude Code Bare  Use the lean Claude Code-style harness.
+        Kimi CLI  Use the Kimi CLI-style tool harness.
+        Qwen Code  Use the Qwen Code-style tool harness.
+        DeepSeek TUI  Use the DeepSeek TUI-style tool harness.
+        mini-swe-agent  Use the mini-swe-agent-style tool harness.
+        opencode  Use the opencode-style tool harness.
+        SWE-agent  Use the SWE-agent-style tool harness.
+        Terminus 2  Use the Terminus 2-style terminal harness.
+        Minimal  Use a minimal shell-oriented tool harness.
+        "###
         );
     }
 

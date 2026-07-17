@@ -14,6 +14,8 @@ use crate::tools::handlers::ExecCommandHandler;
 use crate::tools::handlers::ExecCommandHandlerOptions;
 use crate::tools::handlers::GetContextRemainingHandler;
 use crate::tools::handlers::HarnessAliasHandler;
+use crate::tools::handlers::KimiCodeAliasHandler;
+use crate::tools::handlers::KimiCodeExtraHandler;
 use crate::tools::handlers::ListAvailablePluginsToInstallHandler;
 use crate::tools::handlers::ListMcpResourceTemplatesHandler;
 use crate::tools::handlers::ListMcpResourcesHandler;
@@ -621,7 +623,21 @@ fn add_harness_alias_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mu
     planned_tools.add(HarnessAliasHandler::GrepLower);
     planned_tools.add(HarnessAliasHandler::AskUserQuestion);
     if matches!(harness, Harness::KimiCode) {
+        planned_tools.add_dispatch_only(HarnessAliasHandler::Agent);
         planned_tools.add_dispatch_only(HarnessAliasHandler::ReadMediaFile);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::TaskList);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::TaskOutput);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::TaskStop);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeEnterPlanMode);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeExitPlanMode);
+        planned_tools.add_dispatch_only(HarnessAliasHandler::ZCodeSkill);
+        planned_tools.add_dispatch_only(KimiCodeAliasHandler::CreateGoal);
+        planned_tools.add_dispatch_only(KimiCodeAliasHandler::GetGoal);
+        planned_tools.add_dispatch_only(KimiCodeAliasHandler::SetGoalBudget);
+        planned_tools.add_dispatch_only(KimiCodeAliasHandler::TodoList);
+        planned_tools.add_dispatch_only(KimiCodeAliasHandler::UpdateGoal);
+        planned_tools.add_dispatch_only(KimiCodeExtraHandler::AgentSwarm);
+        planned_tools.add_dispatch_only(KimiCodeExtraHandler::FetchUrl);
     }
     if matches!(harness, Harness::DeepSeekTui) {
         planned_tools.add_dispatch_only(HarnessAliasHandler::DeepSeekApplyPatch);
