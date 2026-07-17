@@ -771,6 +771,27 @@ fn unstable_warning_event_only_mentions_enabled_under_development_features() {
 }
 
 #[test]
+fn unstable_warning_event_ignores_stable_default_mode_request_user_input() {
+    let mut configured_features = Table::new();
+    configured_features.insert(
+        "default_mode_request_user_input".to_string(),
+        TomlValue::Boolean(true),
+    );
+
+    let mut features = Features::with_defaults();
+    features.enable(Feature::DefaultModeRequestUserInput);
+
+    let warning = unstable_features_warning_event(
+        Some(&configured_features),
+        /*suppress_unstable_features_warning*/ false,
+        &features,
+        "/tmp/config.toml",
+    );
+
+    assert!(warning.is_none());
+}
+
+#[test]
 fn unstable_warning_event_mentions_enabled_structured_under_development_feature() {
     let configured_features: Table = toml::from_str(
         r#"
