@@ -53,6 +53,8 @@ mod harness;
 mod hook_runtime;
 mod image_preparation;
 mod installation_id;
+mod kimi_cron;
+mod kimi_cron_expression;
 pub(crate) mod landlock;
 pub use landlock::spawn_command_under_linux_sandbox;
 pub(crate) mod mcp;

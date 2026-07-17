@@ -15,6 +15,7 @@ use crate::environment_selection::ThreadEnvironments;
 use crate::exec_policy::ExecPolicyManager;
 use crate::guardian::GuardianRejection;
 use crate::guardian::GuardianRejectionCircuitBreaker;
+use crate::kimi_cron::KimiCronService;
 use crate::mcp::McpManager;
 use crate::session::McpRuntimeSnapshot;
 use crate::tools::code_mode::CodeModeService;
@@ -74,6 +75,7 @@ pub(crate) struct SessionServices {
     pub(crate) guardian_rejections: Mutex<HashMap<String, GuardianRejection>>,
     pub(crate) guardian_rejection_circuit_breaker: Mutex<GuardianRejectionCircuitBreaker>,
     pub(crate) runtime_handle: Handle,
+    pub(crate) kimi_cron: KimiCronService,
     pub(crate) skills_service: Arc<SkillsService>,
     pub(crate) agents_md_manager: Arc<AgentsMdManager>,
     pub(crate) plugins_manager: Arc<PluginsManager>,
