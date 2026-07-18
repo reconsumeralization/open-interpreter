@@ -124,23 +124,6 @@ fn deepseek_tui_cycle_handoff_user_prompt(cwd: Option<&Path>) -> String {
 }
 
 fn active_path_lines(cwd: &Path) -> String {
-    if cwd.join("module.py").exists()
-        && cwd.join("created_by_gauntlet.txt").exists()
-        && cwd.join("shell_proof.txt").exists()
-    {
-        return [
-            "- module.py (file)",
-            "- created_by_gauntlet.txt (file)",
-            "-  (dir)",
-            "- shell_proof.txt (file)",
-            "- 1/1 (file)",
-            "- SHELL_OK/n (file)",
-            "- a/module.py (file)",
-            "- b/module.py (file)",
-        ]
-        .join("\n");
-    }
-
     workspace_entries(cwd)
         .into_iter()
         .take(8)
@@ -502,7 +485,7 @@ fn find_upward(start: &Path, name: &str) -> Option<PathBuf> {
 }
 
 fn current_local_date() -> String {
-    if let Ok(fake_time) = std::env::var("HARNESS_LAB_FAKE_TIME") {
+    if let Ok(fake_time) = std::env::var("OPENINTERPRETER_TEST_TIME") {
         let date = fake_time.split_whitespace().next().unwrap_or_default();
         if date.len() == "YYYY-MM-DD".len()
             && date.chars().all(|ch| ch.is_ascii_digit() || ch == '-')
@@ -636,25 +619,14 @@ fn first_readme(cwd: &Path) -> Option<PathBuf> {
 
 fn active_paths(cwd: &Path, user_content: &str) -> Vec<String> {
     let mut entries = Vec::new();
-    for candidate in [
-        "module.py",
-        "SHELL_OK/n",
-        "created_by_gauntlet.txt",
-        "editing/patching",
-        "shell_proof.txt",
-    ] {
-        let mentioned = user_content.contains(candidate)
-            || (candidate == "SHELL_OK/n" && user_content.contains("SHELL_OK"));
-        if (mentioned || cwd.join(candidate).exists())
-            && !entries.iter().any(|entry| entry == candidate)
-        {
-            entries.push(candidate.to_string());
-        }
-    }
     for entry in workspace_entries(cwd)
         .into_iter()
         .filter(|entry| entry != "README.md")
     {
+        let mentioned = user_content.contains(&entry);
+        if mentioned && !entries.iter().any(|existing| existing == &entry) {
+            entries.push(entry.clone());
+        }
         if !entries.iter().any(|existing| existing == &entry) {
             entries.push(entry);
         }
@@ -716,7 +688,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn deepseek_tui_request_matches_captured_top_level_shape() {
+    fn deepseek_tui_request_uses_expected_top_level_shape() {
         let prompt = Prompt::default();
         let model_info = model_info();
         let (request, tool_kinds) = build_request(&prompt, &model_info).expect("request");
@@ -818,18 +790,15 @@ mod tests {
     }
 
     #[test]
-    fn deepseek_tui_compaction_request_matches_captured_structured_state() {
+    fn deepseek_tui_compaction_request_uses_structured_state() {
         let workspace = tempfile::tempdir().expect("workspace");
         fs::write(
             workspace.path().join("module.py"),
             "VALUE = \"NEEDLE_NEW\"\\n",
         )
         .expect("write module");
-        fs::write(
-            workspace.path().join("created_by_gauntlet.txt"),
-            "CREATE_OK\n",
-        )
-        .expect("write created file");
+        fs::write(workspace.path().join("generated_file.txt"), "CREATE_OK\n")
+            .expect("write created file");
         fs::write(workspace.path().join("shell_proof.txt"), "SHELL_OK\n")
             .expect("write shell proof");
 
@@ -859,7 +828,9 @@ mod tests {
             .as_str()
             .expect("user content");
         assert!(user.contains("Strategy metadata\n- [~] Initialize tracking and inspect workspace\n- [ ] Search, git, and diagnostics\n- [ ] Create, edit, verify, and finalize"));
-        assert!(user.contains("- a/module.py (file)\n- b/module.py (file)"));
+        assert!(user.contains("- generated_file.txt (file)"));
+        assert!(user.contains("- module.py (file)"));
+        assert!(user.contains("- shell_proof.txt (file)"));
         assert!(!user.contains("write/edit/patch (file)"));
     }
 

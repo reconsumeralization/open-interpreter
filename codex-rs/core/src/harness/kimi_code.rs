@@ -173,7 +173,7 @@ fn kimi_os_label() -> &'static str {
 }
 
 fn kimi_now() -> String {
-    if let Ok(fake_time) = std::env::var("HARNESS_LAB_FAKE_TIME") {
+    if let Ok(fake_time) = std::env::var("OPENINTERPRETER_TEST_TIME") {
         if let Some((date, time)) = fake_time.split_once(' ') {
             return format!("{date}T{time}.000Z");
         }
@@ -550,7 +550,7 @@ mod tests {
     }
 
     #[test]
-    fn kimi_code_request_preserves_captured_video_tool_content() {
+    fn kimi_code_request_preserves_video_tool_content() {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {

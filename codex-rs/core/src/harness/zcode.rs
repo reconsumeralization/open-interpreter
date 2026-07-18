@@ -1000,7 +1000,7 @@ fn current_date_reminder() -> String {
 }
 
 fn current_local_date() -> chrono::NaiveDate {
-    if let Ok(fake_time) = std::env::var("HARNESS_LAB_FAKE_TIME") {
+    if let Ok(fake_time) = std::env::var("OPENINTERPRETER_TEST_TIME") {
         let date = fake_time
             .split_once(' ')
             .map_or(fake_time.as_str(), |(date, _)| date);
@@ -1474,7 +1474,7 @@ mod tests {
     }
 
     #[test]
-    fn build_request_matches_captured_zcode_basics() {
+    fn build_request_uses_expected_zcode_basics() {
         let prompt = Prompt {
             input: vec![ResponseItem::Message {
                 id: Some(std::convert::identity("user".to_string())),
@@ -1689,7 +1689,7 @@ mod tests {
     }
 
     #[test]
-    fn build_compaction_request_matches_captured_zcode_shape() {
+    fn build_compaction_request_uses_expected_zcode_shape() {
         let prompt = Prompt {
             input: vec![
                 ResponseItem::Message {
