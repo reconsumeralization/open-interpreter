@@ -475,7 +475,7 @@ fn parse_leading_minor_version(suffix: &str) -> Option<u32> {
 }
 
 fn current_local_date() -> chrono::NaiveDate {
-    if let Ok(fake_time) = std::env::var("HARNESS_LAB_FAKE_TIME") {
+    if let Ok(fake_time) = std::env::var("OPENINTERPRETER_TEST_TIME") {
         let date = fake_time
             .split_once(' ')
             .map_or(fake_time.as_str(), |(date, _)| date);
@@ -2997,7 +2997,7 @@ mod tests {
     const QA_TESTING_SKILLS_INSTRUCTIONS: &str = "<skills_instructions>\n## Skills\nA skill is a set of local instructions to follow that is stored in a `SKILL.md` file.\n### Available skills\n- qa-testing: Run the project's QA test plan against a live build (file: /home/user/skills/.system/qa-testing/SKILL.md)\n### How to use skills\n- Discovery: ...\n</skills_instructions>";
 
     #[test]
-    fn session_skills_replace_reference_skills_in_reminder() {
+    fn session_skills_replace_default_skills_in_reminder() {
         let prompt = skills_prompt(QA_TESTING_SKILLS_INSTRUCTIONS);
 
         let request = build_request(
@@ -3020,7 +3020,7 @@ mod tests {
             text,
             "<system-reminder>\nThe following skills are available for use with the Skill tool:\n\n- qa-testing: Run the project's QA test plan against a live build\n</system-reminder>\n"
         );
-        // The captured reference-trace skills must not leak into the request.
+        // Skills that are not present in the session must not leak into the request.
         assert!(!request_json.contains("update-config"));
         assert!(!request_json.contains("claude-api"));
     }
@@ -3873,7 +3873,7 @@ mod tests {
     }
 
     #[test]
-    fn build_tools_matches_reference_claude_core_surface() {
+    fn build_tools_matches_expected_claude_core_surface() {
         let parameters: codex_tools::JsonSchema = serde_json::from_value(serde_json::json!({
             "type": "object",
             "properties": {},

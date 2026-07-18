@@ -52,7 +52,7 @@ fn one_shot_delivery_is_due_at_the_next_minute() {
 }
 
 #[tokio::test]
-async fn create_list_delete_and_resume_match_reference_shapes() {
+async fn create_list_delete_and_resume_use_stable_shapes() {
     let temp = tempfile::tempdir().expect("tempdir");
     let service = KimiCronService::new(
         temp.path().join("cron"),
@@ -70,7 +70,7 @@ async fn create_list_delete_and_resume_match_reference_shapes() {
     );
 
     let created = service
-        .create("*/5 * * * *", "KIMI_CODE_CRON_GAUNTLET".to_string(), false)
+        .create("*/5 * * * *", "KIMI_CODE_CRON_CHECK".to_string(), false)
         .await
         .expect("cron should be created");
     let id = created
@@ -86,7 +86,7 @@ async fn create_list_delete_and_resume_match_reference_shapes() {
     let listed = service.list().await;
     assert!(listed.contains("cron_jobs: 1"));
     assert!(listed.contains(&format!("id: {id}")));
-    assert!(listed.contains("prompt: \"KIMI_CODE_CRON_GAUNTLET\""));
+    assert!(listed.contains("prompt: \"KIMI_CODE_CRON_CHECK\""));
 
     let resumed = KimiCronService::new(
         temp.path().join("cron"),
