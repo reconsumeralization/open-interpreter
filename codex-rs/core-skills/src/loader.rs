@@ -31,7 +31,6 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_absolute_path::AbsolutePathBufGuard;
 use codex_utils_path_uri::PathUri;
 use codex_utils_plugins::PluginSkillRoot;
-use dirs::home_dir;
 use discovery::DirectorySymlinkPolicy;
 use discovery::DiscoveredSkill;
 use discovery::HiddenDirectoryPolicy;
@@ -250,27 +249,7 @@ pub(crate) async fn load_skill_root(root: SkillRoot) -> SkillRootSnapshot {
     }
 }
 
-pub(crate) async fn skill_roots(
-    fs: Option<Arc<dyn ExecutorFileSystem>>,
-    config_layer_stack: &ConfigLayerStack,
-    cwd: &AbsolutePathBuf,
-    plugin_skill_roots: Vec<PluginSkillRoot>,
-    extra_skill_roots: Vec<AbsolutePathBuf>,
-) -> Vec<SkillRoot> {
-    let home_dir =
-        home_dir().and_then(|path| AbsolutePathBuf::from_absolute_path_checked(path).ok());
-    skill_roots_with_home_dir(
-        fs,
-        config_layer_stack,
-        cwd,
-        home_dir.as_ref(),
-        plugin_skill_roots,
-        extra_skill_roots,
-    )
-    .await
-}
-
-async fn skill_roots_with_home_dir(
+pub(crate) async fn skill_roots_with_home_dir(
     fs: Option<Arc<dyn ExecutorFileSystem>>,
     config_layer_stack: &ConfigLayerStack,
     cwd: &AbsolutePathBuf,
@@ -329,18 +308,8 @@ fn skill_roots_from_layer_stack_inner(
                 }
             }
             ConfigLayerSource::User { .. } => {
-                // Deprecated user skills location (`$CODEX_HOME/skills`), kept for backward
-                // compatibility.
-                roots.push(SkillRoot {
-                    path: config_folder.join(SKILLS_DIR_NAME),
-                    scope: SkillScope::User,
-                    file_system: Arc::clone(&LOCAL_FS),
-                    plugin_id: None,
-                    plugin_namespace: None,
-                    plugin_root: None,
-                });
-
-                // `$HOME/.agents/skills` (user-installed skills).
+                // Prefer the shared Agent Skills location so compatible tools can use the same
+                // user-authored skills without copying or importing them.
                 if let Some(home_dir) = home_dir {
                     roots.push(SkillRoot {
                         path: home_dir.join(AGENTS_DIR_NAME).join(SKILLS_DIR_NAME),
@@ -351,6 +320,17 @@ fn skill_roots_from_layer_stack_inner(
                         plugin_root: None,
                     });
                 }
+
+                // Deprecated product-specific user skills location (`$CODEX_HOME/skills`), kept
+                // as a compatibility fallback.
+                roots.push(SkillRoot {
+                    path: config_folder.join(SKILLS_DIR_NAME),
+                    scope: SkillScope::User,
+                    file_system: Arc::clone(&LOCAL_FS),
+                    plugin_id: None,
+                    plugin_namespace: None,
+                    plugin_root: None,
+                });
 
                 // Embedded system skills are cached under `$CODEX_HOME/skills/.system` and are a
                 // special case (not a config layer).
