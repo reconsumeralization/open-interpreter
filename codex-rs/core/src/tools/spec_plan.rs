@@ -15,6 +15,7 @@ use crate::tools::handlers::ExecCommandHandlerOptions;
 use crate::tools::handlers::GetContextRemainingHandler;
 use crate::tools::handlers::HarnessAliasHandler;
 use crate::tools::handlers::KimiCodeAliasHandler;
+use crate::tools::handlers::KimiCodeCronHandler;
 use crate::tools::handlers::KimiCodeExtraHandler;
 use crate::tools::handlers::ListAvailablePluginsToInstallHandler;
 use crate::tools::handlers::ListMcpResourceTemplatesHandler;
@@ -636,6 +637,9 @@ fn add_harness_alias_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mu
         planned_tools.add_dispatch_only(KimiCodeAliasHandler::SetGoalBudget);
         planned_tools.add_dispatch_only(KimiCodeAliasHandler::TodoList);
         planned_tools.add_dispatch_only(KimiCodeAliasHandler::UpdateGoal);
+        planned_tools.add_dispatch_only(KimiCodeCronHandler::Create);
+        planned_tools.add_dispatch_only(KimiCodeCronHandler::Delete);
+        planned_tools.add_dispatch_only(KimiCodeCronHandler::List);
         planned_tools.add_dispatch_only(KimiCodeExtraHandler::AgentSwarm);
         planned_tools.add_dispatch_only(KimiCodeExtraHandler::FetchUrl);
     }

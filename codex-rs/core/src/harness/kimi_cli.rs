@@ -884,6 +884,13 @@ fn kimi_output_content_item(item: &FunctionCallOutputContentItem) -> Value {
                 "id": null,
             }
         }),
+        FunctionCallOutputContentItem::InputVideo { video_url, id } => json!({
+            "type": "video_url",
+            "video_url": {
+                "url": video_url,
+                "id": id,
+            }
+        }),
         FunctionCallOutputContentItem::EncryptedContent { .. } => json!({
             "type": "text",
             "text": "<system>Tool returned encrypted content.</system>",
@@ -1052,7 +1059,7 @@ pub(super) fn session_kimi_skills(items: &[ResponseItem]) -> Vec<KimiSkill> {
 }
 
 /// Renders the `${KIMI_SKILLS}` system-prompt section from on-disk discovery
-/// (the captured Kimi CLI behavior) plus the session's actual skills. Disk
+/// (the Kimi CLI behavior) plus the session's actual skills. Disk
 /// re-discovery alone misses session skill roots such as
 /// `<home>/skills/.system`, and the workspace harness instruction-role rule
 /// forbids dropping skills assembled above the harness layer, so session
@@ -1308,7 +1315,7 @@ fn render_conditional_block(
 }
 
 fn current_kimi_now() -> String {
-    if let Ok(fake_time) = std::env::var("HARNESS_LAB_FAKE_TIME") {
+    if let Ok(fake_time) = std::env::var("OPENINTERPRETER_TEST_TIME") {
         if let Some((date, time)) = fake_time.split_once(' ') {
             return format!("{date}T{time}.000000+00:00");
         }

@@ -5498,6 +5498,15 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
         guardian_rejections: Mutex::new(std::collections::HashMap::new()),
         guardian_rejection_circuit_breaker: Mutex::new(Default::default()),
         runtime_handle: tokio::runtime::Handle::current(),
+        kimi_cron: crate::kimi_cron::KimiCronService::new(
+            config
+                .codex_home
+                .join("cron")
+                .join(thread_id.to_string())
+                .to_path_buf(),
+            Arc::new(crate::current_time::SystemTimeProvider),
+            thread_id,
+        ),
         skills_service,
         agents_md_manager: Arc::new(AgentsMdManager::new(/*user_instructions*/ None)),
         plugins_manager,
@@ -7634,6 +7643,15 @@ where
         guardian_rejections: Mutex::new(std::collections::HashMap::new()),
         guardian_rejection_circuit_breaker: Mutex::new(Default::default()),
         runtime_handle: tokio::runtime::Handle::current(),
+        kimi_cron: crate::kimi_cron::KimiCronService::new(
+            config
+                .codex_home
+                .join("cron")
+                .join(thread_id.to_string())
+                .to_path_buf(),
+            Arc::new(crate::current_time::SystemTimeProvider),
+            thread_id,
+        ),
         skills_service,
         agents_md_manager: Arc::new(AgentsMdManager::new(/*user_instructions*/ None)),
         plugins_manager,

@@ -340,14 +340,10 @@ impl AppServerSession {
                 false,
             ),
             Some(Account::Chatgpt { email, plan_type }) => {
-                let feedback_audience = if email
-                    .as_deref()
-                    .is_some_and(|email| email.ends_with("@openai.com"))
-                {
-                    FeedbackAudience::OpenAiEmployee
-                } else {
-                    FeedbackAudience::External
-                };
+                let feedback_audience = feedback_audience_for_product(
+                    codex_product_info::Product::current(),
+                    email.as_deref(),
+                );
                 (
                     email.clone(),
                     Some(TelemetryAuthMode::Chatgpt),
@@ -1186,6 +1182,19 @@ impl AppServerSession {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
         RequestId::Integer(request_id)
+    }
+}
+
+fn feedback_audience_for_product(
+    product: codex_product_info::Product,
+    email: Option<&str>,
+) -> FeedbackAudience {
+    if product == codex_product_info::Product::Codex
+        && email.is_some_and(|email| email.ends_with("@openai.com"))
+    {
+        FeedbackAudience::OpenAiEmployee
+    } else {
+        FeedbackAudience::External
     }
 }
 
@@ -2731,5 +2740,23 @@ mod tests {
                 plan: Some(ref plan),
             }) if plan == "Business"
         ));
+    }
+
+    #[test]
+    fn open_interpreter_feedback_never_uses_openai_internal_routing() {
+        assert_eq!(
+            feedback_audience_for_product(
+                codex_product_info::Product::OpenInterpreter,
+                Some("person@openai.com")
+            ),
+            FeedbackAudience::External
+        );
+        assert_eq!(
+            feedback_audience_for_product(
+                codex_product_info::Product::Codex,
+                Some("person@openai.com")
+            ),
+            FeedbackAudience::OpenAiEmployee
+        );
     }
 }

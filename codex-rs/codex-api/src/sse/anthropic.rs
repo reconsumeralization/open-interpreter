@@ -803,10 +803,10 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"aude-cor"}         }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"e-ga"}        }
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"e-sc"}        }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"untlet"}   }
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"enario"}   }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"-run-v"}   }
@@ -818,16 +818,16 @@ event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"tool"}             }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"-gauntlet/"}         }
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"-scenario/"}         }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"workspace/"}         }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"gaunt"}     }
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"scen"}     }
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"let.txt\""}        }
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"ario.txt\""}        }
 
 event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":", \"old_stri"}    }
@@ -897,7 +897,7 @@ data: {"type":"message_stop"   }
                 assert_eq!(
                     serde_json::from_str::<serde_json::Value>(arguments).expect("arguments json"),
                     serde_json::json!({
-                        "file_path": "/tmp/claude-core-gauntlet-run-v6/tui-core-tool-gauntlet/workspace/gauntlet.txt",
+                        "file_path": "/tmp/claude-core-scenario-run-v6/tui-core-tool-scenario/workspace/scenario.txt",
                         "new_string": "TOKEN_NEW",
                         "old_string": "TOKEN_OLD",
                         "replace_all": true,

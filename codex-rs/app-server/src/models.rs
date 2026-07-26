@@ -10,7 +10,6 @@ use codex_core::config::Config;
 use codex_http_client::HttpClientFactory;
 use codex_login::AuthManager;
 use codex_models_manager::manager::RefreshStrategy;
-use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelPreset;
 use codex_protocol::openai_models::ReasoningEffortPreset;
 
@@ -37,13 +36,6 @@ pub async fn supported_models_for_provider(
     let Some(provider) = config.model_providers.get(provider_id).cloned() else {
         return Vec::new();
     };
-    if let Some(cached_models) = provider_specific_cached_models(config, provider_id) {
-        return models_from_presets(
-            cached_models.into_iter().map(ModelPreset::from).collect(),
-            include_hidden,
-        );
-    }
-
     let mut provider_config = config.clone();
     provider_config.model_provider_id = provider_id.to_string();
     provider_config.model_provider = provider;
@@ -55,18 +47,6 @@ pub async fn supported_models_for_provider(
             .await,
         include_hidden,
     )
-}
-
-fn provider_specific_cached_models(config: &Config, provider_id: &str) -> Option<Vec<ModelInfo>> {
-    let cache_path = config
-        .codex_home
-        .join("models-cache")
-        .join(provider_id)
-        .join("models_cache.json");
-    let bytes = std::fs::read(cache_path).ok()?;
-    let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    let models = value.get("models")?.clone();
-    serde_json::from_value(models).ok()
 }
 
 fn models_from_presets(presets: Vec<ModelPreset>, include_hidden: bool) -> Vec<Model> {

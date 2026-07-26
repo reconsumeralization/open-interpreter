@@ -4932,7 +4932,7 @@ mod tests {
     }
 
     #[test]
-    fn zcode_read_session_context_prompt_matches_captured_shape() {
+    fn zcode_read_session_context_prompt_has_expected_shape() {
         let history = vec![
             ResponseItem::Message {
                 id: None,
@@ -5009,7 +5009,7 @@ mod tests {
     }
 
     #[test]
-    fn zcode_tool_input_text_preserves_captured_key_order() {
+    fn zcode_tool_input_text_preserves_key_order() {
         assert_eq!(
             zcode_tool_input_text("Write", r#"{"content":"body","file_path":"a.txt"}"#),
             r#"{"file_path":"a.txt","content":"body"}"#
@@ -5189,7 +5189,7 @@ mod tests {
     }
 
     #[test]
-    fn deepseek_tool_search_result_matches_captured_order() {
+    fn deepseek_tool_search_result_uses_expected_order() {
         assert_eq!(
             deepseek_tool_search_result(),
             r#"{"type":"tool_search_tool_search_result","tool_references":[{"type":"tool_reference","tool_name":"apply_patch"},{"type":"tool_reference","tool_name":"edit_file"},{"type":"tool_reference","tool_name":"agent_open"},{"type":"tool_reference","tool_name":"handle_read"},{"type":"tool_reference","tool_name":"tool_agent"}]}"#
