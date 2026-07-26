@@ -24,10 +24,11 @@ use crate::config_rules::skill_config_rules_from_stack;
 use crate::loader::MAX_CONCURRENT_ROOT_SCANS;
 use crate::loader::SkillRoot;
 use crate::loader::load_skills_from_roots;
-use crate::loader::skill_roots;
+use crate::loader::skill_roots_with_home_dir;
 use crate::system::install_system_skills;
 use crate::system::uninstall_system_skills;
 use codex_config::SkillsConfig;
+use dirs::home_dir;
 
 #[derive(Debug, Clone)]
 pub struct SkillsLoadInput {
@@ -69,6 +70,7 @@ impl SkillsLoadInput {
 /// Source-specific model exposure remains the responsibility of the skills extension.
 pub struct SkillsService {
     codex_home: AbsolutePathBuf,
+    user_home: Option<AbsolutePathBuf>,
     restriction_product: Option<Product>,
     extra_roots: RwLock<Vec<AbsolutePathBuf>>,
     cache_by_cwd: RwLock<HashMap<AbsolutePathBuf, HostSkillsSnapshot>>,
@@ -87,8 +89,42 @@ impl SkillsService {
         bundled_skills_enabled: bool,
         restriction_product: Option<Product>,
     ) -> Self {
+        let user_home =
+            home_dir().and_then(|path| AbsolutePathBuf::from_absolute_path_checked(path).ok());
+        Self::new_inner(
+            codex_home,
+            bundled_skills_enabled,
+            restriction_product,
+            user_home,
+        )
+    }
+
+    /// Creates a skills service whose user-installed skills are resolved from an explicit home.
+    ///
+    /// This is useful for isolated runtimes and tests that must not inspect the host process home.
+    pub fn new_with_restriction_product_and_user_home(
+        codex_home: AbsolutePathBuf,
+        bundled_skills_enabled: bool,
+        restriction_product: Option<Product>,
+        user_home: AbsolutePathBuf,
+    ) -> Self {
+        Self::new_inner(
+            codex_home,
+            bundled_skills_enabled,
+            restriction_product,
+            Some(user_home),
+        )
+    }
+
+    fn new_inner(
+        codex_home: AbsolutePathBuf,
+        bundled_skills_enabled: bool,
+        restriction_product: Option<Product>,
+        user_home: Option<AbsolutePathBuf>,
+    ) -> Self {
         let service = Self {
             codex_home,
+            user_home,
             restriction_product,
             extra_roots: RwLock::new(Vec::new()),
             cache_by_cwd: RwLock::new(HashMap::new()),
@@ -157,10 +193,11 @@ impl SkillsService {
         input: &SkillsLoadInput,
         fs: Option<Arc<dyn ExecutorFileSystem>>,
     ) -> Vec<SkillRoot> {
-        let mut roots = skill_roots(
+        let mut roots = skill_roots_with_home_dir(
             fs,
             &input.config_layer_stack,
             &input.cwd,
+            self.user_home.as_ref(),
             input.effective_skill_roots.clone(),
             self.extra_roots(),
         )
@@ -185,10 +222,11 @@ impl SkillsService {
             return snapshot;
         }
 
-        let mut roots = skill_roots(
+        let mut roots = skill_roots_with_home_dir(
             fs.clone(),
             &input.config_layer_stack,
             &input.cwd,
+            self.user_home.as_ref(),
             input.effective_skill_roots.clone(),
             self.extra_roots(),
         )

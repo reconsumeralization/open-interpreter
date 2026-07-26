@@ -360,11 +360,11 @@ async fn skill_roots_from_layer_stack_maps_user_to_user_and_system_cache_and_sys
     assert_eq!(
         got,
         vec![
-            (SkillScope::User, user_folder.join("skills")),
             (
                 SkillScope::User,
                 home_folder.join(AGENTS_DIR_NAME).join(SKILLS_DIR_NAME)
             ),
+            (SkillScope::User, user_folder.join("skills")),
             (
                 SkillScope::System,
                 user_folder.join("skills").join(".system")
@@ -430,11 +430,11 @@ async fn skill_roots_from_layer_stack_includes_disabled_project_layers() -> anyh
         got,
         vec![
             (SkillScope::Repo, dot_codex.join("skills")),
-            (SkillScope::User, user_folder.join("skills")),
             (
                 SkillScope::User,
                 home_folder.join(AGENTS_DIR_NAME).join(SKILLS_DIR_NAME)
             ),
+            (SkillScope::User, user_folder.join("skills")),
             (
                 SkillScope::System,
                 user_folder.join("skills").join(".system")
@@ -2816,11 +2816,13 @@ async fn loads_skills_from_system_cache_when_present() {
 async fn skill_roots_include_admin_with_lowest_priority() {
     let codex_home = tempfile::tempdir().expect("tempdir");
     let cfg = make_config(&codex_home).await;
+    let user_home = codex_home.path().abs();
 
-    let scopes: Vec<SkillScope> = super::skill_roots(
+    let scopes: Vec<SkillScope> = super::skill_roots_with_home_dir(
         Some(Arc::clone(&LOCAL_FS)),
         &cfg.config_layer_stack,
         &cfg.cwd,
+        Some(&user_home),
         Vec::new(),
         Vec::new(),
     )
@@ -2828,10 +2830,11 @@ async fn skill_roots_include_admin_with_lowest_priority() {
     .into_iter()
     .map(|root| root.scope)
     .collect();
-    let mut expected = vec![SkillScope::User, SkillScope::System];
-    if home_dir().is_some() {
-        expected.insert(1, SkillScope::User);
-    }
-    expected.push(SkillScope::Admin);
+    let expected = vec![
+        SkillScope::User,
+        SkillScope::User,
+        SkillScope::System,
+        SkillScope::Admin,
+    ];
     assert_eq!(scopes, expected);
 }
