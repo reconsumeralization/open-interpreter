@@ -14,6 +14,7 @@ app-server-backed terminal UI.
 | `--image, -i <path[,path...]>` | Attach image files to the initial prompt. |
 | `--model, -m <model>` | Override the configured model. |
 | `--oss` | Use the configured local open source provider. |
+| `--local-provider <provider>` | Use `ollama` or `lmstudio` with `--oss`. |
 | `--profile, -p <name>` | Load a config profile. |
 | `--sandbox, -s <mode>` | Select `read-only`, `workspace-write`, or `danger-full-access`. |
 | `--ask-for-approval, -a <policy>` | Select `untrusted`, `on-request`, or `never`. |
