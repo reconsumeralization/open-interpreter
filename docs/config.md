@@ -130,6 +130,25 @@ wire_api = "responses"
 Provider credentials should usually come from environment variables or the
 credential store rather than inline tokens.
 
+### app.nz
+
+[app.nz](https://app.nz/) is a hosted OpenAI-compatible gateway. Add it as a
+custom chat-completions provider and point `model` at its `app/auto`
+auto-router:
+
+```toml
+model_provider = "appnz"
+model = "app/auto"
+
+[model_providers.appnz]
+name = "app.nz"
+base_url = "https://app.nz/v1"
+env_key = "APPNZ_API_KEY"
+wire_api = "chat"
+```
+
+Set `APPNZ_API_KEY` to your app.nz API key.
+
 ## Harness
 
 Open Interpreter adds a `harness` setting for compatibility modes that shape
