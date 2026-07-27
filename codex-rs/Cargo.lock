@@ -4474,6 +4474,7 @@ name = "codex-utils-cli"
 version = "0.145.0"
 dependencies = [
  "clap",
+ "codex-product-info",
  "codex-protocol",
  "codex-shell-command",
  "pretty_assertions",

@@ -1,4 +1,5 @@
 use codex_features::FEATURES;
+use codex_product_info::Product;
 use codex_protocol::account::PlanType;
 use lazy_static::lazy_static;
 use rand::Rng;
@@ -84,7 +85,12 @@ pub(crate) fn get_tooltip(plan: Option<PlanType>, fast_mode_enabled: bool) -> Op
         }
     }
 
-    pick_tooltip(&mut rng).map(str::to_string)
+    pick_tooltip(&mut rng).map(|tooltip| tooltip_for_product(tooltip, Product::current()))
+}
+
+fn tooltip_for_product(tooltip: &str, product: Product) -> String {
+    let resume_command = format!("`{} resume`", product.command_name());
+    tooltip.replace("`codex resume`", &resume_command)
 }
 
 fn paid_app_tooltip() -> Option<&'static str> {
@@ -344,6 +350,20 @@ mod tests {
 
         let mut rng = StdRng::seed_from_u64(7);
         assert_eq!(expected, pick_tooltip(&mut rng));
+    }
+
+    #[test]
+    fn resume_tooltip_uses_the_product_command() {
+        let tooltip = "You can resume a previous conversation by running `codex resume`";
+
+        assert_eq!(
+            tooltip_for_product(tooltip, Product::Codex),
+            "You can resume a previous conversation by running `codex resume`"
+        );
+        assert_eq!(
+            tooltip_for_product(tooltip, Product::OpenInterpreter),
+            "You can resume a previous conversation by running `interpreter resume`"
+        );
     }
 
     #[test]

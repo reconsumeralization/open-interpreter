@@ -1701,9 +1701,12 @@ fn profile_v2_for_subcommand<'a>(
         | Subcommand::Debug(DebugCommand {
             subcommand: DebugSubcommand::PromptInput(_),
         }) => Ok(Some(profile_v2)),
-        _ => anyhow::bail!(
-            "--profile only applies to runtime commands and `codex mcp`: `codex`, `codex exec`, `codex review`, `codex resume`, `codex archive`, `codex delete`, `codex unarchive`, `codex fork`, `codex mcp`, `codex sandbox`, and `codex debug prompt-input`."
-        ),
+        _ => {
+            let command = product_command_name();
+            anyhow::bail!(
+                "--profile only applies to runtime commands and `{command} mcp`: `{command}`, `{command} exec`, `{command} review`, `{command} resume`, `{command} archive`, `{command} delete`, `{command} unarchive`, `{command} fork`, `{command} mcp`, `{command} sandbox`, and `{command} debug prompt-input`."
+            )
+        }
     }
 }
 
