@@ -2685,6 +2685,7 @@ dependencies = [
  "codex-git-utils",
  "codex-model-provider-info",
  "codex-network-proxy",
+ "codex-product-info",
  "codex-protocol",
  "codex-utils-absolute-path",
  "codex-utils-path",
