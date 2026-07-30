@@ -43,6 +43,7 @@ use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::sync::Arc;
 
 pub(crate) const CLAUDE_CODE_BETA_HEADER: &str = "claude-code-20250219,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,advisor-tool-2026-03-01,effort-2025-11-24";
 pub(crate) const CLAUDE_CODE_BARE_BETA_HEADER: &str = "claude-code-20250219,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24";
@@ -266,6 +267,8 @@ pub(crate) fn build_claude_code_responses_shaped_request(
         tools,
     } = claude_code_system_and_tools(prompt, model_info, profile, is_child_agent_request)?;
     let tools = claude_code_tools_as_responses_json(&tools);
+    let tools =
+        codex_api::ResponsesApiTools::from(Arc::from(serde_json::value::to_raw_value(&tools)?));
     Ok(codex_api::ResponsesApiRequest {
         model: model_info.slug.clone(),
         instructions: system_prompt,
@@ -4653,10 +4656,10 @@ mod tests {
         assert_eq!(request.input.len(), 1);
 
         // Tools are flat Responses-style function tools, limited to the bare set.
-        let tool_names: Vec<&str> = request
-            .tools
-            .as_ref()
-            .expect("tools")
+        let tools: Vec<serde_json::Value> =
+            serde_json::from_str(request.tools.as_ref().expect("tools").as_raw_value().get())
+                .expect("tools should be valid JSON");
+        let tool_names: Vec<&str> = tools
             .iter()
             .map(|tool| {
                 assert_eq!(tool["type"], "function");
@@ -4703,7 +4706,9 @@ mod tests {
         // The full profile renders the rich Claude Code agent system prompt.
         assert!(request.instructions.contains("Claude Code"));
         // Tools are flat Responses-style function tools and include Bash.
-        let tools = request.tools.as_ref().expect("tools");
+        let tools: Vec<serde_json::Value> =
+            serde_json::from_str(request.tools.as_ref().expect("tools").as_raw_value().get())
+                .expect("tools should be valid JSON");
         assert!(tools.iter().all(|tool| tool["type"] == "function"));
         assert!(tools.iter().any(|tool| tool["name"] == "Bash"));
     }

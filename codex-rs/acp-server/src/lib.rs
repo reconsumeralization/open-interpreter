@@ -248,8 +248,12 @@ impl AppServerAcpAgent {
             arg0_paths.codex_linux_sandbox_exe.clone(),
         )?;
         let environment_manager = Arc::new(
-            EnvironmentManager::from_codex_home(config.codex_home.clone(), Some(runtime_paths))
-                .await?,
+            EnvironmentManager::from_codex_home(
+                config.codex_home.clone(),
+                Some(runtime_paths),
+                config.http_client_factory(),
+            )
+            .await?,
         );
         let state_db = codex_core::init_state_db(&config).await;
         let mut client = InProcessAppServerClient::start(InProcessClientStartArgs {
@@ -608,6 +612,7 @@ impl AppServerAcpAgent {
                         search_term: None,
                         parent_thread_id: None,
                         ancestor_thread_id: None,
+                        is_pinned: None,
                     },
                 })
                 .await

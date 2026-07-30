@@ -833,7 +833,7 @@ mod tests {
                 phase: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: Some(Vec::new()),
+            tools: Some(crate::request::responses_api_tools(Vec::new())),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,

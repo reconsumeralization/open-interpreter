@@ -193,6 +193,8 @@ impl SlashCommand {
             self,
             SlashCommand::Review
                 | SlashCommand::Rename
+                | SlashCommand::New
+                | SlashCommand::Clear
                 | SlashCommand::Plan
                 | SlashCommand::Goal
                 | SlashCommand::Ide

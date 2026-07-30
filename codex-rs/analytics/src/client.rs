@@ -50,9 +50,12 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
 const ANALYTICS_EVENTS_QUEUE_SIZE: usize = 256;
 const ANALYTICS_EVENTS_TIMEOUT: Duration = Duration::from_secs(10);
+// Covers two sequential POSTs plus queue/barrier scheduling; additional queued sends remain best-effort.
+const ANALYTICS_EVENTS_FLUSH_TIMEOUT: Duration = Duration::from_secs(25);
 const ANALYTICS_EVENT_DEDUPE_MAX_KEYS: usize = 4096;
 // Open Interpreter analytics endpoint. This replaces upstream Codex's
 // `{chatgpt_base_url}/codex/analytics-events/events` so events from any
@@ -61,9 +64,14 @@ const ANALYTICS_EVENT_DEDUPE_MAX_KEYS: usize = 4096;
 const INTERPRETER_ANALYTICS_URL: &str = "https://oi-new-api.fly.dev/v0/interpreter-events";
 const LOCAL_ANALYTICS_EVENTS_PATH: &str = "/codex/analytics-events/events";
 
+pub(crate) enum AnalyticsEventsQueueMessage {
+    Fact(Box<AnalyticsFact>),
+    Flush(oneshot::Sender<()>),
+}
+
 #[derive(Clone)]
 pub(crate) struct AnalyticsEventsQueue {
-    pub(crate) sender: mpsc::Sender<AnalyticsFact>,
+    pub(crate) sender: mpsc::Sender<AnalyticsEventsQueueMessage>,
     pub(crate) app_used_emitted_keys: Arc<Mutex<HashSet<(String, String)>>>,
     pub(crate) plugin_used_emitted_keys: Arc<Mutex<HashSet<(String, String)>>>,
 }
@@ -133,6 +141,13 @@ impl AnalyticsEventsQueue {
         tokio::spawn(async move {
             let mut reducer = AnalyticsReducer::default();
             while let Some(input) = receiver.recv().await {
+                let input = match input {
+                    AnalyticsEventsQueueMessage::Fact(input) => *input,
+                    AnalyticsEventsQueueMessage::Flush(done_tx) => {
+                        let _ = done_tx.send(());
+                        continue;
+                    }
+                };
                 let mut events = Vec::new();
                 reducer.ingest(input, &mut events).await;
                 send_track_events(&auth_manager, &destination, events).await;
@@ -146,7 +161,11 @@ impl AnalyticsEventsQueue {
     }
 
     fn try_send(&self, input: AnalyticsFact) {
-        if self.sender.try_send(input).is_err() {
+        if self
+            .sender
+            .try_send(AnalyticsEventsQueueMessage::Fact(Box::new(input)))
+            .is_err()
+        {
             //TODO: add a metric for this
             tracing::warn!("dropping analytics events: queue is full");
         }
@@ -209,6 +228,29 @@ impl AnalyticsEventsClient {
 
     pub fn disabled() -> Self {
         Self { queue: None }
+    }
+
+    pub async fn flush(&self) {
+        let Some(queue) = self.queue.as_ref() else {
+            return;
+        };
+        let (done_tx, done_rx) = oneshot::channel();
+        let flushed = tokio::time::timeout(ANALYTICS_EVENTS_FLUSH_TIMEOUT, async {
+            if queue
+                .sender
+                .send(AnalyticsEventsQueueMessage::Flush(done_tx))
+                .await
+                .is_err()
+            {
+                return false;
+            }
+            done_rx.await.is_ok()
+        })
+        .await;
+
+        if !matches!(flushed, Ok(true)) {
+            tracing::warn!("timed out or failed while flushing analytics events");
+        }
     }
 
     pub fn track_skill_invocations(
