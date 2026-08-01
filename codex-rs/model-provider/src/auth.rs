@@ -531,7 +531,7 @@ mod tests {
             region: "us-east-1".to_string(),
         });
 
-        match resolve_provider_auth(Some(&auth), &provider) {
+        match resolve_provider_auth(Some(&auth), &provider, /*codex_home*/ None).await {
             Err(err) => match err.details() {
                 CodexErrorDetails::UnsupportedOperation(message) => {
                     assert_eq!(message, BEDROCK_API_KEY_UNSUPPORTED_MESSAGE);
