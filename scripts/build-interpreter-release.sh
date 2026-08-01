@@ -3,7 +3,14 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: scripts/build-interpreter-release.sh [--target <rust-target>] [--install-dir <dir>] [--home <dir>]
+Usage: scripts/build-interpreter-release.sh [options]
+
+Options:
+  --target <target>        Rust target triple (defaults to host platform)
+  --install-dir <dir>      Visible bin directory for shims
+  --home <dir>             Open Interpreter home directory
+  -j, --jobs <N>           Number of parallel Cargo build jobs (default: 1)
+  -h, --help               Show this help message
 
 Builds a local Open Interpreter standalone package using the same package
 layout as the public installer, stages it under INTERPRETER_HOME, and
@@ -20,16 +27,36 @@ build_jobs="${CARGO_BUILD_JOBS:-1}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --target=*)
+      target="${1#*=}"
+      shift
+      ;;
     --target)
       target="${2:?--target requires a value}"
       shift 2
+      ;;
+    --install-dir=*)
+      install_dir="${1#*=}"
+      shift
       ;;
     --install-dir)
       install_dir="${2:?--install-dir requires a value}"
       shift 2
       ;;
+    --home=*)
+      interpreter_home="${1#*=}"
+      shift
+      ;;
     --home)
       interpreter_home="${2:?--home requires a value}"
+      shift 2
+      ;;
+    --jobs=*|-j=*)
+      build_jobs="${1#*=}"
+      shift
+      ;;
+    --jobs|-j)
+      build_jobs="${2:?--jobs requires a value}"
       shift 2
       ;;
     -h|--help)
@@ -44,13 +71,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ ! "$build_jobs" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Cargo build jobs must be a positive integer: $build_jobs" >&2
+  exit 1
+fi
+
+# Resolve paths to absolute locations so relative CLI arguments work safely.
+mkdir -p "$install_dir" "$interpreter_home"
+install_dir="$(cd "$install_dir" && pwd -P)"
+interpreter_home="$(cd "$interpreter_home" && pwd -P)"
+
 package_root="$interpreter_home/packages/standalone"
 releases_dir="$package_root/releases"
 current_link="$package_root/current"
-target_args=()
 target_label="host"
 if [[ -n "$target" ]]; then
-  target_args=(--target "$target")
   target_label="$target"
 fi
 
@@ -59,7 +94,7 @@ staging_dir="$releases_dir/.staging.local-$target_label.$$"
 cleanup_staging=true
 
 cleanup() {
-  if [[ "$cleanup_staging" == "true" ]]; then
+  if [[ "${cleanup_staging:-false}" == "true" && -n "${staging_dir:-}" ]]; then
     rm -rf "$staging_dir"
   fi
 }
@@ -75,6 +110,7 @@ replace_symlink() {
     exit 1
   fi
 
+  mkdir -p "$(dirname -- "$link_path")"
   rm -f "$tmp_link"
   ln -s "$target_path" "$tmp_link"
   rm -f "$link_path"
@@ -122,4 +158,10 @@ echo "Installed shims:"
 echo "  $install_dir/interpreter -> $current_link/bin/interpreter"
 echo "  $install_dir/i -> $current_link/bin/interpreter"
 echo
-"$install_dir/interpreter" --version
+
+if [[ -x "$install_dir/interpreter" ]]; then
+  "$install_dir/interpreter" --version
+else
+  echo "Error: Installed binary at $install_dir/interpreter is not executable" >&2
+  exit 1
+fi
