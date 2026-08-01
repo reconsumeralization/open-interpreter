@@ -104,8 +104,8 @@ fn test_model_client_with_thread_id(
         /*enable_request_compression*/ false,
         /*include_timing_metrics*/ false,
         /*beta_features_header*/ None,
-        /*harness*/ codex_tools::Harness::Native,
-        /*harness_guidance*/ false,
+        codex_tools::Harness::Native,
+        /*harness_guidance*/ true,
         /*item_ids_enabled*/ false,
         /*concurrent_reasoning_summaries_enabled*/ false,
         /*attestation_provider*/ None,
@@ -152,8 +152,8 @@ async fn compact_uses_bearer_after_agent_identity_session_fallback() -> anyhow::
         /*enable_request_compression*/ false,
         /*include_timing_metrics*/ false,
         /*beta_features_header*/ None,
-        /*harness*/ codex_tools::Harness::Native,
-        /*harness_guidance*/ false,
+        codex_tools::Harness::Native,
+        /*harness_guidance*/ true,
         /*item_ids_enabled*/ false,
         /*concurrent_reasoning_summaries_enabled*/ false,
         /*attestation_provider*/ None,
@@ -334,7 +334,7 @@ async fn chatgpt_auth_manager(
         /*forced_chatgpt_workspace_id*/ None,
         /*chatgpt_base_url*/ None,
         AuthKeyringBackendKind::default(),
-        /*auth_route_config*/ None,
+        codex_login::test_support::transport_default_auth_route_config(),
     )
     .await;
     let auth = auth_manager.auth().await.expect("auth should load");
@@ -829,8 +829,8 @@ fn model_client_with_counting_attestation(
         /*enable_request_compression*/ false,
         /*include_timing_metrics*/ false,
         /*beta_features_header*/ None,
-        /*harness*/ codex_tools::Harness::Native,
-        /*harness_guidance*/ false,
+        codex_tools::Harness::Native,
+        /*harness_guidance*/ true,
         /*item_ids_enabled*/ false,
         /*concurrent_reasoning_summaries_enabled*/ false,
         Some(Arc::new(CountingAttestationProvider {

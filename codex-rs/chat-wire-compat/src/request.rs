@@ -37,6 +37,13 @@ pub enum ToolOutputKind {
 pub type ToolKinds = HashMap<String, ToolOutputKind>;
 type OriginalFunctionNames = HashMap<(Option<String>, String), String>;
 
+#[cfg(test)]
+pub(crate) fn responses_api_tools(tools: Vec<Value>) -> codex_api::ResponsesApiTools {
+    let raw_tools =
+        serde_json::value::to_raw_value(&tools).expect("tool definitions should serialize");
+    codex_api::ResponsesApiTools::from(std::sync::Arc::from(raw_tools))
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct ChatCompletionRequest {
     pub(crate) model: String,
@@ -104,8 +111,16 @@ pub(crate) struct ChatFunctionCall {
 pub(crate) fn convert_request(
     request: &ResponsesApiRequest,
 ) -> Result<(ChatCompletionRequest, ToolKinds), ApiError> {
-    let (tools, tool_kinds, original_function_names) =
-        convert_tools(request.tools.as_deref().unwrap_or_default())?;
+    let response_tools: Vec<Value> = request
+        .tools
+        .as_ref()
+        .map(|tools| serde_json::from_str(tools.as_raw_value().get()))
+        .transpose()
+        .map_err(|err| ApiError::InvalidRequest {
+            message: format!("failed to parse serialized tool definitions: {err}"),
+        })?
+        .unwrap_or_default();
+    let (tools, tool_kinds, original_function_names) = convert_tools(&response_tools)?;
     let mut messages = Vec::new();
     if !request.instructions.trim().is_empty() {
         messages.push(ChatMessage {
@@ -895,12 +910,12 @@ mod tests {
                 phase: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: Some(vec![json!({
+            tools: Some(responses_api_tools(vec![json!({
                 "type": "function",
                 "name": "shell_command",
                 "description": "Run a shell command",
                 "parameters": { "type": "object" }
-            })]),
+            })])),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -941,7 +956,7 @@ mod tests {
                 phase: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: Some(Vec::new()),
+            tools: Some(responses_api_tools(Vec::new())),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1001,12 +1016,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: Some(vec![json!({
+            tools: Some(responses_api_tools(vec![json!({
                 "type": "function",
                 "name": "shell",
                 "description": "Run a command",
                 "parameters": { "type": "object" }
-            })]),
+            })])),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1047,7 +1062,7 @@ mod tests {
                 call_id: "call-lookup".to_string(),
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: Some(vec![json!({
+            tools: Some(responses_api_tools(vec![json!({
                 "type": "namespace",
                 "name": "mcp__demo__",
                 "description": "Demo tools",
@@ -1066,7 +1081,7 @@ mod tests {
                         }
                     }
                 ]
-            })]),
+            })])),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1202,12 +1217,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: Some(vec![json!({
+            tools: Some(responses_api_tools(vec![json!({
                 "type": "function",
                 "name": "Read",
                 "description": "Read a file",
                 "parameters": { "type": "object" }
-            })]),
+            })])),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1302,12 +1317,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: Some(vec![json!({
+            tools: Some(responses_api_tools(vec![json!({
                 "type": "function",
                 "name": "Read",
                 "description": "Read a file",
                 "parameters": { "type": "object" }
-            })]),
+            })])),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1397,12 +1412,12 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: Some(vec![json!({
+            tools: Some(responses_api_tools(vec![json!({
                 "type": "function",
                 "name": "Bash",
                 "description": "Run a command",
                 "parameters": { "type": "object" }
-            })]),
+            })])),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1458,10 +1473,10 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: Some(vec![json!({
+            tools: Some(responses_api_tools(vec![json!({
                 "type": "tool_search",
                 "description": "Search available tools"
-            })]),
+            })])),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,
@@ -1514,7 +1529,7 @@ mod tests {
                 phase: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: Some(Vec::new()),
+            tools: Some(responses_api_tools(Vec::new())),
             tool_choice: "auto".to_string(),
             parallel_tool_calls: true,
             reasoning: None,

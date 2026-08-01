@@ -4215,12 +4215,12 @@ mod tests {
             current.shell,
         ));
         let file_system_sandbox_policy =
-            FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry {
-                path: FileSystemPath::Path {
+            FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry::new(
+                FileSystemPath::Path {
                     path: workspace_root,
                 },
-                access: FileSystemAccessMode::Write,
-            }]);
+                FileSystemAccessMode::Write,
+            )]);
         turn.permission_profile = PermissionProfile::from_runtime_permissions(
             &file_system_sandbox_policy,
             NetworkSandboxPolicy::Restricted,
@@ -4316,7 +4316,11 @@ mod tests {
     #[tokio::test]
     async fn write_alias_emits_file_change_events() {
         let workspace = tempfile::tempdir().expect("workspace temp dir");
-        let path = workspace.path().join("created.txt");
+        let path = workspace
+            .path()
+            .canonicalize()
+            .expect("canonical workspace path")
+            .join("created.txt");
         let (invocation, events) = invocation_with_harness_and_events(
             &workspace,
             "Write",
@@ -4331,10 +4335,19 @@ mod tests {
             .expect("write should succeed");
 
         let started = events.recv().await.expect("file change started event");
+        let legacy_started = events
+            .recv()
+            .await
+            .expect("legacy file change started event");
         let completed = events.recv().await.expect("file change completed event");
-        assert!(matches!(
+        let legacy_completed = events
+            .recv()
+            .await
+            .expect("legacy file change completed event");
+        assert!(
+            matches!(
             started.msg,
-            EventMsg::ItemStarted(event)
+            EventMsg::ItemStarted(ref event)
                 if matches!(
                     event.item,
                     TurnItem::FileChange(FileChangeItem {
@@ -4348,6 +4361,12 @@ mod tests {
                         },
                     )])
                 )
+            ),
+            "unexpected started event: {started:#?}"
+        );
+        assert!(matches!(
+            legacy_started.msg,
+            EventMsg::PatchApplyBegin(ref event) if event.changes.contains_key(&path)
         ));
         assert!(matches!(
             completed.msg,
@@ -4360,12 +4379,22 @@ mod tests {
                     })
                 )
         ));
+        assert!(matches!(
+            legacy_completed.msg,
+            EventMsg::PatchApplyEnd(ref event)
+                if event.status == PatchApplyStatus::Completed
+                    && event.changes.contains_key(&path)
+        ));
     }
 
     #[tokio::test]
     async fn edit_alias_emits_file_change_events() {
         let workspace = tempfile::tempdir().expect("workspace temp dir");
-        let path = workspace.path().join("existing.txt");
+        let path = workspace
+            .path()
+            .canonicalize()
+            .expect("canonical workspace path")
+            .join("existing.txt");
         std::fs::write(&path, "before\n").expect("seed file");
         let (invocation, events) = invocation_with_harness_and_events(
             &workspace,
@@ -4385,10 +4414,19 @@ mod tests {
             .expect("edit should succeed");
 
         let started = events.recv().await.expect("file change started event");
+        let legacy_started = events
+            .recv()
+            .await
+            .expect("legacy file change started event");
         let completed = events.recv().await.expect("file change completed event");
-        assert!(matches!(
+        let legacy_completed = events
+            .recv()
+            .await
+            .expect("legacy file change completed event");
+        assert!(
+            matches!(
             started.msg,
-            EventMsg::ItemStarted(event)
+            EventMsg::ItemStarted(ref event)
                 if matches!(
                     event.item,
                     TurnItem::FileChange(FileChangeItem {
@@ -4402,6 +4440,12 @@ mod tests {
                                 && unified_diff.contains("+after")
                     )
                 )
+            ),
+            "unexpected started event: {started:#?}"
+        );
+        assert!(matches!(
+            legacy_started.msg,
+            EventMsg::PatchApplyBegin(ref event) if event.changes.contains_key(&path)
         ));
         assert!(matches!(
             completed.msg,
@@ -4413,6 +4457,12 @@ mod tests {
                         ..
                     })
                 )
+        ));
+        assert!(matches!(
+            legacy_completed.msg,
+            EventMsg::PatchApplyEnd(ref event)
+                if event.status == PatchApplyStatus::Completed
+                    && event.changes.contains_key(&path)
         ));
     }
 

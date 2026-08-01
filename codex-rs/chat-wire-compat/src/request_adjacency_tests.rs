@@ -6,12 +6,12 @@ fn request_with_input(input: Vec<ResponseItem>) -> ResponsesApiRequest {
         model: "gpt-5.6".to_string(),
         instructions: String::new(),
         input,
-        tools: Some(vec![json!({
+        tools: Some(responses_api_tools(vec![json!({
             "type": "function",
             "name": "Bash",
             "description": "Run a command",
             "parameters": { "type": "object" }
-        })]),
+        })])),
         tool_choice: "auto".to_string(),
         parallel_tool_calls: true,
         reasoning: None,
