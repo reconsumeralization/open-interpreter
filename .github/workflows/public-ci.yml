@@ -53,8 +53,18 @@ jobs:
           tags = release.fetch(true).fetch("push").fetch("tags")
           raise "release workflow missing tag trigger" unless tags.any? { |tag| tag.include?("v*.*.*") }
 
+          build_steps = release.fetch("jobs").fetch("build").fetch("steps")
+          rusty_v8 = build_steps.find { |step| step["uses"] == "./.github/actions/setup-rusty-v8" }
+          raise "release workflow missing checksum-verified rusty_v8 setup" unless rusty_v8
+          raise "rusty_v8 setup must run on every release target" if rusty_v8.key?("if")
+
           text = File.read(".github/workflows/rust-release.yml")
           raise "release workflow must build the open-interpreter bundle" unless text.include?("open-interpreter")
+
+          public_ci = File.read(".github/workflows/public-ci.yml")
+          %w[codex codex-code-mode-host codex-command-runner codex-windows-sandbox-setup].each do |binary|
+            raise "Windows CI must build release binary #{binary}" unless public_ci.include?("--bin #{binary}")
+          end
           RUBY
 
       - name: Confirm inherited heavyweight workflows are manual-only
@@ -92,9 +102,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - windows-2025
-          - windows-11-arm
+        include:
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -107,16 +119,35 @@ jobs:
         shell: pwsh
         run: scripts/install/test_install_ps1.ps1
 
-      # This is intentionally a native Windows compile, not a manifest or
-      # installer-only check. Windows-only Rust modules are excluded on Linux
-      # and macOS, so ownership/name-resolution failures otherwise surface only
-      # after a release tag has started the full packaging matrix.
-      - uses: dtolnay/rust-toolchain@a0b273b48ed29de4470960879e8381ff45632f26 # 1.93.0
+      # This intentionally mirrors the release binary set, not merely one
+      # Windows-only crate. Windows-only Rust modules and target-specific native
+      # dependencies are excluded on Linux and macOS, so failures otherwise
+      # surface only after a release tag starts the packaging matrix.
+      - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
+        with:
+          targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: codex-rs
 
-      - name: Compile the native Windows sandbox
+      - name: Configure checksum-verified rusty_v8 artifact
+        uses: ./.github/actions/setup-rusty-v8
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build the native Windows release binaries
+        shell: pwsh
         working-directory: codex-rs
-        run: cargo check -p codex-windows-sandbox --locked
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:TARGET -eq "x86_64-pc-windows-msvc") {
+            $env:LIBSQLITE3_FLAGS = "SQLITE_DISABLE_INTRINSIC"
+          }
+          cargo build --locked --target $env:TARGET --release `
+            --bin codex `
+            --bin codex-code-mode-host `
+            --bin codex-command-runner `
+            --bin codex-windows-sandbox-setup
