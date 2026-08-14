@@ -57,6 +57,13 @@ jobs:
           # Stable key so the cache survives job/workflow renames (the default
           # add-job-id-key bakes the job name into the key and busts on rename).
           shared-key: codex-rs
+      # rusty_v8 does not publish the sandbox-enabled archive at its default
+      # upstream URL. Use the same checksum-verified Codex artifact as release
+      # builds so the blocking workspace build exercises the shipped runtime.
+      - name: Configure rusty_v8 artifact overrides and verify checksums
+        uses: ./.github/actions/setup-rusty-v8
+        with:
+          target: x86_64-unknown-linux-gnu
       - name: cargo fmt --check
         run: cargo fmt -- --config imports_granularity=Item --check
       # Hard gate: build the whole workspace including all test code (catches
