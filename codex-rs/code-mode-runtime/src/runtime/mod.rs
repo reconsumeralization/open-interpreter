@@ -108,7 +108,7 @@ pub(crate) fn spawn_runtime(
     String,
 > {
     Err(
-        "code mode execution requires the V8 runtime (rebuild with --features codex-code-mode/v8-runtime)"
+        "code mode execution requires the V8 runtime (rebuild with --features codex-code-mode-runtime/v8-runtime)"
             .to_string(),
     )
 }

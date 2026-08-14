@@ -39,7 +39,7 @@ pub fn initialize_v8(jit_mode: V8JitMode) -> Result<(), String> {
 #[cfg(not(feature = "v8-runtime"))]
 pub fn initialize_v8(_jit_mode: V8JitMode) -> Result<(), String> {
     Err(
-        "code mode execution requires the V8 runtime (rebuild with --features codex-code-mode/v8-runtime)"
+        "code mode execution requires the V8 runtime (rebuild with --features codex-code-mode-runtime/v8-runtime)"
             .to_string(),
     )
 }
