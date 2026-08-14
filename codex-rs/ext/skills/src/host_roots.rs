@@ -16,7 +16,6 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
 use codex_utils_plugins::PluginSkillRoot;
 use codex_utils_plugins::SkillDiscoveryMode;
-use dirs::home_dir;
 use futures::StreamExt;
 use toml::Value as TomlValue;
 
@@ -30,16 +29,15 @@ pub(crate) async fn resolve_skill_roots(
     repository_file_system: Option<Arc<dyn ExecutorFileSystem>>,
     config_layer_stack: &ConfigLayerStack,
     cwd: &AbsolutePathBuf,
+    home_dir: Option<&AbsolutePathBuf>,
     plugin_skill_roots: Vec<PluginSkillRoot>,
     extra_skill_roots: Vec<AbsolutePathBuf>,
 ) -> Vec<SkillRoot> {
-    let home_dir =
-        home_dir().and_then(|path| AbsolutePathBuf::from_absolute_path_checked(path).ok());
     resolve_skill_roots_with_home_dir(
         repository_file_system,
         config_layer_stack,
         cwd,
-        home_dir.as_ref(),
+        home_dir,
         plugin_skill_roots,
         extra_skill_roots,
     )
