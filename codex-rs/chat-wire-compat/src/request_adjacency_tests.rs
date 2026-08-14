@@ -33,6 +33,7 @@ fn function_call(call_id: &str) -> ResponseItem {
         namespace: None,
         arguments: json!({ "command": "pwd" }).to_string(),
         call_id: call_id.to_string(),
+        encrypted_function_args: None,
         internal_chat_message_metadata_passthrough: None,
     }
 }

@@ -718,6 +718,8 @@ mod tests {
                     arguments: "{\"command\":\"pwd\"}".to_string(),
                     call_id: "bash:0".to_string(),
 
+                    encrypted_function_args: None,
+
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
@@ -760,6 +762,8 @@ mod tests {
             arguments: "{\"command\":\" echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\n\"}"
                 .to_string(),
             call_id: "bash:0".to_string(),
+
+            encrypted_function_args: None,
 
             internal_chat_message_metadata_passthrough: None,
         };
@@ -859,6 +863,8 @@ mod tests {
                     namespace: None,
                     arguments: "{\"command\":\"pwd\"}".to_string(),
                     call_id: "bash:0".to_string(),
+
+                    encrypted_function_args: None,
 
                     internal_chat_message_metadata_passthrough: None,
                 },

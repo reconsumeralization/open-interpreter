@@ -180,8 +180,15 @@ write-config-schema:
     cargo run -p codex-core --bin codex-write-config-schema
 
 # Regenerate vendored app-server protocol schema artifacts.
-write-app-server-schema *args:
-    cargo run -p codex-app-server-protocol --bin write_schema_fixtures -- {args}
+[unix]
+write-app-server-schema:
+    CODEX_APP_SERVER_SCHEMA_ROOT={{ justfile_directory() }}/codex-rs/app-server-protocol/schema CODEX_APP_SERVER_SCHEMA_EXPERIMENTAL=0 cargo test -p codex-app-server-protocol write_schema_fixtures_from_env -- --ignored
+    CODEX_APP_SERVER_SCHEMA_ROOT={{ justfile_directory() }}/codex-rs/app-server-protocol/schema CODEX_APP_SERVER_SCHEMA_EXPERIMENTAL=1 cargo test -p codex-app-server-protocol write_schema_fixtures_from_env -- --ignored
+
+[windows]
+write-app-server-schema:
+    $env:CODEX_APP_SERVER_SCHEMA_ROOT = "{{ justfile_directory() }}/codex-rs/app-server-protocol/schema"; $env:CODEX_APP_SERVER_SCHEMA_EXPERIMENTAL = "0"; cargo test -p codex-app-server-protocol write_schema_fixtures_from_env -- --ignored
+    $env:CODEX_APP_SERVER_SCHEMA_ROOT = "{{ justfile_directory() }}/codex-rs/app-server-protocol/schema"; $env:CODEX_APP_SERVER_SCHEMA_EXPERIMENTAL = "1"; cargo test -p codex-app-server-protocol write_schema_fixtures_from_env -- --ignored
 
 [no-cd]
 write-hooks-schema:
@@ -204,8 +211,8 @@ argument-comment-lint-from-source *args:
 # Tail logs from the state SQLite database
 [unix]
 log *args:
-    if [ "${1:-}" = "--" ]; then shift; fi; cargo run -p codex-state --bin logs_client -- "$@"
+    if [ "${1:-}" = "--" ]; then shift; fi; cargo run -p codex-cli --bin logs_client -- "$@"
 
 [windows]
 log *args:
-    $forwarded_args = @($args | Select-Object -Skip 1); if ($forwarded_args.Count -gt 0 -and $forwarded_args[0] -eq "--") { $forwarded_args = @($forwarded_args | Select-Object -Skip 1) }; cargo run -p codex-state --bin logs_client -- @forwarded_args
+    $forwarded_args = @($args | Select-Object -Skip 1); if ($forwarded_args.Count -gt 0 -and $forwarded_args[0] -eq "--") { $forwarded_args = @($forwarded_args | Select-Object -Skip 1) }; cargo run -p codex-cli --bin logs_client -- @forwarded_args

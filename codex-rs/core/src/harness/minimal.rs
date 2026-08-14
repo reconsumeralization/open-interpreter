@@ -587,6 +587,8 @@ mod tests {
                     arguments: json!({"command": "date"}).to_string(),
                     call_id: "call-date".to_string(),
 
+                    encrypted_function_args: None,
+
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {

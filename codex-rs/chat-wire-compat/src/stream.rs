@@ -414,6 +414,7 @@ async fn finalize_and_complete(
                 total_tokens: usage.total_tokens.unwrap_or_else(|| {
                     usage.prompt_tokens.unwrap_or(0) + usage.completion_tokens.unwrap_or(0)
                 }),
+                codex_rollout_budget_units: None,
             }),
             end_turn: None,
         }))
@@ -506,6 +507,7 @@ async fn finalize_tool_calls_until(
                 namespace: None,
                 arguments: tool_call.arguments,
                 call_id,
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             Some(ToolOutputKind::NamespacedFunction {
@@ -517,6 +519,7 @@ async fn finalize_tool_calls_until(
                 namespace: Some(namespace.clone()),
                 arguments: tool_call.arguments,
                 call_id,
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             Some(ToolOutputKind::Custom) => {
@@ -544,6 +547,7 @@ async fn finalize_tool_calls_until(
                 namespace: None,
                 arguments: tool_call.arguments,
                 call_id,
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
         };

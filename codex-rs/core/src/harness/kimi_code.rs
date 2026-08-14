@@ -473,6 +473,8 @@ mod tests {
                     arguments: r#"{"pattern":"*.py"}"#.to_string(),
                     call_id: "Glob:0".to_string(),
 
+                    encrypted_function_args: None,
+
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
@@ -578,6 +580,7 @@ mod tests {
                     namespace: None,
                     arguments: r#"{"path":"probe.mp4"}"#.to_string(),
                     call_id: "ReadMediaFile:1".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
