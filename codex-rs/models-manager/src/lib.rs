@@ -1,4 +1,4 @@
-pub(crate) mod cache;
+pub mod cache;
 pub mod collaboration_mode_presets;
 pub(crate) mod compatibility_enrichment;
 pub(crate) mod config;
@@ -38,7 +38,7 @@ mod tests {
     fn open_interpreter_advertises_embedded_codex_compatibility_version() {
         assert_eq!(
             client_version_to_whole_for_product(codex_product_info::Product::OpenInterpreter),
-            "0.145.0"
+            "0.147.0"
         );
     }
 }

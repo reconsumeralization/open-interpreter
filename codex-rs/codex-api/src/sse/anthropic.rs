@@ -407,6 +407,7 @@ async fn process_anthropic_event(
                     namespace: None,
                     arguments: normalize_tool_arguments(&input_json)?,
                     call_id: id,
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
             };
@@ -510,6 +511,7 @@ fn build_token_usage(state: &AnthropicStreamState) -> Option<TokenUsage> {
         output_tokens: state.output_tokens,
         reasoning_output_tokens: 0,
         total_tokens,
+        codex_rollout_budget_units: None,
     })
 }
 
@@ -632,6 +634,7 @@ mod tests {
                         output_tokens: 3,
                         reasoning_output_tokens: 0,
                         total_tokens: 15,
+                        codex_rollout_budget_units: None,
                     })
                 );
             }
@@ -688,6 +691,7 @@ mod tests {
                         output_tokens: 7,
                         reasoning_output_tokens: 0,
                         total_tokens: 27,
+                        codex_rollout_budget_units: None,
                     })
                 );
             }
@@ -921,6 +925,7 @@ data: {"type":"message_stop"   }
                     output_tokens: 63,
                     reasoning_output_tokens: 0,
                     total_tokens: 5265,
+                    codex_rollout_budget_units: None,
                 }),
                 ..
             } if response_id == "msg_01D2KUE7AyuS2vMBQo8ZDZY5"

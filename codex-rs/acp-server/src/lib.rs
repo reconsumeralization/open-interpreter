@@ -607,12 +607,12 @@ impl AppServerAcpAgent {
                             ThreadSourceKind::Unknown,
                         ]),
                         archived: Some(false),
+                        section_id: None,
                         cwd: None,
                         use_state_db_only: false,
                         search_term: None,
                         parent_thread_id: None,
                         ancestor_thread_id: None,
-                        is_pinned: None,
                     },
                 })
                 .await
@@ -796,7 +796,7 @@ impl AppServerAcpAgent {
                         &session_id,
                         &thread_id,
                         &turn_id,
-                        notification,
+                        *notification,
                         &cx,
                         &mut completed_item_ids,
                     )? {
@@ -804,7 +804,7 @@ impl AppServerAcpAgent {
                     }
                 }
                 Some(AppServerEvent::ServerRequest(request)) => {
-                    self.handle_server_request(&session_id, request, &cx)
+                    self.handle_server_request(&session_id, *request, &cx)
                         .await?;
                 }
                 Some(AppServerEvent::Lagged { .. }) => {}

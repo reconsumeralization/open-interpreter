@@ -1,9 +1,9 @@
 use super::Model;
+use crate::JsonSchema;
+use crate::TS;
 use codex_protocol::openai_models::ReasoningEffort;
-use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
-use ts_rs::TS;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
 #[serde(rename_all = "lowercase")]

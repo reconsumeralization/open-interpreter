@@ -42,7 +42,8 @@ pub(super) async fn handle(
             format!("builtin://{skill_name}"),
         )
     } else {
-        let outcome = invocation.turn.turn_skills.snapshot.outcome();
+        let skills_snapshot = invocation.turn.skills_snapshot();
+        let outcome = skills_snapshot.outcome();
         let Some(skill) = outcome
             .skills
             .iter()
@@ -57,13 +58,7 @@ pub(super) async fn handle(
                 /*success*/ Some(false),
             )));
         };
-        let contents = match invocation
-            .turn
-            .turn_skills
-            .snapshot
-            .read_skill_text(&skill)
-            .await
-        {
+        let contents = match skills_snapshot.read_skill_text(&skill).await {
             Ok(contents) => contents,
             Err(err) => {
                 return Ok(boxed_tool_output(FunctionToolOutput::from_text(

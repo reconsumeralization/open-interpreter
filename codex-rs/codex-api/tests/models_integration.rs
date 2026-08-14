@@ -3,12 +3,12 @@ use codex_api::ModelsClient;
 use codex_api::Provider;
 use codex_api::RetryConfig;
 use codex_client::ReqwestTransport;
+use codex_http_client::HttpClientBuilder;
 use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::openai_models::ConfigShellToolType;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelVisibility;
 use codex_protocol::openai_models::ModelsResponse;
-use codex_protocol::openai_models::ReasoningControl;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::openai_models::ReasoningEffortPreset;
 use codex_protocol::openai_models::TruncationPolicyConfig;
@@ -57,7 +57,6 @@ async fn models_client_hits_models_endpoint() {
             display_name: "gpt-test".to_string(),
             description: Some("desc".to_string()),
             default_reasoning_level: Some(ReasoningEffort::Medium),
-            reasoning_control: ReasoningControl::None,
             supported_reasoning_levels: vec![
                 ReasoningEffortPreset {
                     effort: ReasoningEffort::Low,
@@ -80,10 +79,12 @@ async fn models_client_hits_models_endpoint() {
             service_tiers: Vec::new(),
             default_service_tier: None,
             upgrade: None,
-            base_instructions: "base instructions".to_string(),
             model_messages: None,
             include_skills_usage_instructions: false,
+            include_plugin_usage_instructions: false,
+            include_apps_usage_instructions: false,
             supports_reasoning_summaries: false,
+            reasoning_control: Default::default(),
             supports_reasoning_summary_parameter: true,
             default_reasoning_summary: ReasoningSummary::Auto,
             support_verbosity: false,
@@ -105,6 +106,7 @@ async fn models_client_hits_models_endpoint() {
             supports_search_tool: false,
             use_responses_lite: false,
             auto_review_model_override: None,
+            model_specialty: None,
             tool_mode: None,
             multi_agent_version: None,
         }],
@@ -120,7 +122,11 @@ async fn models_client_hits_models_endpoint() {
         .mount(&server)
         .await;
 
-    let transport = ReqwestTransport::new(reqwest::Client::new());
+    let transport = ReqwestTransport::from_http_client(
+        HttpClientBuilder::new()
+            .build_direct()
+            .expect("test HTTP client should build"),
+    );
     let provider = provider(&base_url);
     let request_url = ModelsClient::<ReqwestTransport>::request_url(&provider, "0.1.0");
     let client = ModelsClient::new(transport, provider, Arc::new(DummyAuth));

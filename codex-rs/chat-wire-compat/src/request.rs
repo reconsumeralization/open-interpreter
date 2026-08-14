@@ -1007,6 +1007,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls" }).to_string(),
                     call_id: "call-1".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
@@ -1060,6 +1061,7 @@ mod tests {
                 namespace: Some("mcp__demo__".to_string()),
                 arguments: json!({ "order_id": "ord_123" }).to_string(),
                 call_id: "call-lookup".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             }],
             tools: Some(responses_api_tools(vec![json!({
@@ -1214,6 +1216,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/file.txt" }).to_string(),
                     call_id: "call-1".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
@@ -1262,6 +1265,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/legacy.py" }).to_string(),
                     call_id: "call-1".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
@@ -1270,6 +1274,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/data.csv" }).to_string(),
                     call_id: "call-2".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
@@ -1296,6 +1301,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "file_path": "/app/config.ini" }).to_string(),
                     call_id: "call-3".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
@@ -1380,6 +1386,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls" }).to_string(),
                     call_id: "call-1".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::Message {
@@ -1397,6 +1404,7 @@ mod tests {
                     namespace: None,
                     arguments: json!({ "command": "ls -a" }).to_string(),
                     call_id: "call-2".to_string(),
+                    encrypted_function_args: None,
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {

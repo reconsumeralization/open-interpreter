@@ -2605,6 +2605,8 @@ mod tests {
                         .to_string(),
                     call_id: "toolu_1".to_string(),
 
+                    encrypted_function_args: None,
+
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
@@ -2622,6 +2624,8 @@ mod tests {
                     namespace: None,
                     arguments: "{\"file_path\":\"/tmp/input.txt\"}".to_string(),
                     call_id: "toolu_2".to_string(),
+
+                    encrypted_function_args: None,
 
                     internal_chat_message_metadata_passthrough: None,
                 },
@@ -2775,6 +2779,8 @@ mod tests {
                     arguments: "{\"command\":\"git clone repo\"}".to_string(),
                     call_id: "toolu_clone".to_string(),
 
+                    encrypted_function_args: None,
+
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCall {
@@ -2783,6 +2789,8 @@ mod tests {
                     namespace: None,
                     arguments: "{\"command\":\"python3 --version\"}".to_string(),
                     call_id: "toolu_python".to_string(),
+
+                    encrypted_function_args: None,
 
                     internal_chat_message_metadata_passthrough: None,
                 },
@@ -2866,6 +2874,8 @@ mod tests {
                     })
                     .to_string(),
                     call_id: "toolu_edit".to_string(),
+
+                    encrypted_function_args: None,
 
                     internal_chat_message_metadata_passthrough: None,
                 },
@@ -3228,6 +3238,8 @@ mod tests {
                     arguments: "{\"command\":\"echo \\\"TodoWrite done\\\"\"}".to_string(),
                     call_id: "toolu_bash".to_string(),
 
+                    encrypted_function_args: None,
+
                     internal_chat_message_metadata_passthrough: None,
                 },
                 ResponseItem::FunctionCallOutput {
@@ -3370,6 +3382,8 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -3394,6 +3408,8 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             });
@@ -3465,6 +3481,8 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -3487,6 +3505,8 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             });
@@ -3562,6 +3582,8 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("grep_{index}"),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             });
@@ -3651,6 +3673,8 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -3685,6 +3709,8 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             });
@@ -3752,6 +3778,8 @@ mod tests {
                 arguments: todos,
                 call_id: "todo_1".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -3774,6 +3802,8 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             });
@@ -4129,6 +4159,8 @@ mod tests {
                     arguments: "{\"command\":\"printf 'DOT_OK\\\\n' > /tmp/output.txt\"}"
                         .to_string(),
                     call_id: "toolu_1".to_string(),
+
+                    encrypted_function_args: None,
 
                     internal_chat_message_metadata_passthrough: None,
                 },

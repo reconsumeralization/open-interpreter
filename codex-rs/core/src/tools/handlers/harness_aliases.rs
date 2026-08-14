@@ -356,8 +356,11 @@ async fn handle_kimi_code_foreground_agent(
         .unwrap_or("coder");
     let task_name = zcode_task_name(&args.description);
     let child_depth = next_thread_spawn_depth(&turn.session_source);
-    let mut config =
-        build_agent_spawn_config(&session.get_base_instructions().await, turn.as_ref())?;
+    let mut config = build_agent_spawn_config(
+        &session.get_base_instructions().await,
+        turn.as_ref(),
+        turn.environments.primary(),
+    )?;
     apply_requested_spawn_agent_model_overrides(
         &session,
         turn.as_ref(),
@@ -376,7 +379,7 @@ async fn handle_kimi_code_foreground_agent(
         /*requested_service_tier*/ None,
     )
     .await?;
-    apply_spawn_agent_runtime_overrides(&mut config, turn.as_ref())?;
+    apply_spawn_agent_runtime_overrides(&mut config, turn.as_ref(), turn.environments.primary())?;
 
     let parent_thread_id = session.thread_id();
     let spawn_source = thread_spawn_source(
@@ -446,8 +449,11 @@ async fn handle_zcode_agent(
         .unwrap_or("Explore");
     let task_name = zcode_task_name(&args.description);
     let child_depth = next_thread_spawn_depth(&turn.session_source);
-    let mut config =
-        build_agent_spawn_config(&session.get_base_instructions().await, turn.as_ref())?;
+    let mut config = build_agent_spawn_config(
+        &session.get_base_instructions().await,
+        turn.as_ref(),
+        turn.environments.primary(),
+    )?;
     apply_requested_spawn_agent_model_overrides(
         &session,
         turn.as_ref(),
@@ -466,7 +472,7 @@ async fn handle_zcode_agent(
         /*requested_service_tier*/ None,
     )
     .await?;
-    apply_spawn_agent_runtime_overrides(&mut config, turn.as_ref())?;
+    apply_spawn_agent_runtime_overrides(&mut config, turn.as_ref(), turn.environments.primary())?;
 
     let parent_thread_id = session.thread_id();
     let spawn_source = thread_spawn_source(
@@ -2916,7 +2922,11 @@ async fn handle_opencode_task(
     let base_instructions = BaseInstructions {
         text: OPENCODE_SEARCH_AGENT_BASE_INSTRUCTIONS.to_string(),
     };
-    let mut config = build_agent_spawn_config(&base_instructions, turn.as_ref())?;
+    let mut config = build_agent_spawn_config(
+        &base_instructions,
+        turn.as_ref(),
+        turn.environments.primary(),
+    )?;
     config.base_instructions = Some(OPENCODE_SEARCH_AGENT_BASE_INSTRUCTIONS.to_string());
     let role_name = args.subagent_type.as_deref();
     let parent_thread_id = session.thread_id();
@@ -4139,6 +4149,7 @@ The agent starts with no context from this conversation, so the prompt briefs it
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PermissionProfileSnapshot;
     use codex_protocol::models::PermissionProfile;
     use codex_protocol::protocol::FileSystemAccessMode;
     use codex_protocol::protocol::FileSystemPath;
@@ -4207,13 +4218,6 @@ mod tests {
             .expect("primary environment")
             .clone();
         let workspace_root_uri: codex_utils_path_uri::PathUri = workspace_root.clone().into();
-        turn.environments.environments[0] = TurnEnvironmentState::Ready(TurnEnvironment::new(
-            current.environment_id,
-            current.environment,
-            workspace_root_uri.clone(),
-            vec![workspace_root_uri],
-            current.shell,
-        ));
         let file_system_sandbox_policy =
             FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry::new(
                 FileSystemPath::Path {
@@ -4221,10 +4225,20 @@ mod tests {
                 },
                 FileSystemAccessMode::Write,
             )]);
-        turn.permission_profile = PermissionProfile::from_runtime_permissions(
-            &file_system_sandbox_policy,
-            NetworkSandboxPolicy::Restricted,
-        );
+        let mut environment_config = current.config.clone();
+        environment_config.permission_profile =
+            PermissionProfileSnapshot::legacy(PermissionProfile::from_runtime_permissions(
+                &file_system_sandbox_policy,
+                NetworkSandboxPolicy::Restricted,
+            ));
+        turn.environments.environments[0] = TurnEnvironmentState::Ready(TurnEnvironment::new(
+            current.environment_id,
+            current.environment,
+            workspace_root_uri.clone(),
+            vec![workspace_root_uri],
+            current.shell,
+            environment_config,
+        ));
         let turn = Arc::new(turn);
         (
             ToolInvocation {
@@ -4769,6 +4783,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "call-write".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -5241,6 +5256,7 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"content":"done","file_path":"notes.txt"}"#.to_string(),
                 call_id: "call-write".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -5311,6 +5327,7 @@ mod tests {
                 namespace: None,
                 arguments: "{}".to_string(),
                 call_id: "call-bash".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             }),
             RolloutItem::ResponseItem(ResponseItem::FunctionCall {
@@ -5319,6 +5336,7 @@ mod tests {
                 namespace: None,
                 arguments: "{}".to_string(),
                 call_id: "call-read".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             }),
             RolloutItem::EventMsg(EventMsg::TurnComplete(
@@ -5361,6 +5379,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "previous-todo".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCall {
@@ -5378,6 +5397,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "current-todo".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
         ];

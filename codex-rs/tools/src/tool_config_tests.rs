@@ -4,7 +4,6 @@ use codex_protocol::config_types::ModeKind;
 use codex_protocol::openai_models::ConfigShellToolType;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelVisibility;
-use codex_protocol::openai_models::ReasoningControl;
 use codex_protocol::openai_models::TruncationPolicyConfig;
 use pretty_assertions::assert_eq;
 
@@ -17,7 +16,6 @@ fn model_with_shell_type(shell_type: ConfigShellToolType) -> ModelInfo {
         description: None,
         default_reasoning_level: None,
         supported_reasoning_levels: Vec::new(),
-        reasoning_control: ReasoningControl::None,
         shell_type,
         visibility: ModelVisibility::List,
         supported_in_api: true,
@@ -27,10 +25,12 @@ fn model_with_shell_type(shell_type: ConfigShellToolType) -> ModelInfo {
         default_service_tier: None,
         availability_nux: None,
         upgrade: None,
-        base_instructions: String::new(),
         model_messages: None,
         include_skills_usage_instructions: false,
+        include_plugin_usage_instructions: false,
+        include_apps_usage_instructions: false,
         supports_reasoning_summaries: false,
+        reasoning_control: Default::default(),
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: Default::default(),
         support_verbosity: false,
@@ -51,6 +51,7 @@ fn model_with_shell_type(shell_type: ConfigShellToolType) -> ModelInfo {
         supports_search_tool: false,
         use_responses_lite: false,
         auto_review_model_override: None,
+        model_specialty: None,
         tool_mode: None,
         multi_agent_version: None,
     }

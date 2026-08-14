@@ -1903,6 +1903,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
@@ -1922,6 +1923,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             });
         }
@@ -2019,6 +2021,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2040,6 +2043,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("edit_{index}"),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
@@ -2110,6 +2114,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2138,6 +2143,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("bash_{index}"),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
@@ -2201,6 +2207,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "read_large".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2256,6 +2263,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2284,6 +2292,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: format!("read_{index}"),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             });
             items.push(ResponseItem::FunctionCallOutput {
@@ -2340,6 +2349,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "agent_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2388,6 +2398,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "agent_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2445,6 +2456,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2519,6 +2531,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "todo_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2554,6 +2567,7 @@ mod tests {
                 })
                 .to_string(),
                 call_id: "read_1".to_string(),
+                encrypted_function_args: None,
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {

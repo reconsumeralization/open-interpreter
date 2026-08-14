@@ -1506,6 +1506,8 @@ mod tests {
                 arguments: "{}".to_string(),
                 call_id: "GetGoal:0".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2138,6 +2140,8 @@ mod tests {
                 arguments: r#"{"path":"/app/ars.R","content":"ok"}"#.to_string(),
                 call_id: "WriteFile:6".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::Message {
@@ -2178,6 +2182,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             },
@@ -2257,6 +2263,8 @@ mod tests {
                 arguments: r#"{"command":"ls"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2321,6 +2329,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:1".to_string(),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             },
@@ -2390,6 +2400,8 @@ mod tests {
                 arguments: r#"{"command":"./a.out"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2458,6 +2470,8 @@ mod tests {
                 arguments: r#"{"command":"printf"}"#.to_string(),
                 call_id: "Shell:0".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2494,6 +2508,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"path":"/app/ars.R","content":"ok"}"#.to_string(),
                 call_id: "WriteFile:6".to_string(),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             },
@@ -2546,6 +2562,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"command":"false"}"#.to_string(),
                 call_id: "Shell:7".to_string(),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             },
@@ -2619,6 +2637,8 @@ mod tests {
                 arguments: r#"{"command":"which R && R --version"}"#.to_string(),
                 call_id: "Shell:7".to_string(),
 
+                encrypted_function_args: None,
+
                 internal_chat_message_metadata_passthrough: None,
             },
             ResponseItem::FunctionCallOutput {
@@ -2675,6 +2695,8 @@ mod tests {
                 namespace: None,
                 arguments: r#"{"path":"screenshot.png"}"#.to_string(),
                 call_id: "ReadMediaFile:1".to_string(),
+
+                encrypted_function_args: None,
 
                 internal_chat_message_metadata_passthrough: None,
             },
