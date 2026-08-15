@@ -43,6 +43,21 @@ def sha256(path: Path) -> str:
 
 
 class InstallShLatestResolutionTests(unittest.TestCase):
+    def test_help_advertises_only_open_interpreter_environment_names(self) -> None:
+        result = subprocess.run(
+            [str(INSTALL_SH), "--help"],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("OPEN_INTERPRETER_RELEASE", result.stdout)
+        self.assertIn("OPEN_INTERPRETER_NONINTERACTIVE", result.stdout)
+        self.assertNotIn("CODEX_NON_INTERACTIVE", result.stdout)
+
     def run_installer_with_release_list(
         self,
         release_list: str,
@@ -88,14 +103,14 @@ class InstallShLatestResolutionTests(unittest.TestCase):
             env = {
                 **os.environ,
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
-                "CODEX_GITHUB_REPO": repo,
-                "CODEX_INSTALL_PRODUCT_NAME": product_name,
-                "CODEX_PACKAGE_ASSET_STEM": package_asset_stem,
-                "CODEX_COMMAND_NAME": command_name,
-                "CODEX_RELEASE_TAG_PREFIX": "rust-v",
-                "CODEX_NON_INTERACTIVE": "1",
-                "CODEX_HOME": str(tmp / "home"),
-                "CODEX_INSTALL_DIR": str(tmp / "install-bin"),
+                "OPEN_INTERPRETER_GITHUB_REPO": repo,
+                "OPEN_INTERPRETER_PRODUCT_NAME": product_name,
+                "OPEN_INTERPRETER_PACKAGE_ASSET_STEM": package_asset_stem,
+                "OPEN_INTERPRETER_COMMAND_NAME": command_name,
+                "OPEN_INTERPRETER_RELEASE_TAG_PREFIX": "rust-v",
+                "OPEN_INTERPRETER_NONINTERACTIVE": "1",
+                "INTERPRETER_HOME": str(tmp / "home"),
+                "OPEN_INTERPRETER_INSTALL_DIR": str(tmp / "install-bin"),
             }
             return subprocess.run(
                 [str(INSTALL_SH)],
@@ -334,15 +349,15 @@ class InstallShLatestResolutionTests(unittest.TestCase):
             env={
                 **os.environ,
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
-                "CODEX_GITHUB_REPO": "openinterpreter/openinterpreter",
-                "CODEX_INSTALL_PRODUCT_NAME": "Open Interpreter",
-                "CODEX_PACKAGE_ASSET_STEM": "open-interpreter-package",
-                "CODEX_COMMAND_NAME": "interpreter",
-                "CODEX_ALIAS_COMMAND_NAMES": "i",
-                "CODEX_RELEASE_TAG_PREFIX": "rust-v",
-                "CODEX_NON_INTERACTIVE": "1",
-                "CODEX_HOME": str(codex_home),
-                "CODEX_INSTALL_DIR": str(install_dir),
+                "OPEN_INTERPRETER_GITHUB_REPO": "openinterpreter/openinterpreter",
+                "OPEN_INTERPRETER_PRODUCT_NAME": "Open Interpreter",
+                "OPEN_INTERPRETER_PACKAGE_ASSET_STEM": "open-interpreter-package",
+                "OPEN_INTERPRETER_COMMAND_NAME": "interpreter",
+                "OPEN_INTERPRETER_ALIAS_COMMAND_NAMES": "i",
+                "OPEN_INTERPRETER_RELEASE_TAG_PREFIX": "rust-v",
+                "OPEN_INTERPRETER_NONINTERACTIVE": "1",
+                "INTERPRETER_HOME": str(codex_home),
+                "OPEN_INTERPRETER_INSTALL_DIR": str(install_dir),
             },
             text=True,
             stdout=subprocess.PIPE,
@@ -381,7 +396,7 @@ class InstallShLatestResolutionTests(unittest.TestCase):
                 )
 
     def test_install_dir_matching_managed_executable_dir_is_rejected(self) -> None:
-        # CODEX_INSTALL_DIR pointed at the release's own managed bin/
+        # OPEN_INTERPRETER_INSTALL_DIR pointed at the release's own managed bin/
         # directory used to make the installer overwrite the real managed
         # executable with a symlink to itself (issue #1813). It must now be
         # rejected before any visible-link replacement happens.

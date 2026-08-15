@@ -31,8 +31,6 @@ use super::selection_popup_common::GenericDisplayRow;
 use super::selection_popup_common::measure_rows_height;
 use super::selection_popup_common::render_rows;
 
-const MEMORIES_DOC_URL: &str = "https://developers.openai.com/codex/memories";
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum MemoriesSetting {
     Use,
@@ -101,7 +99,10 @@ impl MemoriesSettingsView {
             app_event_tx,
             docs_link: Line::from(vec![
                 "Learn more: ".dim(),
-                MEMORIES_DOC_URL.cyan().underlined(),
+                codex_product_info::Product::current()
+                    .memories_docs_url()
+                    .cyan()
+                    .underlined(),
             ]),
             keymap,
         };
@@ -117,7 +118,11 @@ impl MemoriesSettingsView {
         let mut header = ColumnRenderable::new();
         header.push(Line::from("Memories".bold()));
         header.push(Line::from(
-            "Choose how Codex uses and creates memories. Changes are saved to config.toml".dim(),
+            format!(
+                "Choose how {} uses and creates memories. Changes are saved to config.toml",
+                codex_product_info::Product::current().short_display_name()
+            )
+            .dim(),
         ));
         header
     }
@@ -126,8 +131,11 @@ impl MemoriesSettingsView {
         let mut header = ColumnRenderable::new();
         header.push(Line::from("Reset all memories?".bold()));
         header.push(Line::from(
-            "This clears local memory files and rollout summaries for the current Codex home."
-                .dim(),
+            format!(
+                "This clears local memory files and rollout summaries for the current {} home.",
+                codex_product_info::Product::current().short_display_name()
+            )
+            .dim(),
         ));
         header
     }
@@ -426,7 +434,11 @@ impl Renderable for MemoriesSettingsView {
         }
         if self.reset_confirmation.is_none() {
             self.docs_link.clone().render(docs_area, buf);
-            crate::terminal_hyperlinks::mark_url_hyperlink(buf, docs_area, MEMORIES_DOC_URL);
+            crate::terminal_hyperlinks::mark_url_hyperlink(
+                buf,
+                docs_area,
+                codex_product_info::Product::current().memories_docs_url(),
+            );
         }
 
         let hint_area = Rect {

@@ -127,6 +127,7 @@ Open Interpreter ships with a QA skill that lets any model operate and test inte
 - [Codex SDK](https://www.openinterpreter.com/docs/terminal/sdk)
 - [Portability](https://www.openinterpreter.com/docs/terminal/portability)
 - [Sandbox & approvals](https://www.openinterpreter.com/docs/terminal/sandbox?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=sandbox_approvals)
+- [Branding a distribution fork](FORK_BRANDING.md)
 
 Provider and model membership is generated, not maintained as Rust lists. From
 `codex-rs`, refresh all hosted providers with

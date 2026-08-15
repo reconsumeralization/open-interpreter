@@ -266,8 +266,9 @@ impl App {
                     setting,
                     "failed to refresh effective config after an overridden write"
                 );
+                let product_name = codex_product_info::Product::current().short_display_name();
                 self.chat_widget.add_error_message(format!(
-                    "{setting} were saved, but Codex could not refresh the effective config: {err}"
+                    "{setting} were saved, but {product_name} could not refresh the effective config: {err}"
                 ));
                 None
             }

@@ -72,10 +72,10 @@ pub(super) fn updates_check(config: &Config) -> DoctorCheck {
             NpmRootCheck::MissingPackageRoot => {
                 status = status.max(CheckStatus::Warning);
                 summary = "npm update target could not be proven".to_string();
-                remediation = Some(
-                    "Reinstall or update Codex so the JS shim provides CODEX_MANAGED_PACKAGE_ROOT."
-                        .to_string(),
-                );
+                remediation = Some(format!(
+                    "Reinstall or update {} so the JS shim provides the managed package root.",
+                    Product::current().short_display_name()
+                ));
             }
             NpmRootCheck::NpmUnavailable(error) => {
                 status = status.max(CheckStatus::Warning);

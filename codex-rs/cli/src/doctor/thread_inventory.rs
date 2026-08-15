@@ -4,6 +4,7 @@ use super::CheckStatus;
 use super::Config;
 use super::DoctorCheck;
 use super::DoctorIssue;
+use codex_product_info::Product;
 use codex_protocol::protocol::InternalSessionSource;
 use codex_protocol::protocol::RolloutItem;
 use codex_protocol::protocol::RolloutLine;
@@ -193,11 +194,15 @@ fn missing_state_db_check(scan: RolloutScan, details: Vec<String>) -> DoctorChec
                 )
                 .measured(format!("{} rollout files", scan.files.len()))
                 .expected("state DB contains matching thread rows")
-                .remedy("Start Codex with no state DB present so startup backfill can create it from rollout files."),
+                .remedy(format!(
+                    "Start {} with no state DB present so startup backfill can create it from rollout files.",
+                    Product::current().short_display_name()
+                )),
         )
-            .remediation(
-                "Start Codex with no state DB present so startup backfill can create it from rollout files.",
-            );
+            .remediation(format!(
+                "Start {} with no state DB present so startup backfill can create it from rollout files.",
+                Product::current().short_display_name()
+            ));
     }
     if !scan.scan_errors.is_empty() || !scan.malformed_names.is_empty() || scan.reached_scan_cap {
         check = check.issue(

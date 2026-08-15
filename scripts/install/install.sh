@@ -5,17 +5,17 @@ set -eu
 RELEASE="${OPEN_INTERPRETER_RELEASE:-${CODEX_RELEASE:-latest}}"
 NON_INTERACTIVE="${OPEN_INTERPRETER_NONINTERACTIVE:-${CODEX_NON_INTERACTIVE:-false}}"
 GITHUB_REPO="${OPEN_INTERPRETER_GITHUB_REPO:-${CODEX_GITHUB_REPO:-openinterpreter/openinterpreter}}"
-PRODUCT_NAME="${CODEX_INSTALL_PRODUCT_NAME:-Open Interpreter}"
-PACKAGE_ASSET_STEM="${CODEX_PACKAGE_ASSET_STEM:-open-interpreter-package}"
-COMMAND_NAME="${CODEX_COMMAND_NAME:-interpreter}"
-ALIAS_COMMAND_NAMES="${CODEX_ALIAS_COMMAND_NAMES:-i}"
-RELEASE_TAG_PREFIX="${CODEX_RELEASE_TAG_PREFIX:-rust-v}"
+PRODUCT_NAME="${OPEN_INTERPRETER_PRODUCT_NAME:-${CODEX_INSTALL_PRODUCT_NAME:-Open Interpreter}}"
+PACKAGE_ASSET_STEM="${OPEN_INTERPRETER_PACKAGE_ASSET_STEM:-${CODEX_PACKAGE_ASSET_STEM:-open-interpreter-package}}"
+COMMAND_NAME="${OPEN_INTERPRETER_COMMAND_NAME:-${CODEX_COMMAND_NAME:-interpreter}}"
+ALIAS_COMMAND_NAMES="${OPEN_INTERPRETER_ALIAS_COMMAND_NAMES:-${CODEX_ALIAS_COMMAND_NAMES:-i}}"
+RELEASE_TAG_PREFIX="${OPEN_INTERPRETER_RELEASE_TAG_PREFIX:-${CODEX_RELEASE_TAG_PREFIX:-rust-v}}"
 
 BIN_DIR="${OPEN_INTERPRETER_INSTALL_DIR:-${CODEX_INSTALL_DIR:-$HOME/.local/bin}}"
 BIN_PATH="$BIN_DIR/$COMMAND_NAME"
 CODE_MODE_HOST_BIN_PATH="$BIN_DIR/codex-code-mode-host"
-CODEX_HOME_DIR="${INTERPRETER_HOME:-${CODEX_HOME:-$HOME/.openinterpreter}}"
-STANDALONE_ROOT="$CODEX_HOME_DIR/packages/standalone"
+INTERPRETER_HOME_DIR="${INTERPRETER_HOME:-${CODEX_HOME:-$HOME/.openinterpreter}}"
+STANDALONE_ROOT="$INTERPRETER_HOME_DIR/packages/standalone"
 RELEASES_DIR="$STANDALONE_ROOT/releases"
 CURRENT_LINK="$STANDALONE_ROOT/current"
 LOCK_FILE="$STANDALONE_ROOT/install.lock"
@@ -82,8 +82,8 @@ parse_args() {
 Usage: install.sh [--release VERSION]
 
 Environment:
-  CODEX_RELEASE          Version to install; overridden by --release.
-  CODEX_NON_INTERACTIVE  Set to 1, true, or yes to skip prompts.
+  OPEN_INTERPRETER_RELEASE         Version to install; overridden by --release.
+  OPEN_INTERPRETER_NONINTERACTIVE  Set to 1, true, or yes to skip prompts.
 EOF
         exit 0
         ;;
@@ -917,8 +917,8 @@ reject_self_referential_install_dir() {
   bin_dir_real="$(resolve_dir_realpath "$BIN_DIR")"
 
   if [ -n "$managed_dir_real" ] && [ "$managed_dir_real" = "$bin_dir_real" ]; then
-    echo "CODEX_INSTALL_DIR ($BIN_DIR) resolves to this release's managed executable directory ($managed_dir_real)." >&2
-    echo "Installing here would overwrite the managed executable with a self-referential symlink. Choose a different CODEX_INSTALL_DIR." >&2
+    echo "OPEN_INTERPRETER_INSTALL_DIR ($BIN_DIR) resolves to this release's managed executable directory ($managed_dir_real)." >&2
+    echo "Installing here would overwrite the managed executable with a self-referential symlink. Choose a different OPEN_INTERPRETER_INSTALL_DIR." >&2
     exit 1
   fi
 }

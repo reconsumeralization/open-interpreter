@@ -322,7 +322,7 @@ pub(crate) fn empty_mcp_output() -> WebHyperlinkHistoryCell {
     let mut docs_line = HyperlinkLine::new(Line::from("    See the "));
     docs_line.push_span(
         "MCP docs".underlined(),
-        Some("https://developers.openai.com/codex/mcp"),
+        Some(codex_product_info::Product::current().mcp_docs_url()),
     );
     docs_line.push_span(" to configure them.".into(), /*destination*/ None);
 

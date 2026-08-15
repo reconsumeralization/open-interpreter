@@ -994,19 +994,19 @@ fn chatgpt_sign_in_intro(product: Product) -> &'static str {
 fn api_key_billing_copy(product: Product) -> String {
     format!(
         "  {} will use usage-based billing with your API key.",
-        product.display_name()
+        product.short_display_name()
     )
 }
 
 fn chatgpt_success_autonomy_copy(product: Product) -> String {
     format!(
         "  Decide how much autonomy you want to grant {}",
-        product.display_name()
+        product.short_display_name()
     )
 }
 
 fn chatgpt_success_mistakes_copy(product: Product) -> String {
-    format!("  {} can make mistakes", product.display_name())
+    format!("  {} can make mistakes", product.short_display_name())
 }
 
 fn chatgpt_success_docs_link(product: Product) -> (&'static str, &'static str) {

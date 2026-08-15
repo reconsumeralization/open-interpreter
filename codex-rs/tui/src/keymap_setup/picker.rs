@@ -304,7 +304,10 @@ fn keymap_debug_tab() -> SelectionTab {
         label: "Debug".to_string(),
         header: keymap_header(
             "Inspect keypresses from your terminal.".to_string(),
-            "See the key Codex detects and any shortcuts assigned to it.".to_string(),
+            format!(
+                "See the key {} detects and any shortcuts assigned to it.",
+                codex_product_info::Product::current().short_display_name()
+            ),
         ),
         items: vec![SelectionItem {
             name: "Inspect keypresses".to_string(),

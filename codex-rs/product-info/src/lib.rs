@@ -1,4 +1,7 @@
 pub const OPEN_INTERPRETER_BRAND_ENV_VAR: &str = "OPEN_INTERPRETER_BRAND";
+pub const OPEN_INTERPRETER_DISPLAY_NAME: &str = "Open Interpreter";
+pub const OPEN_INTERPRETER_COMMAND_NAME: &str = "interpreter";
+pub const OPEN_INTERPRETER_NON_INTERACTIVE_ENV_VAR: &str = "OPEN_INTERPRETER_NONINTERACTIVE";
 
 /// Upstream Codex release whose client behavior is embedded in Open Interpreter.
 ///
@@ -14,17 +17,25 @@ const OPEN_INTERPRETER_LATEST_RELEASE_URL: &str =
     "https://api.github.com/repos/openinterpreter/openinterpreter/releases/latest";
 const CODEX_INSTALLER_URL: &str = "https://chatgpt.com/codex/install.sh";
 const OPEN_INTERPRETER_INSTALLER_URL: &str = "https://www.openinterpreter.com/install";
+const CODEX_MEMORIES_DOCS_URL: &str = "https://developers.openai.com/codex/memories";
+const OPEN_INTERPRETER_MEMORIES_DOCS_URL: &str =
+    "https://www.openinterpreter.com/docs/terminal/memories";
+const CODEX_MCP_DOCS_URL: &str = "https://developers.openai.com/codex/mcp";
+const OPEN_INTERPRETER_MCP_DOCS_URL: &str = "https://www.openinterpreter.com/docs/terminal/mcp";
+const CODEX_WINDOWS_SANDBOX_DOCS_URL: &str = "https://developers.openai.com/codex/windows";
+const OPEN_INTERPRETER_WINDOWS_SANDBOX_DOCS_URL: &str =
+    "https://www.openinterpreter.com/docs/terminal/configuration";
 const CODEX_INSTALL_COMMAND: &str = "curl -fsSL https://chatgpt.com/codex/install.sh | sh";
 const OPEN_INTERPRETER_INSTALL_COMMAND: &str = "\
 curl -fsSL https://www.openinterpreter.com/install | sh";
 const CODEX_STANDALONE_UNIX_UPDATE_COMMAND: &str =
     "curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh";
 const OPEN_INTERPRETER_STANDALONE_UNIX_UPDATE_COMMAND: &str = "\
-curl -fsSL https://www.openinterpreter.com/install | CODEX_NON_INTERACTIVE=1 sh";
+curl -fsSL https://www.openinterpreter.com/install | OPEN_INTERPRETER_NONINTERACTIVE=1 sh";
 const CODEX_STANDALONE_WINDOWS_UPDATE_COMMAND: &str =
     "$env:CODEX_NON_INTERACTIVE=1; irm https://chatgpt.com/codex/install.ps1 | iex";
 const OPEN_INTERPRETER_STANDALONE_WINDOWS_UPDATE_COMMAND: &str = "\
-$env:CODEX_NON_INTERACTIVE=1; \
+$env:OPEN_INTERPRETER_NONINTERACTIVE=1; \
 irm https://www.openinterpreter.com/install.ps1 | iex";
 const CODEX_STANDALONE_UNIX_UPDATE_ARGS: &[&str] = &["-c", CODEX_STANDALONE_UNIX_UPDATE_COMMAND];
 const OPEN_INTERPRETER_STANDALONE_UNIX_UPDATE_ARGS: &[&str] =
@@ -69,14 +80,21 @@ impl Product {
     pub fn display_name(self) -> &'static str {
         match self {
             Product::Codex => "OpenAI Codex",
-            Product::OpenInterpreter => "Open Interpreter",
+            Product::OpenInterpreter => OPEN_INTERPRETER_DISPLAY_NAME,
+        }
+    }
+
+    pub fn short_display_name(self) -> &'static str {
+        match self {
+            Product::Codex => "Codex",
+            Product::OpenInterpreter => OPEN_INTERPRETER_DISPLAY_NAME,
         }
     }
 
     pub fn command_name(self) -> &'static str {
         match self {
             Product::Codex => "codex",
-            Product::OpenInterpreter => "interpreter",
+            Product::OpenInterpreter => OPEN_INTERPRETER_COMMAND_NAME,
         }
     }
 
@@ -109,6 +127,27 @@ impl Product {
         }
     }
 
+    pub fn memories_docs_url(self) -> &'static str {
+        match self {
+            Product::Codex => CODEX_MEMORIES_DOCS_URL,
+            Product::OpenInterpreter => OPEN_INTERPRETER_MEMORIES_DOCS_URL,
+        }
+    }
+
+    pub fn mcp_docs_url(self) -> &'static str {
+        match self {
+            Product::Codex => CODEX_MCP_DOCS_URL,
+            Product::OpenInterpreter => OPEN_INTERPRETER_MCP_DOCS_URL,
+        }
+    }
+
+    pub fn windows_sandbox_docs_url(self) -> &'static str {
+        match self {
+            Product::Codex => CODEX_WINDOWS_SANDBOX_DOCS_URL,
+            Product::OpenInterpreter => OPEN_INTERPRETER_WINDOWS_SANDBOX_DOCS_URL,
+        }
+    }
+
     pub fn install_command(self) -> &'static str {
         match self {
             Product::Codex => CODEX_INSTALL_COMMAND,
@@ -119,7 +158,7 @@ impl Product {
     pub fn installer_env(self) -> &'static [(&'static str, &'static str)] {
         match self {
             Product::Codex => &[],
-            Product::OpenInterpreter => &[("CODEX_NON_INTERACTIVE", "1")],
+            Product::OpenInterpreter => &[(OPEN_INTERPRETER_NON_INTERACTIVE_ENV_VAR, "1")],
         }
     }
 
@@ -258,7 +297,19 @@ mod tests {
         );
         assert_eq!(
             Product::OpenInterpreter.installer_env(),
-            &[("CODEX_NON_INTERACTIVE", "1")]
+            &[(OPEN_INTERPRETER_NON_INTERACTIVE_ENV_VAR, "1")]
+        );
+        assert!(
+            Product::OpenInterpreter
+                .standalone_unix_update_args()
+                .join(" ")
+                .contains("OPEN_INTERPRETER_NONINTERACTIVE=1")
+        );
+        assert!(
+            Product::OpenInterpreter
+                .standalone_windows_update_args()
+                .join(" ")
+                .contains("OPEN_INTERPRETER_NONINTERACTIVE=1")
         );
     }
 }

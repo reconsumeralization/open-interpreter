@@ -13,7 +13,14 @@ const MAX_OPEN_TABS_CHARS: usize = 20_000;
 // raw prompt before this marker, then transcript rendering strips back to the request after the last
 // marker. Keeping the same marker and stripping semantics lets threads created with IDE context in
 // one surface replay cleanly in the others.
-const PROMPT_REQUEST_BEGIN: &str = "## My request for Codex:";
+const LEGACY_PROMPT_REQUEST_BEGIN: &str = "## My request for Codex:";
+
+fn prompt_request_begin() -> String {
+    format!(
+        "## My request for {}:",
+        codex_product_info::Product::current().short_display_name()
+    )
+}
 
 pub(crate) fn apply_ide_context_to_user_input(
     context: &IdeContext,
@@ -23,7 +30,7 @@ pub(crate) fn apply_ide_context_to_user_input(
         return false;
     };
 
-    let prefix = format!("{context_text}\n{PROMPT_REQUEST_BEGIN}\n");
+    let prefix = format!("{context_text}\n{}\n", prompt_request_begin());
     if let Some(text_index) = items
         .iter()
         .position(|item| matches!(item, UserInput::Text { .. }))
@@ -63,11 +70,17 @@ pub(crate) fn has_prompt_context(context: &IdeContext) -> bool {
 }
 
 pub(crate) fn extract_prompt_request_with_offset(message: &str) -> (&str, usize) {
-    let Some((before_request, request)) = message.rsplit_once(PROMPT_REQUEST_BEGIN) else {
+    let current_marker = prompt_request_begin();
+    let Some((marker_start, marker)) = [current_marker.as_str(), LEGACY_PROMPT_REQUEST_BEGIN]
+        .into_iter()
+        .filter_map(|marker| message.rfind(marker).map(|start| (start, marker)))
+        .max_by_key(|(start, _)| *start)
+    else {
         return (message, 0);
     };
 
-    let request_start = before_request.len() + PROMPT_REQUEST_BEGIN.len();
+    let request_start = marker_start + marker.len();
+    let request = &message[request_start..];
     let trimmed_request = request.trim();
     let leading_trimmed_len = request.len() - request.trim_start().len();
     (trimmed_request, request_start + leading_trimmed_len)

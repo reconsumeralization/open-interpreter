@@ -72,10 +72,11 @@ pub(super) struct HumanOutputOptions {
 /// output intact but hides that row from the human view.
 pub(super) fn render_human_report(report: &DoctorReport, options: HumanOutputOptions) -> String {
     let mut out = String::new();
+    let product_name = codex_product_info::Product::current().short_display_name();
     let _ = writeln!(
         out,
         "{} {}",
-        bold("Codex Doctor", options),
+        bold(&format!("{product_name} Doctor"), options),
         dim(&header_suffix(report), options)
     );
     out.push('\n');
@@ -455,7 +456,10 @@ fn write_footer(out: &mut String, options: HumanOutputOptions) {
             out,
             "{}",
             dim(
-                "Run codex doctor without --summary for detailed diagnostics.",
+                &format!(
+                    "Run {} doctor without --summary for detailed diagnostics.",
+                    codex_product_info::Product::current().command_name()
+                ),
                 options
             )
         );

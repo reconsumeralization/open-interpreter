@@ -508,9 +508,11 @@ impl AppServerAcpAgent {
         if response.account.is_some() || !response.requires_openai_auth {
             Ok(AuthenticateResponse::new())
         } else {
-            Err(Error::auth_required().data(
-                "Codex is not authenticated. Run `interpreter login` or configure an API key.",
-            ))
+            Err(Error::auth_required().data(format!(
+                "{} is not authenticated. Run `{} login` or configure an API key.",
+                codex_product_info::Product::current().short_display_name(),
+                codex_product_info::Product::current().command_name(),
+            )))
         }
     }
 

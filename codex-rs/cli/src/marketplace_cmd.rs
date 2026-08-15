@@ -28,8 +28,31 @@ use crate::plugin_cmd::configured_marketplace_snapshot_issues;
 use crate::plugin_cmd::configured_marketplace_sources;
 use crate::plugin_cmd::load_cli_auth_mode;
 
+fn marketplace_command(suffix: &str) -> String {
+    format!(
+        "{} plugin marketplace{suffix}",
+        codex_product_info::Product::current().command_name()
+    )
+}
+
+fn add_marketplace_examples() -> String {
+    let command = marketplace_command(" add");
+    format!(
+        "Examples:\n  {command} ./path/to/marketplace\n  {command} owner/repo --ref main\n  {command} https://github.com/owner/repo --sparse plugins/foo"
+    )
+}
+
+fn upgrade_marketplace_examples() -> String {
+    let command = marketplace_command(" upgrade");
+    format!("Examples:\n  {command}\n  {command} debug")
+}
+
+fn remove_marketplace_examples() -> String {
+    format!("Example:\n  {} debug", marketplace_command(" remove"))
+}
+
 #[derive(Debug, Parser)]
-#[command(bin_name = "codex plugin marketplace")]
+#[command(bin_name = marketplace_command(""))]
 pub struct MarketplaceCli {
     #[clap(flatten)]
     pub config_overrides: CliConfigOverrides,
@@ -43,7 +66,7 @@ enum MarketplaceSubcommand {
     /// Add a local or Git marketplace to the configured marketplace sources.
     Add(AddMarketplaceArgs),
 
-    /// List plugin marketplaces Codex is currently considering and their roots.
+    /// List plugin marketplaces the agent is currently considering and their roots.
     List(ListMarketplaceArgs),
 
     /// Refresh configured Git marketplace snapshots.
@@ -57,8 +80,8 @@ enum MarketplaceSubcommand {
 
 #[derive(Debug, Parser)]
 #[command(
-    bin_name = "codex plugin marketplace add",
-    after_help = "Examples:\n  codex plugin marketplace add ./path/to/marketplace\n  codex plugin marketplace add owner/repo --ref main\n  codex plugin marketplace add https://github.com/owner/repo --sparse plugins/foo"
+    bin_name = marketplace_command(" add"),
+    after_help = add_marketplace_examples()
 )]
 struct AddMarketplaceArgs {
     /// Marketplace source: a local path, owner/repo[@ref], HTTPS Git URL, or SSH Git URL.
@@ -83,7 +106,7 @@ struct AddMarketplaceArgs {
 }
 
 #[derive(Debug, Parser)]
-#[command(bin_name = "codex plugin marketplace list")]
+#[command(bin_name = marketplace_command(" list"))]
 struct ListMarketplaceArgs {
     /// Output marketplace list as JSON.
     #[arg(long = "json")]
@@ -92,8 +115,8 @@ struct ListMarketplaceArgs {
 
 #[derive(Debug, Parser)]
 #[command(
-    bin_name = "codex plugin marketplace upgrade",
-    after_help = "Examples:\n  codex plugin marketplace upgrade\n  codex plugin marketplace upgrade debug"
+    bin_name = marketplace_command(" upgrade"),
+    after_help = upgrade_marketplace_examples()
 )]
 struct UpgradeMarketplaceArgs {
     /// Optional configured marketplace name to upgrade. Omit to upgrade all Git marketplaces.
@@ -107,8 +130,8 @@ struct UpgradeMarketplaceArgs {
 
 #[derive(Debug, Parser)]
 #[command(
-    bin_name = "codex plugin marketplace remove",
-    after_help = "Example:\n  codex plugin marketplace remove debug"
+    bin_name = marketplace_command(" remove"),
+    after_help = remove_marketplace_examples()
 )]
 struct RemoveMarketplaceArgs {
     /// Configured marketplace name to remove.

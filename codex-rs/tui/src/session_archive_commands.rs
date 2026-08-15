@@ -83,7 +83,9 @@ pub async fn run_session_archive_command(
     target: String,
     options: SessionArchiveCommandOptions,
 ) -> Result<String> {
-    let codex_home = find_codex_home().wrap_err("failed to find Codex home")?;
+    let product_name = codex_product_info::Product::current().short_display_name();
+    let codex_home =
+        find_codex_home().wrap_err_with(|| format!("failed to find {product_name} home"))?;
     let mut app_server =
         start_app_server_for_archive_command(options, codex_home.to_path_buf()).await?;
     run_session_archive_action_with_app_server(

@@ -6,6 +6,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use codex_git_utils::get_git_repo_root;
+use codex_product_info::Product;
 use tokio::process::Command;
 use tokio::time::timeout;
 
@@ -120,7 +121,10 @@ fn git_check_from_inputs(inputs: GitCheckInputs) -> DoctorCheck {
                 "Git executable was found on PATH but did not return a version",
             )
             .expected("git --version succeeds")
-            .remedy("Fix the selected Git executable or PATH so Codex can inspect Git metadata.")
+            .remedy(format!(
+                "Fix the selected Git executable or PATH so {} can inspect Git metadata.",
+                Product::current().short_display_name()
+            ))
             .field("git version")
             .field("selected git"),
         );
@@ -133,7 +137,10 @@ fn git_check_from_inputs(inputs: GitCheckInputs) -> DoctorCheck {
                 "Git repository detected but git executable was not found",
             )
             .expected("git available on PATH")
-            .remedy("Install Git or fix PATH so Codex can inspect repository metadata.")
+            .remedy(format!(
+                "Install Git or fix PATH so {} can inspect repository metadata.",
+                Product::current().short_display_name()
+            ))
             .field("selected git"),
         );
     } else if let Some(cause) =
@@ -145,9 +152,10 @@ fn git_check_from_inputs(inputs: GitCheckInputs) -> DoctorCheck {
             DoctorIssue::new(CheckStatus::Warning, cause)
                 .measured(inputs.git_version.unwrap_or_else(|| "unknown".to_string()))
                 .expected("current Git for Windows")
-                .remedy(
-                    "Update Git for Windows or the bundled Git executable Codex resolves first.",
-                )
+                .remedy(format!(
+                    "Update Git for Windows or the bundled Git executable {} resolves first.",
+                    Product::current().short_display_name()
+                ))
                 .field("git version")
                 .field("selected git"),
         );

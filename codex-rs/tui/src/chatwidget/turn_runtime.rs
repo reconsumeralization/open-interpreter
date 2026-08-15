@@ -347,7 +347,10 @@ impl ChatWidget {
         self.finalize_turn();
 
         let message = if message.trim().is_empty() {
-            "Codex is currently experiencing high load.".to_string()
+            format!(
+                "{} is currently experiencing high load.",
+                codex_product_info::Product::current().short_display_name()
+            )
         } else {
             message
         };
@@ -410,16 +413,16 @@ impl ChatWidget {
         self.codex_rate_limit_reached_type = rate_limit_reached_type;
         match rate_limit_reached_type {
             Some(RateLimitReachedType::WorkspaceOwnerCreditsDepleted) => {
-                self.on_error(
-                    "You're out of credits. Your workspace is out of credits. Add credits to continue using Codex."
-                        .to_string(),
-                );
+                self.on_error(format!(
+                    "You're out of credits. Your workspace is out of credits. Add credits to continue using {}.",
+                    codex_product_info::Product::current().short_display_name()
+                ));
             }
             Some(RateLimitReachedType::WorkspaceOwnerUsageLimitReached) => {
-                self.on_error(
-                    "Usage limit reached. You've reached your usage limit. Increase your limits to continue using codex."
-                        .to_string(),
-                );
+                self.on_error(format!(
+                    "Usage limit reached. You've reached your usage limit. Increase your limits to continue using {}.",
+                    codex_product_info::Product::current().short_display_name()
+                ));
             }
             Some(RateLimitReachedType::WorkspaceMemberCreditsDepleted) => {
                 self.on_error(message);

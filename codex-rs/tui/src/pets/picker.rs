@@ -16,6 +16,7 @@ use crate::bottom_pane::SelectionItem;
 use crate::bottom_pane::SelectionViewParams;
 use crate::bottom_pane::SideContentWidth;
 use crate::bottom_pane::popup_consts::standard_popup_hint_line;
+use codex_product_info::Product;
 
 use super::DEFAULT_PET_ID;
 use super::DISABLED_PET_ID;
@@ -39,7 +40,7 @@ struct PetPickerEntry {
 /// Build the selection popup parameters for `/pets`.
 ///
 /// The picker preselects `DEFAULT_PET_ID` when no pet is configured so the UI
-/// has a sensible starting point without implying that Codex is already the
+/// has a sensible starting point without implying that the default pet is already the
 /// active ambient pet. Callers should treat the returned actions as the only
 /// supported mutation path; bypassing them would skip preview-loading and
 /// selection-specific event wiring.
@@ -136,13 +137,25 @@ pub(crate) fn build_pet_picker_params(
 }
 
 fn available_pet_entries(codex_home: &Path) -> Vec<PetPickerEntry> {
+    let product = Product::current();
     let mut entries = catalog::BUILTIN_PETS
         .iter()
         .map(|pet| PetPickerEntry {
             selector: pet.id.to_string(),
             legacy_selector: None,
-            display_name: pet.display_name.to_string(),
-            description: Some(pet.description.to_string()),
+            display_name: if pet.id == "codex" && product == Product::OpenInterpreter {
+                "Classic".to_string()
+            } else {
+                pet.display_name.to_string()
+            },
+            description: Some(
+                if pet.id == "codex" && product == Product::OpenInterpreter {
+                    "The original terminal companion"
+                } else {
+                    pet.description
+                }
+                .to_string(),
+            ),
         })
         .collect::<Vec<_>>();
     entries.push(PetPickerEntry {

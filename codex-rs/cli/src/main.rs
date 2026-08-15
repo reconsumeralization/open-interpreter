@@ -129,7 +129,7 @@ struct MultitoolCli {
 
 #[derive(Debug, clap::Subcommand)]
 enum Subcommand {
-    /// Run Codex non-interactively.
+    /// Run the agent non-interactively.
     #[clap(visible_alias = "e")]
     Exec(ExecCli),
 
@@ -142,13 +142,13 @@ enum Subcommand {
     /// Remove stored authentication credentials.
     Logout(LogoutCommand),
 
-    /// Manage external MCP servers for Codex.
+    /// Manage external MCP servers.
     Mcp(McpCli),
 
-    /// Manage Codex plugins.
+    /// Manage plugins.
     Plugin(PluginCli),
 
-    /// Start Codex as an MCP server (stdio).
+    /// Start the agent as an MCP server (stdio).
     McpServer(McpServerCommand),
 
     /// [experimental] Run as an Agent Client Protocol (ACP) agent over stdio.
@@ -167,13 +167,13 @@ enum Subcommand {
     /// Generate shell completion scripts.
     Completion(CompletionCommand),
 
-    /// Update Codex to the latest version.
+    /// Update to the latest version.
     Update,
 
-    /// Diagnose local Codex installation, config, auth, and runtime health.
+    /// Diagnose the local installation, config, auth, and runtime health.
     Doctor(DoctorCommand),
 
-    /// Run commands within a Codex-provided sandbox.
+    /// Run commands within the agent-provided sandbox.
     Sandbox(HostSandboxArgs),
 
     /// Debugging tools.
@@ -183,7 +183,7 @@ enum Subcommand {
     #[clap(hide = true)]
     Execpolicy(ExecpolicyCommand),
 
-    /// Apply the latest diff produced by Codex agent as a `git apply` to your local working tree.
+    /// Apply the latest diff produced by the agent as a `git apply` to your local working tree.
     #[clap(visible_alias = "a")]
     Apply(ApplyCommand),
 
@@ -202,7 +202,7 @@ enum Subcommand {
     /// Fork a previous interactive session (picker by default; use --last to fork the most recent).
     Fork(ForkCommand),
 
-    /// [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally.
+    /// [EXPERIMENTAL] Browse remote tasks and apply changes locally.
     #[clap(name = "cloud", alias = "cloud-tasks")]
     Cloud(CloudTasksCli),
 
@@ -292,7 +292,7 @@ struct DebugModelsCommand {
 
 #[derive(Debug, Parser)]
 struct ReviewCommand {
-    /// Error out when config.toml contains fields that are not recognized by this version of Codex.
+    /// Error out when config.toml contains fields that this version does not recognize.
     #[arg(long = "strict-config", default_value_t = false)]
     strict_config: bool,
 
@@ -302,7 +302,7 @@ struct ReviewCommand {
 
 #[derive(Debug, Parser)]
 struct McpServerCommand {
-    /// Error out when config.toml contains fields that are not recognized by this version of Codex.
+    /// Error out when config.toml contains fields that this version does not recognize.
     #[arg(long = "strict-config", default_value_t = false)]
     strict_config: bool,
 }
@@ -362,7 +362,7 @@ struct SessionArchiveConfigOverrides {
     #[clap(flatten)]
     shared: SharedCliOptions,
 
-    /// Error out when config.toml contains fields that are not recognized by this version of Codex.
+    /// Error out when config.toml contains fields that this version does not recognize.
     #[arg(long = "strict-config", default_value_t = false)]
     strict_config: bool,
 
@@ -441,7 +441,7 @@ type HostSandboxArgs = UnsupportedSandboxArgs;
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 #[derive(Debug, Parser)]
 struct UnsupportedSandboxArgs {
-    /// Layer $CODEX_HOME/<name>.config.toml on top of the base user config.
+    /// Layer a named profile config on top of the base user config.
     #[arg(long = "profile", short = 'p')]
     pub config_profile: Option<ProfileV2Name>,
 
@@ -473,13 +473,13 @@ struct LoginCommand {
 
     #[arg(
         long = "with-api-key",
-        help = "Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`)"
+        help = api_key_login_help()
     )]
     with_api_key: bool,
 
     #[arg(
         long = "with-access-token",
-        help = "Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | codex login --with-access-token`)"
+        help = access_token_login_help()
     )]
     with_access_token: bool,
 
@@ -530,7 +530,7 @@ struct AppServerCommand {
     #[command(flatten)]
     code_mode_host: codex_app_server::AppServerCodeModeHostArgs,
 
-    /// Error out when config.toml contains fields that are not recognized by this version of Codex.
+    /// Error out when config.toml contains fields that this version does not recognize.
     #[arg(long = "strict-config", default_value_t = false)]
     strict_config: bool,
 
@@ -575,7 +575,7 @@ struct AppServerCommand {
 
 #[derive(Debug, Parser)]
 struct ExecServerCommand {
-    /// Error out when config.toml contains fields that are not recognized by this version of Codex.
+    /// Error out when config.toml contains fields that this version does not recognize.
     #[arg(long = "strict-config", default_value_t = false)]
     strict_config: bool,
 
@@ -786,7 +786,9 @@ fn handle_app_exit(exit_info: AppExitInfo) -> anyhow::Result<()> {
 fn run_update_action(action: UpdateAction) -> anyhow::Result<()> {
     println!();
     let cmd_str = action.command_str();
-    println!("Updating Codex via `{cmd_str}`...");
+    let product = codex_product_info::Product::current();
+    let product_name = product.short_display_name();
+    println!("Updating {product_name} via `{cmd_str}`...");
 
     let status = {
         #[cfg(windows)]
@@ -821,23 +823,29 @@ fn run_update_action(action: UpdateAction) -> anyhow::Result<()> {
     if !status.success() {
         anyhow::bail!("`{cmd_str}` failed with status {status}");
     }
-    println!("\n🎉 Update ran successfully! Please restart Codex.");
+    println!("\n🎉 Update ran successfully! Please restart {product_name}.");
     Ok(())
 }
 
 fn run_update_command() -> anyhow::Result<()> {
     #[cfg(debug_assertions)]
     {
+        let product = codex_product_info::Product::current();
+        let command_name = product.command_name();
+        let product_name = product.short_display_name();
         anyhow::bail!(
-            "`codex update` is not available in debug builds. Install a release build of Codex to use this command."
+            "`{command_name} update` is not available in debug builds. Install a release build of {product_name} to use this command."
         );
     }
 
     #[cfg(not(debug_assertions))]
     {
+        let product = codex_product_info::Product::current();
+        let product_name = product.short_display_name();
         let Some(action) = codex_tui::get_update_action() else {
             anyhow::bail!(
-                "Could not detect the Codex installation method. Please update manually: https://developers.openai.com/codex/cli/"
+                "Could not detect the {product_name} installation method. Please update manually: {}",
+                product.installer_url()
             );
         };
         run_update_action(action)
@@ -989,16 +997,27 @@ fn product_command_name() -> &'static str {
 fn product_about() -> String {
     format!(
         "{}\n\nIf no subcommand is specified, options will be forwarded to the interactive CLI.",
-        match codex_product_info::Product::current() {
-            codex_product_info::Product::Codex => "Codex CLI",
-            codex_product_info::Product::OpenInterpreter => "Open Interpreter",
-        }
+        codex_product_info::Product::current().display_name()
     )
 }
 
 fn product_usage() -> String {
     let command = product_command_name();
     format!("{command} [OPTIONS] [PROMPT]\n       {command} [OPTIONS] <COMMAND> [ARGS]")
+}
+
+fn api_key_login_help() -> String {
+    format!(
+        "Read the API key from stdin (e.g. `printenv OPENAI_API_KEY | {} login --with-api-key`)",
+        product_command_name()
+    )
+}
+
+fn access_token_login_help() -> String {
+    format!(
+        "Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | {} login --with-access-token`)",
+        product_command_name()
+    )
 }
 
 fn main() -> anyhow::Result<()> {
@@ -1440,8 +1459,9 @@ async fn cli_main(
                         )
                         .await;
                     } else if login_cli.api_key.is_some() {
+                        let command_name = product_command_name();
                         eprintln!(
-                            "The --api-key flag is no longer supported. Pipe the key instead, e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`."
+                            "The --api-key flag is no longer supported. Pipe the key instead, e.g. `printenv OPENAI_API_KEY | {command_name} login --with-api-key`."
                         );
                         std::process::exit(1);
                     } else if login_cli.with_api_key {
@@ -1564,7 +1584,10 @@ async fn cli_main(
             #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
             {
                 let _ = loader_overrides;
-                anyhow::bail!("`codex sandbox` is not supported on this operating system");
+                anyhow::bail!(
+                    "`{} sandbox` is not supported on this operating system",
+                    product_command_name()
+                );
             }
         }
         Some(Subcommand::Debug(DebugCommand { subcommand })) => match subcommand {
@@ -1763,10 +1786,12 @@ async fn run_exec_server_command(
     root_config_overrides: &CliConfigOverrides,
     strict_config: bool,
 ) -> anyhow::Result<()> {
-    let codex_self_exe = arg0_paths
-        .codex_self_exe
-        .clone()
-        .ok_or_else(|| anyhow::anyhow!("Codex executable path is not configured"))?;
+    let codex_self_exe = arg0_paths.codex_self_exe.clone().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} executable path is not configured",
+            codex_product_info::Product::current().short_display_name()
+        )
+    })?;
     let runtime_paths = codex_exec_server::ExecServerRuntimePaths::new(
         codex_self_exe,
         arg0_paths.codex_linux_sandbox_exe.clone(),
@@ -1873,10 +1898,10 @@ async fn load_exec_server_remote_auth_provider(
         return Ok(codex_model_provider::auth_provider_from_auth(&auth));
     }
 
-    let auth = load_exec_server_remote_auth(
-        config,
-        "remote exec-server registration requires ChatGPT authentication or API key authentication; run `codex login` or set CODEX_API_KEY",
-    )
+    let auth = load_exec_server_remote_auth(config, &format!(
+        "remote exec-server registration requires ChatGPT authentication or API key authentication; run `{} login` or set CODEX_API_KEY",
+        product_command_name()
+    ))
     .await?;
 
     if !is_supported_exec_server_remote_auth(&auth) {
@@ -1946,7 +1971,7 @@ async fn load_exec_server_config(
 
 async fn load_exec_server_remote_auth(
     config: &codex_core::config::Config,
-    missing_auth_error: &'static str,
+    missing_auth_error: &str,
 ) -> anyhow::Result<codex_login::CodexAuth> {
     let auth_manager =
         AuthManager::shared_from_config(config, /*enable_codex_api_key_env*/ true).await;
@@ -1958,7 +1983,7 @@ async fn load_exec_server_remote_auth(
             auth_manager
                 .auth()
                 .await
-                .ok_or_else(|| anyhow::anyhow!(missing_auth_error))?
+                .ok_or_else(|| anyhow::anyhow!("{missing_auth_error}"))?
         }
     };
 
@@ -2219,13 +2244,15 @@ fn reject_remote_mode_for_subcommand(
     subcommand: &str,
 ) -> anyhow::Result<()> {
     if let Some(remote) = remote {
+        let command_name = product_command_name();
         anyhow::bail!(
-            "`--remote {remote}` is only supported for interactive TUI commands, not `codex {subcommand}`"
+            "`--remote {remote}` is only supported for interactive TUI commands, not `{command_name} {subcommand}`"
         );
     }
     if remote_auth_token_env.is_some() {
+        let command_name = product_command_name();
         anyhow::bail!(
-            "`--remote-auth-token-env` is only supported for interactive TUI commands, not `codex {subcommand}`"
+            "`--remote-auth-token-env` is only supported for interactive TUI commands, not `{command_name} {subcommand}`"
         );
     }
     Ok(())
@@ -2317,7 +2344,10 @@ fn reject_strict_config_for_unsupported_subcommand(
     subcommand: &str,
 ) -> anyhow::Result<()> {
     if strict_config {
-        anyhow::bail!("`--strict-config` is not supported for `codex {subcommand}`");
+        anyhow::bail!(
+            "`--strict-config` is not supported for `{} {subcommand}`",
+            product_command_name()
+        );
     }
     Ok(())
 }
@@ -2448,8 +2478,9 @@ async fn run_interactive_tui(
             ));
         }
 
+        let product_name = codex_product_info::Product::current().short_display_name();
         eprintln!(
-            "WARNING: TERM is set to \"dumb\". Codex's interactive TUI may not work in this terminal."
+            "WARNING: TERM is set to \"dumb\". {product_name}'s interactive TUI may not work in this terminal."
         );
         if !confirm("Continue anyway? [y/N]: ")? {
             return Ok(AppExitInfo::fatal(
@@ -2501,7 +2532,8 @@ async fn run_interactive_tui(
             Err(backup_err) => {
                 local_state_db::print_diagnostic_guidance(startup_error);
                 return Ok(AppExitInfo::fatal(format!(
-                    "failed to move damaged Codex local database files into a backup folder automatically: {backup_err}"
+                    "failed to move damaged {} local database files into a backup folder automatically: {backup_err}",
+                    codex_product_info::Product::current().short_display_name()
                 )));
             }
         }

@@ -174,7 +174,7 @@ impl ChatWidget {
             return false;
         };
 
-        self.add_warning_message(message.to_string());
+        self.add_warning_message(message);
         true
     }
 

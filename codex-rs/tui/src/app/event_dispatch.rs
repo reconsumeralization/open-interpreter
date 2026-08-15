@@ -1959,8 +1959,11 @@ impl App {
                                     Line::from(vec!["• ".dim(), "Sandbox ready".into()]),
                                     Line::from(vec![
                                         "  ".into(),
-                                        "Codex can now safely edit files and execute commands in your computer"
-                                            .dark_gray(),
+                                        format!(
+                                            "{} can now safely edit files and execute commands on your computer",
+                                            codex_product_info::Product::current().short_display_name()
+                                        )
+                                        .dark_gray(),
                                     ]),
                                 ]);
                             } else {
@@ -1992,8 +1995,11 @@ impl App {
                                     Line::from(vec!["• ".dim(), "Sandbox ready".into()]),
                                     Line::from(vec![
                                         "  ".into(),
-                                        "Codex can now safely edit files and execute commands in your computer"
-                                            .dark_gray(),
+                                        format!(
+                                            "{} can now safely edit files and execute commands on your computer",
+                                            codex_product_info::Product::current().short_display_name()
+                                        )
+                                        .dark_gray(),
                                     ]),
                                 ]);
                             }
