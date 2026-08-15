@@ -136,6 +136,17 @@ jobs:
         with:
           target: ${{ matrix.target }}
 
+      # rust-cache can restore v8's Cargo fingerprint without preserving the
+      # large native archive in its build-script output directory. Force only
+      # that package to rerun its build script so it unpacks the verified
+      # RUSTY_V8_ARCHIVE downloaded above into this runner's target directory.
+      - name: Invalidate cached rusty_v8 build output
+        shell: pwsh
+        working-directory: codex-rs
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo clean -p v8 --target $env:TARGET
+
       - name: Build the native Windows release binaries
         shell: pwsh
         working-directory: codex-rs
