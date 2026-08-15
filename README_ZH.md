@@ -1,4 +1,4 @@
-<!-- README translation source: README.md sha256=ef2a5edc453b796000caa58b003828f569285d31ff55083299bdc5387b47afff -->
+<!-- README translation source: README.md sha256=1b75430c73f72e6925f46a696dae97c046d4ecc43cc0a9d1efb294a29a2f85c4 -->
 
 <h1 align="center">Open Interpreter</h1>
 
@@ -109,6 +109,7 @@ Open Interpreter 内置 QA 技能，让任何模型都能操作和测试界面�
 - [Agent Client Protocol](https://www.openinterpreter.com/docs/terminal/acp)
 - [Codex SDK](https://www.openinterpreter.com/docs/terminal/sdk)
 - [沙箱与审批](https://www.openinterpreter.com/docs/terminal/sandbox?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=sandbox_approvals)
+- [为发行版分支定制品牌](FORK_BRANDING.md)
 
 模型服务商和模型列表由工具自动生成，而不是在 Rust 代码中手动维护。在 `codex-rs` 目录中运行 `python3 scripts/write_provider_catalog.py` 可刷新所有托管服务商；也可以多次使用 `--provider <provider-id>`，仅更新指定的服务商。实时模型源需要使用[服务商文档](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=provider_catalog_generation)中说明的对应凭据。
 

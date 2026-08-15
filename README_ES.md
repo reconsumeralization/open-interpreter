@@ -1,4 +1,4 @@
-<!-- README translation source: README.md sha256=ef2a5edc453b796000caa58b003828f569285d31ff55083299bdc5387b47afff -->
+<!-- README translation source: README.md sha256=1b75430c73f72e6925f46a696dae97c046d4ecc43cc0a9d1efb294a29a2f85c4 -->
 
 <h1 align="center">Open Interpreter</h1>
 
@@ -109,6 +109,7 @@ Open Interpreter incluye una habilidad de QA que permite a cualquier modelo oper
 - [Protocolo de Cliente de Agente](https://www.openinterpreter.com/docs/terminal/acp)
 - [SDK de Codex](https://www.openinterpreter.com/docs/terminal/sdk)
 - [Aislamiento y aprobaciones](https://www.openinterpreter.com/docs/terminal/sandbox?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=sandbox_approvals)
+- [Personalizar la marca de una distribución derivada](FORK_BRANDING.md)
 
 La lista de proveedores y modelos se genera automáticamente; no se mantiene como listas en Rust. Desde `codex-rs`, actualiza todos los proveedores alojados con `python3 scripts/write_provider_catalog.py`, o repite `--provider <provider-id>` para actualizar solo los proveedores seleccionados. Las fuentes de modelos en vivo requieren las credenciales del proveedor que se indican en la [documentación de proveedores](https://www.openinterpreter.com/docs/terminal/providers?utm_source=github&utm_medium=referral&utm_campaign=readme&utm_content=provider_catalog_generation).
 
