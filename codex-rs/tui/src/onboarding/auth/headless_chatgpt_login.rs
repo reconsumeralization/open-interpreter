@@ -1,6 +1,7 @@
 use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::LoginAccountParams;
 use codex_app_server_protocol::LoginAccountResponse;
+use codex_product_info::Product;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::prelude::Widget;
@@ -126,9 +127,12 @@ pub(super) fn render_device_code_login(
         ]));
         lines.push("".into());
         lines.push(
-            "  Continue only if you started this login in Codex. If a website or another person gave you this code, cancel."
-                .dim()
-                .into(),
+            format!(
+                "  Continue only if you started this login in {}. If a website or another person gave you this code, cancel.",
+                Product::current().short_display_name()
+            )
+            .dim()
+            .into(),
         );
         lines.push("".into());
         Some(verification_url.clone())

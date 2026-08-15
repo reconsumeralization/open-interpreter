@@ -175,7 +175,10 @@ impl SlashCommand {
             SlashCommand::Mcp => "list configured MCP tools; use /mcp verbose for details",
             SlashCommand::Apps => "manage apps",
             SlashCommand::Plugins => "browse plugins",
-            SlashCommand::Logout => "log out of Codex",
+            SlashCommand::Logout => match codex_product_info::Product::current() {
+                codex_product_info::Product::Codex => "log out of Codex",
+                codex_product_info::Product::OpenInterpreter => "log out of Open Interpreter",
+            },
             SlashCommand::Rollout => "print the rollout file path",
             SlashCommand::TestApproval => "test approval request",
         }

@@ -99,7 +99,12 @@ async fn run_elevated(
         .cli_overrides(cli_overrides)
         .build()
         .await
-        .context("failed to load target user's Codex config for sandbox provisioning")?;
+        .with_context(|| {
+            format!(
+                "failed to load target user's {} config for sandbox provisioning",
+                codex_product_info::Product::current().short_display_name()
+            )
+        })?;
 
     codex_core::windows_sandbox::run_elevated_provisioning_setup(
         identity.codex_home.as_path(),

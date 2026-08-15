@@ -8,6 +8,7 @@ use crate::selection_list::selection_option_row;
 use crate::tui::FrameRequester;
 use crate::tui::Tui;
 use crate::tui::TuiEvent;
+use codex_product_info::Product;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
@@ -81,8 +82,9 @@ pub(crate) fn migration_copy_for_models(
         };
     }
 
+    let product_name = Product::current().short_display_name();
     let heading_text = Span::from(format!(
-        "Codex just got an upgrade. Introducing {target_display_name}."
+        "{product_name} just got an upgrade. Introducing {target_display_name}."
     ))
     .bold();
     let description_line: Line<'static>;
@@ -342,11 +344,14 @@ impl ModelMigrationScreen {
     fn render_menu(&self, column: &mut ColumnRenderable) {
         column.push(Line::from(""));
         column.push(
-            Paragraph::new("Choose how you'd like Codex to proceed.")
-                .wrap(Wrap { trim: false })
-                .inset(Insets::tlbr(
-                    /*top*/ 0, /*left*/ 2, /*bottom*/ 0, /*right*/ 0,
-                )),
+            Paragraph::new(format!(
+                "Choose how you'd like {} to proceed.",
+                Product::current().short_display_name()
+            ))
+            .wrap(Wrap { trim: false })
+            .inset(Insets::tlbr(
+                /*top*/ 0, /*left*/ 2, /*bottom*/ 0, /*right*/ 0,
+            )),
         );
         column.push(Line::from(""));
 

@@ -52,13 +52,16 @@ fn experimental_tooltips() -> Vec<&'static str> {
 /// Pick a random tooltip to show to the user when starting Codex.
 pub(crate) fn get_tooltip(plan: Option<PlanType>, fast_mode_enabled: bool) -> Option<String> {
     let mut rng = rand::rng();
+    let product = Product::current();
 
-    if let Some(announcement) = announcement::fetch_announcement_tip(plan) {
+    if product == Product::Codex
+        && let Some(announcement) = announcement::fetch_announcement_tip(plan)
+    {
         return Some(announcement);
     }
 
     // Leave small chance for a random tooltip to be shown.
-    if rng.random_ratio(8, 10) {
+    if product == Product::Codex && rng.random_ratio(8, 10) {
         match plan {
             Some(plan_type)
                 if matches!(
@@ -85,12 +88,14 @@ pub(crate) fn get_tooltip(plan: Option<PlanType>, fast_mode_enabled: bool) -> Op
         }
     }
 
-    pick_tooltip(&mut rng).map(|tooltip| tooltip_for_product(tooltip, Product::current()))
+    pick_tooltip(&mut rng).map(|tooltip| tooltip_for_product(tooltip, product))
 }
 
 fn tooltip_for_product(tooltip: &str, product: Product) -> String {
     let resume_command = format!("`{} resume`", product.command_name());
-    tooltip.replace("`codex resume`", &resume_command)
+    tooltip
+        .replace("`codex resume`", &resume_command)
+        .replace("Codex", product.short_display_name())
 }
 
 fn paid_app_tooltip() -> Option<&'static str> {

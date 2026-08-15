@@ -44,7 +44,7 @@ impl PetImageSupport {
         }
     }
 
-    pub(crate) fn unsupported_message(self) -> Option<&'static str> {
+    pub(crate) fn unsupported_message(self) -> Option<String> {
         match self {
             Self::Supported(_) => None,
             Self::Unsupported(reason) => Some(reason.message()),
@@ -61,20 +61,21 @@ pub(crate) enum PetImageUnsupportedReason {
 }
 
 impl PetImageUnsupportedReason {
-    fn message(self) -> &'static str {
+    fn message(self) -> String {
+        let command_name = codex_product_info::Product::current().command_name();
         match self {
-            Self::Tmux => {
-                "Pets are disabled in tmux. Terminal images don’t stay pane-local in tmux and can corrupt scrollback or move between panes. Run Codex outside tmux to use pets."
-            }
-            Self::Zellij => {
-                "Pets are disabled in Zellij. Terminal images don’t stay reliably pane-local in Zellij. Run Codex outside Zellij to use pets."
-            }
+            Self::Tmux => format!(
+                "Pets are disabled in tmux. Terminal images don’t stay pane-local in tmux and can corrupt scrollback or move between panes. Run {command_name} outside tmux to use pets."
+            ),
+            Self::Zellij => format!(
+                "Pets are disabled in Zellij. Terminal images don’t stay reliably pane-local in Zellij. Run {command_name} outside Zellij to use pets."
+            ),
             Self::Iterm2TooOld => {
-                "Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets."
+                "Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets.".to_string()
             }
-            Self::Terminal => {
-                "Pets aren’t available in this terminal. Terminal pets need image support, and this terminal environment doesn’t expose a supported image protocol. Try a terminal with Kitty graphics or Sixel support, or run Codex outside tmux."
-            }
+            Self::Terminal => format!(
+                "Pets aren’t available in this terminal. Terminal pets need image support, and this terminal environment doesn’t expose a supported image protocol. Try a terminal with Kitty graphics or Sixel support, or run {command_name} outside tmux."
+            ),
         }
     }
 }
@@ -496,7 +497,10 @@ mod tests {
 
         assert_eq!(
             message,
-            Some("Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets.")
+            Some(
+                "Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets."
+                    .to_string()
+            )
         );
     }
 

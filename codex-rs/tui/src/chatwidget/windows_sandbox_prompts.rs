@@ -233,16 +233,19 @@ impl ChatWidget {
             self.windows_sandbox_mode_allowed(WindowsSandboxModeToml::Unelevated);
         let setup_choice_is_required =
             !allow_unelevated || self.elevated_windows_sandbox_setup_required();
+        let product = codex_product_info::Product::current();
+        let product_name = product.short_display_name();
+        let docs_url = product.windows_sandbox_docs_url();
         let mut header = ColumnRenderable::new();
         header.push(*Box::new(
             Paragraph::new(if allow_unelevated {
                 vec![
-                    line!["Set up the Codex agent sandbox to protect your files and control network access. Learn more <https://developers.openai.com/codex/windows>"],
+                    line![format!("Set up the {product_name} agent sandbox to protect your files and control network access. Learn more <{docs_url}>")],
                 ]
             } else {
                 vec![
-                    line!["Your organization requires the default Codex agent sandbox to continue. Set it up to protect your files and control network access."],
-                    line!["Learn more <https://developers.openai.com/codex/windows>"],
+                    line![format!("Your organization requires the default {product_name} agent sandbox to continue. Set it up to protect your files and control network access.")],
+                    line![format!("Learn more <{docs_url}>")],
                 ]
             })
             .wrap(Wrap { trim: false }),
@@ -343,23 +346,24 @@ impl ChatWidget {
             self.windows_sandbox_mode_allowed(WindowsSandboxModeToml::Unelevated);
         let setup_choice_is_required =
             !allow_unelevated || self.elevated_windows_sandbox_setup_required();
+        let product = codex_product_info::Product::current();
+        let product_name = product.short_display_name();
+        let docs_url = product.windows_sandbox_docs_url();
         let mut lines = Vec::new();
         lines.push(line![
             "Couldn't set up your sandbox with Administrator permissions".bold()
         ]);
         lines.push(line![""]);
         if allow_unelevated {
-            lines.push(line![
-                "You can still use Codex in a non-admin sandbox. It carries greater risk if prompt injected."
-            ]);
+            lines.push(line![format!(
+                "You can still use {product_name} in a non-admin sandbox. It carries greater risk if prompt injected."
+            )]);
         } else {
-            lines.push(line![
-                "Your organization requires the default sandbox before Codex can continue."
-            ]);
+            lines.push(line![format!(
+                "Your organization requires the default sandbox before {product_name} can continue."
+            )]);
         }
-        lines.push(line![
-            "Learn more <https://developers.openai.com/codex/windows>"
-        ]);
+        lines.push(line![format!("Learn more <{docs_url}>")]);
 
         let mut header = ColumnRenderable::new();
         header.push(*Box::new(Paragraph::new(lines).wrap(Wrap { trim: false })));
@@ -394,7 +398,7 @@ impl ChatWidget {
         }];
         if allow_unelevated {
             items.push(SelectionItem {
-                name: "Use Codex with non-admin sandbox".to_string(),
+                name: format!("Use {product_name} with non-admin sandbox"),
                 description: None,
                 actions: vec![Box::new({
                     let otel = self.session_telemetry.clone();

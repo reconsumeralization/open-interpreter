@@ -574,10 +574,10 @@ pub(crate) fn feedback_upload_consent_params(
         items: vec![
             super::SelectionItem {
                 name: "Yes".to_string(),
-                description: Some(
-                    "Share the current Codex session logs and diagnostics with the team for troubleshooting."
-                        .to_string(),
-                ),
+                description: Some(format!(
+                    "Share the current {} session logs and diagnostics with the team for troubleshooting.",
+                    codex_product_info::Product::current().short_display_name()
+                )),
                 actions: vec![yes_action],
                 dismiss_on_select: true,
                 ..Default::default()

@@ -46,8 +46,9 @@ impl Notification {
                 )
             }
             Notification::EditApprovalRequested { cwd, changes } => {
+                let product_name = codex_product_info::Product::current().short_display_name();
                 format!(
-                    "Codex wants to edit {}",
+                    "{product_name} wants to edit {}",
                     if changes.len() == 1 {
                         #[allow(clippy::unwrap_used)]
                         display_path_for(changes.first().unwrap(), cwd)

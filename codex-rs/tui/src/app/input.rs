@@ -89,10 +89,10 @@ impl App {
             Ok(cmd) => cmd,
             Err(external_editor::EditorError::MissingEditor) => {
                 self.chat_widget
-                    .add_to_history(history_cell::new_error_event(
-                    "Cannot open external editor: set $VISUAL or $EDITOR before starting Codex."
-                        .to_string(),
-                ));
+                    .add_to_history(history_cell::new_error_event(format!(
+                        "Cannot open external editor: set $VISUAL or $EDITOR before starting {}.",
+                        codex_product_info::Product::current().short_display_name()
+                    )));
                 self.reset_external_editor_state(tui);
                 return;
             }

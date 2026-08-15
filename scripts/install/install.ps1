@@ -2,10 +2,10 @@
 param(
     [string]$Release = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_RELEASE)) { $env:CODEX_RELEASE } else { $env:OPEN_INTERPRETER_RELEASE }),
     [string]$Repo = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_GITHUB_REPO)) { if ([string]::IsNullOrWhiteSpace($env:CODEX_GITHUB_REPO)) { "openinterpreter/openinterpreter" } else { $env:CODEX_GITHUB_REPO } } else { $env:OPEN_INTERPRETER_GITHUB_REPO }),
-    [string]$ProductName = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_PRODUCT_NAME)) { "Open Interpreter" } else { $env:CODEX_INSTALL_PRODUCT_NAME }),
-    [string]$PackageAssetStem = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_PACKAGE_ASSET_STEM)) { "open-interpreter-package" } else { $env:CODEX_PACKAGE_ASSET_STEM }),
-    [string]$CommandName = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_COMMAND_NAME)) { "interpreter" } else { $env:CODEX_COMMAND_NAME }),
-    [string]$ReleaseTagPrefix = $(if ([string]::IsNullOrWhiteSpace($env:CODEX_RELEASE_TAG_PREFIX)) { "rust-v" } else { $env:CODEX_RELEASE_TAG_PREFIX })
+    [string]$ProductName = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_PRODUCT_NAME)) { if ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_PRODUCT_NAME)) { "Open Interpreter" } else { $env:CODEX_INSTALL_PRODUCT_NAME } } else { $env:OPEN_INTERPRETER_PRODUCT_NAME }),
+    [string]$PackageAssetStem = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_PACKAGE_ASSET_STEM)) { if ([string]::IsNullOrWhiteSpace($env:CODEX_PACKAGE_ASSET_STEM)) { "open-interpreter-package" } else { $env:CODEX_PACKAGE_ASSET_STEM } } else { $env:OPEN_INTERPRETER_PACKAGE_ASSET_STEM }),
+    [string]$CommandName = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_COMMAND_NAME)) { if ([string]::IsNullOrWhiteSpace($env:CODEX_COMMAND_NAME)) { "interpreter" } else { $env:CODEX_COMMAND_NAME } } else { $env:OPEN_INTERPRETER_COMMAND_NAME }),
+    [string]$ReleaseTagPrefix = $(if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_RELEASE_TAG_PREFIX)) { if ([string]::IsNullOrWhiteSpace($env:CODEX_RELEASE_TAG_PREFIX)) { "rust-v" } else { $env:CODEX_RELEASE_TAG_PREFIX } } else { $env:OPEN_INTERPRETER_RELEASE_TAG_PREFIX })
 )
 
 Set-StrictMode -Version Latest
@@ -22,10 +22,14 @@ $nonInteractiveValue = if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_NO
     $env:OPEN_INTERPRETER_NONINTERACTIVE
 }
 $NonInteractive = $nonInteractiveValue -match "^(?i:1|true|yes)$"
-$AliasCommandNames = if ([string]::IsNullOrWhiteSpace($env:CODEX_ALIAS_COMMAND_NAMES)) {
-    @("i")
+$AliasCommandNames = if ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_ALIAS_COMMAND_NAMES)) {
+    if ([string]::IsNullOrWhiteSpace($env:CODEX_ALIAS_COMMAND_NAMES)) {
+        @("i")
+    } else {
+        $env:CODEX_ALIAS_COMMAND_NAMES -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    }
 } else {
-    $env:CODEX_ALIAS_COMMAND_NAMES -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $env:OPEN_INTERPRETER_ALIAS_COMMAND_NAMES -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 }
 
 function Write-Step {
@@ -909,8 +913,10 @@ $lockPath = Join-Path $standaloneRoot "install.lock"
 $defaultVisibleBinDir = Join-Path $env:LOCALAPPDATA "Programs\Open Interpreter\bin"
 if (-not [string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_INSTALL_DIR)) {
     $visibleBinDir = $env:OPEN_INTERPRETER_INSTALL_DIR
-} elseif ([string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_DIR)) {
+} elseif ([string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_INSTALL_DIR) -and [string]::IsNullOrWhiteSpace($env:CODEX_INSTALL_DIR)) {
     $visibleBinDir = $defaultVisibleBinDir
+} elseif (-not [string]::IsNullOrWhiteSpace($env:OPEN_INTERPRETER_INSTALL_DIR)) {
+    $visibleBinDir = $env:OPEN_INTERPRETER_INSTALL_DIR
 } else {
     $visibleBinDir = $env:CODEX_INSTALL_DIR
 }

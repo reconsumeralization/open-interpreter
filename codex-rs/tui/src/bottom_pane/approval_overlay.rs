@@ -910,7 +910,10 @@ fn exec_options(
                 shortcuts: keymap.deny.clone(),
             }),
             CommandExecutionApprovalDecision::Cancel => Some(ApprovalOption {
-                label: "No, and tell Codex what to do differently".to_string(),
+                label: format!(
+                    "No, and tell {} what to do differently",
+                    codex_product_info::Product::current().short_display_name()
+                ),
                 decision: ApprovalDecision::Command(CommandExecutionApprovalDecision::Cancel),
                 shortcuts: keymap.decline.clone(),
             }),
@@ -1026,7 +1029,10 @@ fn patch_options(keymap: &ApprovalKeymap) -> Vec<ApprovalOption> {
             shortcuts: keymap.approve_for_session.clone(),
         },
         ApprovalOption {
-            label: "No, and tell Codex what to do differently".to_string(),
+            label: format!(
+                "No, and tell {} what to do differently",
+                codex_product_info::Product::current().short_display_name()
+            ),
             decision: ApprovalDecision::FileChange(FileChangeApprovalDecision::Cancel),
             shortcuts: keymap.decline.clone(),
         },
@@ -2255,10 +2261,11 @@ mod tests {
             })
             .collect();
         let expected = vec![
-            "✔ You approved codex to run".to_string(),
-            "  git add tui/src/render/".to_string(),
-            "  mod.rs tui/src/render/".to_string(),
-            "  renderable.rs this time".to_string(),
+            "✔ You approved the agent to".to_string(),
+            "  run git add tui/src/".to_string(),
+            "  render/mod.rs tui/src/".to_string(),
+            "  render/renderable.rs this".to_string(),
+            "  time".to_string(),
         ];
         assert_eq!(rendered, expected);
     }
@@ -2325,7 +2332,7 @@ mod tests {
         assert_eq!(
             render_history_cell_lines(decision.as_ref(), /*width*/ 80),
             vec![
-                "✔ You approved codex network access to https://example.com:8443 this time"
+                "✔ You approved the agent network access to https://example.com:8443 this time"
                     .to_string(),
             ]
         );

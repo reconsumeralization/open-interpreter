@@ -40,7 +40,9 @@ pub(crate) enum StatusSurfacePreviewItem {
 impl StatusSurfacePreviewItem {
     fn placeholder(self) -> &'static str {
         match self {
-            StatusSurfacePreviewItem::AppName => "codex",
+            StatusSurfacePreviewItem::AppName => {
+                codex_product_info::Product::current().command_name()
+            }
             StatusSurfacePreviewItem::ProjectName => "my-project",
             StatusSurfacePreviewItem::ProjectRoot => "my-project",
             StatusSurfacePreviewItem::CurrentDir => "~/my-project/subdir",

@@ -181,10 +181,10 @@ impl ChatWidget {
             SlashCommand::Archive => {
                 self.bottom_pane.show_selection_view(SelectionViewParams {
                     title: Some("Archive this session?".to_string()),
-                    subtitle: Some(
-                        "Are you sure? This will archive the current session and exit Codex"
-                            .to_string(),
-                    ),
+                    subtitle: Some(format!(
+                        "Are you sure? This will archive the current session and exit {}",
+                        codex_product_info::Product::current().short_display_name()
+                    )),
                     footer_hint: Some(standard_popup_hint_line()),
                     items: vec![
                         SelectionItem {

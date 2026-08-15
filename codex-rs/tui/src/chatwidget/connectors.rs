@@ -186,15 +186,18 @@ impl ChatWidget {
             };
             let missing_label = format!("{status_label}. App link unavailable.");
             let instructions = if connector.is_accessible {
-                "Manage this app in your browser."
+                "Manage this app in your browser.".to_string()
             } else {
-                "Install this app in your browser, then reload Codex."
+                format!(
+                    "Install this app in your browser, then reload {}.",
+                    codex_product_info::Product::current().short_display_name()
+                )
             };
             if let Some(install_url) = connector.install_url.clone() {
                 let app_id = connector.id.clone();
                 let is_enabled = connector.is_enabled;
                 let title = connector_title.clone();
-                let instructions = instructions.to_string();
+                let instructions = instructions.clone();
                 let description = link_description.clone();
                 item.actions = vec![Box::new(move |tx| {
                     tx.send(AppEvent::OpenAppLink {

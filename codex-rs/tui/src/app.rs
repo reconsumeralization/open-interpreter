@@ -715,7 +715,13 @@ fn archived_session_guidance(err: &color_eyre::eyre::Report) -> Option<String> {
     let message = message
         .split_once(" (code ")
         .map_or(message, |(message, _)| message);
-    Some(message.to_string())
+    Some(message.replace(
+        "`codex unarchive ",
+        &format!(
+            "`{} unarchive ",
+            codex_product_info::Product::current().command_name()
+        ),
+    ))
 }
 
 fn active_turn_interrupt_race(error: &TypedRequestError) -> Option<String> {
@@ -1028,7 +1034,7 @@ impl App {
             color_eyre::eyre::eyre!(
                 "Invalid `tui.keymap` configuration: {err}\n\
 Fix the config and retry.\n\
-See the Codex keymap documentation for supported actions and examples."
+See the keymap documentation for supported actions and examples."
             )
         })?;
         #[cfg(not(debug_assertions))]

@@ -53,6 +53,7 @@ use codex_login::default_client::create_client_without_request_logging;
 use codex_login::default_client::default_headers;
 use codex_login::load_auth_dot_json;
 use codex_model_provider::create_model_provider;
+use codex_product_info::Product;
 use codex_protocol::auth::AuthMode;
 use codex_protocol::protocol::AskForApproval;
 use codex_terminal_detection::Multiplexer;
@@ -517,7 +518,12 @@ async fn load_config(
         .harness_overrides(overrides)
         .build()
         .await
-        .context("failed to load Codex config")
+        .with_context(|| {
+            format!(
+                "failed to load {} config",
+                Product::current().short_display_name()
+            )
+        })
 }
 
 fn config_overrides_from_interactive(
@@ -850,10 +856,10 @@ fn installation_check(show_details: bool) -> DoctorCheck {
             NpmRootCheck::MissingPackageRoot => {
                 status = status.max(CheckStatus::Warning);
                 summary = "npm-managed launch is missing package-root provenance".to_string();
-                remediation = Some(
-                    "Reinstall or update Codex so the JS shim provides CODEX_MANAGED_PACKAGE_ROOT."
-                        .to_string(),
-                );
+                remediation = Some(format!(
+                    "Reinstall or update {} so the JS shim provides the managed package root.",
+                    Product::current().short_display_name()
+                ));
             }
             NpmRootCheck::NpmUnavailable(error) => {
                 status = status.max(CheckStatus::Warning);
@@ -1247,8 +1253,10 @@ fn auth_check(config: &Config) -> DoctorCheck {
             let mut check =
                 DoctorCheck::new("auth.credentials", "auth", status, summary).details(details);
             if status == CheckStatus::Fail {
-                check =
-                    check.remediation("Run codex login again or provide a supported auth env var.");
+                check = check.remediation(format!(
+                    "Run {} login again or provide a supported auth env var.",
+                    Product::current().command_name()
+                ));
             }
             check
         }
@@ -1263,10 +1271,16 @@ fn auth_check(config: &Config) -> DoctorCheck {
             "auth.credentials",
             "auth",
             CheckStatus::Fail,
-            "no Codex credentials were found",
+            format!(
+                "no {} credentials were found",
+                Product::current().short_display_name()
+            ),
         )
         .details(details)
-        .remediation("Run codex login or provide an API key through a supported auth env var."),
+        .remediation(format!(
+            "Run {} login or provide an API key through a supported auth env var.",
+            Product::current().command_name()
+        )),
         Err(err) => DoctorCheck::new(
             "auth.credentials",
             "auth",
@@ -1274,7 +1288,10 @@ fn auth_check(config: &Config) -> DoctorCheck {
             "stored credentials could not be read",
         )
         .detail(err.to_string())
-        .remediation("Fix auth storage access or run codex login again."),
+        .remediation(format!(
+            "Fix auth storage access or run {} login again.",
+            Product::current().command_name()
+        )),
     }
 }
 
