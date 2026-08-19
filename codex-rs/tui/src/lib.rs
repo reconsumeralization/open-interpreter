@@ -171,8 +171,10 @@ mod session_state;
 mod shimmer;
 mod skills_helpers;
 mod slash_command;
+mod startup_draft;
 mod startup_error;
 mod startup_hooks_review;
+mod startup_preflight;
 mod status;
 mod status_indicator_widget;
 mod streaming;
@@ -605,6 +607,7 @@ fn session_target_from_app_server_thread(
         Ok(thread_id) => Some(resume_picker::SessionTarget {
             path: thread.path,
             thread_id,
+            history_mode: Some(thread.history_mode),
         }),
         Err(err) => {
             warn!(
@@ -853,6 +856,19 @@ fn app_server_target_for_launch(
     }
 }
 
+async fn cloud_config_bundle_for_app_server_target(
+    app_server_target: &AppServerTarget,
+    bootstrap_config: &ConfigTomlLoadResult,
+    codex_home: &Path,
+) -> std::io::Result<CloudConfigBundleLoader> {
+    cloud_config_bundle_loader_for_storage(
+        app_server_target
+            .auth_config_for_cloud_loader(bootstrap_auth_config(codex_home, bootstrap_config)?),
+        /*enable_codex_api_key_env*/ false,
+    )
+    .await
+}
+
 fn loader_overrides_are_default(loader_overrides: &LoaderOverrides) -> bool {
     let loader_overrides_are_default = loader_overrides.user_config_path.is_none()
         && loader_overrides.user_config_profile.is_none()
@@ -951,7 +967,7 @@ pub async fn run_main(
         &cli_kv_overrides,
         &launch_loader_overrides,
         strict_config,
-        cli.bypass_hook_trust || cli.psp,
+        cli.bypass_hook_trust,
     );
     let default_daemon = if explicit_remote_endpoint.is_none() && reuse_implicit_local_daemon {
         maybe_probe_default_daemon_socket(&codex_home).await
@@ -1008,7 +1024,7 @@ pub async fn run_main(
             .auth_config_for_cloud_loader(bootstrap_auth_config(&codex_home, &bootstrap_config)?),
         /*enable_codex_api_key_env*/ false,
     )
-    .await;
+    .await?;
 
     let cwd_override = if app_server_target.uses_remote_workspace() {
         None
@@ -1043,7 +1059,13 @@ pub async fn run_main(
             Some(provider)
         } else {
             // No provider configured, prompt the user
-            let selection = oss_selection::select_oss_provider().await?;
+            let selection = match oss_selection::detect_oss_provider().await {
+                oss_selection::OssProviderDetection::AutoSelected(selection) => selection,
+                oss_selection::OssProviderDetection::NeedsSelection {
+                    lmstudio_status,
+                    ollama_status,
+                } => oss_selection::select_oss_provider(lmstudio_status, ollama_status).await?,
+            };
             let provider = selection.provider;
             if provider == "__CANCELLED__" {
                 return Err(std::io::Error::other(
@@ -1085,7 +1107,6 @@ pub async fn run_main(
         main_execve_wrapper_exe: arg0_paths.main_execve_wrapper_exe.clone(),
         show_raw_agent_reasoning: cli.oss.then_some(true),
         bypass_hook_trust: cli.bypass_hook_trust.then_some(true),
-        psp: Some(cli.psp),
         additional_writable_roots: additional_dirs,
         ..Default::default()
     };
@@ -1259,7 +1280,7 @@ pub async fn run_main(
         manually_selected_oss_provider,
         overrides,
         cli_kv_overrides,
-        cloud_config_bundle,
+        cloud_config_bundle?,
         feedback,
         log_db,
         state_db,
@@ -1444,7 +1465,7 @@ async fn run_ratatui_app(
                 initial_config.auth_config(),
                 /*enable_codex_api_key_env*/ false,
             )
-            .await;
+            .await?;
         }
 
         // If the user made an explicit trust decision, or we showed the login flow, reload config
@@ -1619,6 +1640,7 @@ async fn run_ratatui_app(
     .await
     {
         Ok(ResolveCwdOutcome::Continue(cwd)) => cwd,
+        Ok(ResolveCwdOutcome::ContinueAfterPrompt(cwd)) => Some(cwd),
         Ok(ResolveCwdOutcome::Exit) => {
             terminal_restore_guard.restore_silently();
             session_log::log_session_end();
@@ -2259,6 +2281,7 @@ mod tests {
             let target_session = resume_picker::SessionTarget {
                 path: Some(rollout_path),
                 thread_id,
+                history_mode: None,
             };
             let session_selection = match action {
                 CwdPromptAction::Resume => resume_picker::SessionSelection::Resume(target_session),
@@ -2278,6 +2301,7 @@ mod tests {
             .await?
             {
                 ResolveCwdOutcome::Continue(cwd) => cwd,
+                ResolveCwdOutcome::ContinueAfterPrompt(cwd) => Some(cwd),
                 ResolveCwdOutcome::Exit => panic!("configured cwd should not exit startup"),
             };
             let final_config = ConfigBuilder::default()
@@ -2346,6 +2370,7 @@ mod tests {
             &resume_picker::SessionSelection::Resume(resume_picker::SessionTarget {
                 path: None,
                 thread_id: ThreadId::new(),
+                history_mode: None,
             }),
             /*cwd_override*/ None,
             /*uses_remote_workspace*/ false,
@@ -2382,6 +2407,7 @@ mod tests {
             &resume_picker::SessionSelection::Resume(resume_picker::SessionTarget {
                 path: None,
                 thread_id: ThreadId::new(),
+                history_mode: None,
             }),
             /*cwd_override*/ None,
             /*uses_remote_workspace*/ false,
@@ -2423,6 +2449,7 @@ mod tests {
         let target = crate::resume_picker::SessionTarget {
             path: None,
             thread_id,
+            history_mode: None,
         };
 
         assert_eq!(target.display_label(), format!("thread {thread_id}"));

@@ -14,6 +14,7 @@ use crate::app_event::PermissionProfileSelection;
 use crate::app_event::PluginLocation;
 use crate::app_event::PluginRemoteSectionError;
 use crate::app_event::RateLimitRefreshOrigin;
+use crate::app_event::RunningTaskExitAction;
 #[cfg(target_os = "windows")]
 use crate::app_event::WindowsSandboxEnableMode;
 use crate::app_event_sender::AppEventSender;
@@ -230,6 +231,7 @@ mod thread_goal_actions;
 mod thread_routing;
 mod thread_session_state;
 mod thread_settings;
+mod transcript_export;
 
 use self::agent_navigation::AgentNavigationDirection;
 use self::agent_navigation::AgentNavigationState;
@@ -529,6 +531,9 @@ pub(crate) struct App {
     pub(crate) file_search: FileSearchManager,
 
     pub(crate) transcript_cells: Vec<Arc<dyn HistoryCell>>,
+    last_rendered_history_tail: Option<history_ui::RenderedHistoryTail>,
+    last_thread_usage_status_cell: Option<history_ui::ThreadUsageStatusHistory>,
+    pub(crate) pending_thread_usage_history_refresh: bool,
 
     // Pager overlay state (Transcript or Static like Diff)
     pub(crate) overlay: Option<Overlay>,
@@ -590,6 +595,10 @@ pub(crate) struct App {
     pending_primary_events: VecDeque<ThreadBufferedEvent>,
     pending_app_server_requests: PendingAppServerRequests,
     pending_startup_thread_start: bool,
+    /// Keeps protected screens quarantined until initialized chat receives genuine user input.
+    startup_protected_input_boundary: bool,
+    /// Keeps that boundary armed while a startup approval waits for the typing-idle timer.
+    startup_pending_protected_request: bool,
     /// Invalidates in-flight full rate-limit reads when a newer rolling hard stop arrives.
     rate_limit_hard_stop_generation: u64,
     // Serialize plugin enablement writes per plugin so stale completions cannot
@@ -744,6 +753,19 @@ fn active_turn_interrupt_race(error: &TypedRequestError) -> Option<String> {
 }
 
 impl App {
+    /// Recognizes queued requests before they become visible protected screens.
+    pub(super) fn has_queued_startup_protected_request(&self) -> bool {
+        self.startup_protected_input_boundary
+            && (self
+                .active_thread_rx
+                .as_ref()
+                .is_some_and(|receiver| !receiver.is_empty())
+                || self
+                    .pending_primary_events
+                    .iter()
+                    .any(|event| matches!(event, ThreadBufferedEvent::Request(_))))
+    }
+
     pub fn chatwidget_init_for_forked_or_resumed_thread(
         &self,
         tui: &mut tui::Tui,
@@ -841,7 +863,7 @@ impl App {
             &app_event_tx,
             &available_models,
         )
-        .await;
+        .await?;
         if let Some(exit_info) = exit_info {
             app_server
                 .shutdown()
@@ -1060,6 +1082,9 @@ See the keymap documentation for supported actions and examples."
             keymap: runtime_keymap,
             key_chord_matcher: KeyChordMatcher::default(),
             transcript_cells: Vec::new(),
+            last_rendered_history_tail: None,
+            last_thread_usage_status_cell: None,
+            pending_thread_usage_history_refresh: false,
             overlay: None,
             deferred_history_lines: Vec::new(),
             has_emitted_history_lines: false,
@@ -1092,6 +1117,8 @@ See the keymap documentation for supported actions and examples."
             pending_primary_events: VecDeque::new(),
             pending_app_server_requests: PendingAppServerRequests::default(),
             pending_startup_thread_start,
+            startup_protected_input_boundary: false,
+            startup_pending_protected_request: false,
             rate_limit_hard_stop_generation: 0,
             pending_plugin_enabled_writes: HashMap::new(),
             pending_hook_enabled_writes: HashMap::new(),

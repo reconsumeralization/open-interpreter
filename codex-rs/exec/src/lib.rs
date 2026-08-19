@@ -77,6 +77,8 @@ use codex_core::path_utils;
 use codex_core::read_session_meta_line;
 use codex_feedback::CodexFeedback;
 use codex_git_utils::get_git_repo_root;
+use codex_history::RolloutItem;
+use codex_history::RolloutLine;
 use codex_login::default_client::set_default_client_residency_requirement;
 use codex_login::default_client::set_default_originator;
 use codex_login::enforce_login_restrictions;
@@ -93,8 +95,6 @@ use codex_protocol::models::PermissionProfile;
 use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::ReviewRequest;
 use codex_protocol::protocol::ReviewTarget;
-use codex_protocol::protocol::RolloutItem;
-use codex_protocol::protocol::RolloutLine;
 use codex_protocol::protocol::SessionConfiguredEvent;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::user_input::UserInput;
@@ -166,6 +166,7 @@ const DEFAULT_ANALYTICS_ENABLED: bool = true;
 const EXEC_DEFAULT_LOG_FILTER: &str = "error,opentelemetry_sdk=off,opentelemetry_otlp=off";
 
 enum InitialOperation {
+    ForkOnly,
     UserTurn {
         items: Vec<UserInput>,
         output_schema: Option<Value>,
@@ -246,7 +247,6 @@ pub async fn run_main(cli: Cli, arg0_paths: Arg0DispatchPaths) -> anyhow::Result
     }
 
     let Cli {
-        psp,
         command,
         strict_config,
         shared,
@@ -348,7 +348,7 @@ pub async fn run_main(cli: Cli, arg0_paths: Arg0DispatchPaths) -> anyhow::Result
         bootstrap_auth_config(&codex_home, &bootstrap_config)?,
         /*enable_codex_api_key_env*/ false,
     )
-    .await;
+    .await?;
     let run_cli_overrides = cli_kv_overrides.clone();
     let run_loader_overrides = loader_overrides.clone();
     let run_cloud_config_bundle = cloud_config_bundle.clone();
@@ -424,7 +424,6 @@ pub async fn run_main(cli: Cli, arg0_paths: Arg0DispatchPaths) -> anyhow::Result
         tools_web_search_request: None,
         ephemeral: ephemeral.then_some(true),
         bypass_hook_trust: bypass_hook_trust.then_some(true),
-        psp: Some(psp),
         additional_writable_roots: add_dir,
     };
 
@@ -738,6 +737,37 @@ async fn run_exec_session(args: ExecRunArgs) -> anyhow::Result<()> {
             };
             (operation, prompt_text)
         }
+        (Some(ExecCommand::Fork(args)), root_prompt, imgs) => {
+            let prompt_arg = args.prompt.clone().or(root_prompt);
+            if let Some(prompt_arg) = prompt_arg {
+                let prompt_text = resolve_prompt(Some(prompt_arg));
+                let mut items: Vec<UserInput> = imgs
+                    .into_iter()
+                    .chain(args.images.iter().cloned())
+                    .map(|path| UserInput::LocalImage { path, detail: None })
+                    .collect();
+                items.push(UserInput::Text {
+                    text: prompt_text.clone(),
+                    text_elements: Vec::new(),
+                });
+                let output_schema = load_output_schema(output_schema_path);
+                (
+                    InitialOperation::UserTurn {
+                        items,
+                        output_schema,
+                    },
+                    prompt_text,
+                )
+            } else if !imgs.is_empty() || !args.images.is_empty() {
+                anyhow::bail!("Forking with images requires a prompt");
+            } else if output_schema_path.is_some() || last_message_file.is_some() {
+                anyhow::bail!("Forking with output options requires a prompt");
+            } else if config.ephemeral {
+                anyhow::bail!("Ephemeral forks require a prompt");
+            } else {
+                (InitialOperation::ForkOnly, String::new())
+            }
+        }
         (None, root_prompt, imgs) => {
             let prompt_text = resolve_root_prompt(root_prompt);
             let mut items: Vec<UserInput> = imgs
@@ -870,6 +900,17 @@ async fn run_exec_session(args: ExecRunArgs) -> anyhow::Result<()> {
     let mut error_seen = false;
 
     let task_id = match initial_operation {
+        InitialOperation::ForkOnly => {
+            request_shutdown(&client, &mut request_ids, &primary_thread_id_for_span)
+                .await
+                .map_err(anyhow::Error::msg)?;
+            client
+                .shutdown()
+                .await
+                .map_err(|err| anyhow::anyhow!("in-process app-server shutdown failed: {err}"))?;
+            event_processor.print_final_output();
+            return Ok(());
+        }
         InitialOperation::UserTurn {
             items,
             output_schema,

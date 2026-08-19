@@ -7,6 +7,7 @@ use super::resize_reflow::trailing_run_start;
 use super::session_lifecycle::ThreadAttachPresentation;
 use super::*;
 use crate::app_event::KimiCodeLoginOutcome;
+use crate::app_event::RunningTaskExitAction;
 use crate::app_server_session::ForkGoalContinuation;
 use crate::config_update::format_config_error;
 use crate::external_agent_config_migration::flow::ExternalAgentConfigMigrationFlowOutcome;
