@@ -3348,6 +3348,7 @@ dependencies = [
  "chrono",
  "codex-app-server-protocol",
  "codex-protocol",
+ "codex-rollout",
  "codex-utils-output-truncation",
  "serde",
  "serde_json",

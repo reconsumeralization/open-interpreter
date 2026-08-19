@@ -10,13 +10,13 @@ use codex_protocol::models::ContentItem;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::AgentMessageEvent;
 use codex_protocol::protocol::EventMsg;
-use codex_protocol::protocol::RolloutItem;
 use codex_protocol::protocol::TokenCountEvent;
 use codex_protocol::protocol::TokenUsage;
 use codex_protocol::protocol::TokenUsageInfo;
 use codex_protocol::protocol::TurnCompleteEvent;
 use codex_protocol::protocol::TurnStartedEvent;
 use codex_protocol::protocol::UserMessageEvent;
+use codex_rollout::RolloutItem;
 use codex_utils_output_truncation::approx_tokens_from_byte_count_i64;
 use std::io;
 use std::path::Path;
@@ -103,7 +103,7 @@ fn rollout_items_from_messages(messages: Vec<ConversationMessage>) -> Vec<Rollou
                 )));
                 response_item_bytes =
                     response_item_bytes.saturating_add(message_byte_count(&message));
-                items.push(RolloutItem::ResponseItem(response_item(message)));
+                items.push(RolloutItem::ResponseItem(response_item(message).into()));
                 current_turn = Some(turn_id);
             }
             MessageRole::Assistant => {
@@ -120,7 +120,7 @@ fn rollout_items_from_messages(messages: Vec<ConversationMessage>) -> Vec<Rollou
                         memory_citation: None,
                     },
                 )));
-                items.push(RolloutItem::ResponseItem(response_item(message)));
+                items.push(RolloutItem::ResponseItem(response_item(message).into()));
             }
         }
     }
@@ -195,6 +195,7 @@ mod tests {
     use super::*;
     use codex_app_server_protocol::ThreadItem;
     use codex_app_server_protocol::build_turns_from_rollout_items;
+    use codex_rollout::ResponseItemEnvelope;
     use serde_json::Value as JsonValue;
     use std::path::Path;
     use tempfile::TempDir;
@@ -304,7 +305,10 @@ mod tests {
             .filter(|item| {
                 matches!(
                     item,
-                    RolloutItem::ResponseItem(ResponseItem::Message { .. })
+                    RolloutItem::ResponseItem(ResponseItemEnvelope {
+                        item: ResponseItem::Message { .. },
+                        ..
+                    })
                 )
             })
             .count();
