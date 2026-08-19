@@ -42,7 +42,7 @@ jobs:
           df -h /
       - name: Install Linux build dependencies
         run: |
-          for sources_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+          for sources_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
             if [ -f "$sources_file" ] && grep -qF 'http://azure.archive.ubuntu.com/ubuntu' "$sources_file"; then
               sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$sources_file"
             fi
