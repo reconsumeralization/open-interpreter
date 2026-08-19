@@ -41,9 +41,6 @@ pub(crate) fn apply_compatibility_catalog(models: Vec<ModelInfo>) -> Vec<ModelIn
             {
                 model.default_reasoning_level = Some(ReasoningEffort::Medium);
             }
-            if entry.supports_parallel_tool_calls {
-                model.supports_parallel_tool_calls = true;
-            }
             if entry.supports_search_tool {
                 model.supports_search_tool = true;
             }
@@ -112,16 +109,6 @@ mod tests {
             enriched.first().expect("model").visibility,
             ModelVisibility::List
         );
-    }
-
-    #[test]
-    fn enriches_parallel_tool_call_support() {
-        let enriched = apply_compatibility_catalog(vec![catalog_model("deepseek-chat")]);
-
-        let model = enriched.first().expect("deepseek-chat model");
-        assert!(model.supports_parallel_tool_calls);
-        assert!(model.supported_reasoning_levels.is_empty());
-        assert_eq!(model.reasoning_control, ReasoningControl::None);
     }
 
     #[test]

@@ -152,7 +152,7 @@ async fn to_extension_call(invocation: &ToolInvocation) -> ExtensionToolCall {
         };
         let additional_permissions = apply_granted_turn_permissions(
             invocation.session.as_ref(),
-            &environment.environment_id,
+            &environment.selection.environment_id,
             native_cwd.as_path(),
             SandboxPermissions::UseDefault,
             /*additional_permissions*/ None,
@@ -163,7 +163,7 @@ async fn to_extension_call(invocation: &ToolInvocation) -> ExtensionToolCall {
             .turn
             .file_system_sandbox_context(additional_permissions, environment);
         environments.push(ToolEnvironment {
-            environment_id: environment.environment_id.clone(),
+            environment_id: environment.selection.environment_id.clone(),
             cwd: native_cwd,
             file_system: environment.environment.get_filesystem(),
             file_system_sandbox_context,
@@ -384,8 +384,15 @@ mod tests {
         session
             .record_conversation_items(&turn, std::slice::from_ref(&history_item))
             .await;
-        let mut expected_history_item = history_item.clone();
-        expected_history_item.set_turn_id_if_missing(&turn_id);
+        let expected_history_item = strip_response_item_id(
+            session
+                .clone_history()
+                .await
+                .raw_items()
+                .next()
+                .expect("history item")
+                .clone(),
+        );
         let raw_history_event = rx.recv().await.expect("history raw response item event");
         let EventMsg::RawResponseItem(raw_history_item) = raw_history_event.msg else {
             panic!("expected raw response item event");
@@ -475,6 +482,7 @@ mod tests {
             revised_prompt: None,
             result: String::new(),
             transparent_background: None,
+            failure: None,
             saved_path: None,
         });
         let expected_completed_item = ExtensionItem::ImageGeneration(ImageGenerationItem {
@@ -483,6 +491,7 @@ mod tests {
             revised_prompt: Some("A tiny blue square".to_string()),
             result: "cG5n".to_string(),
             transparent_background: Some(true),
+            failure: None,
             saved_path: Some(expected_path.clone()),
         });
         codex_tools::TurnItemEmitter::emit_started(
@@ -505,6 +514,7 @@ mod tests {
                     revised_prompt: Some("A tiny blue square".to_string()),
                     result: "cG5n".to_string(),
                     transparent_background: Some(true),
+                    failure: None,
                     saved_path: Some(expected_path.clone()),
                 })],
             },

@@ -21,10 +21,11 @@ use codex_protocol::protocol::AgentStatus;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::protocol::FileChange;
 use codex_protocol::protocol::PatchApplyStatus;
-use codex_protocol::protocol::RolloutItem;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::SubAgentSource;
 use codex_protocol::user_input::UserInput;
+use codex_rollout::ResponseItemEnvelope;
+use codex_rollout::RolloutItem;
 use codex_tools::AdditionalProperties;
 use codex_tools::JsonSchema;
 use codex_tools::ResponsesApiTool;
@@ -2607,35 +2608,11 @@ async fn handle_zcode_exit_plan_mode(
 }
 
 async fn handle_zcode_read_session_context(
-    invocation: ToolInvocation,
+    _invocation: ToolInvocation,
 ) -> Result<Box<dyn ToolOutput>, FunctionCallError> {
-    let arguments = function_arguments(&invocation.payload)?;
-    let input: ZCodeReadSessionContextArgs = parse_arguments(arguments)?;
-    let max_tokens = input.max_tokens.clamp(1, 12_000);
-    let history = invocation.session.clone_history().await.into_raw_items();
-    let title = zcode_read_session_context_title(&history);
-    let cwd = harness_fs::primary_cwd(&invocation);
-    let extraction_prompt =
-        build_zcode_read_session_context_prompt(&history, &input, &cwd, arguments);
-    let client_session = invocation.session.services.model_client.new_session();
-    let extracted = client_session
-        .zcode_read_session_context(
-            extraction_prompt,
-            max_tokens,
-            &invocation.turn.model_info,
-            &invocation.turn.session_telemetry,
-        )
-        .await
-        .map_err(|err| {
-            FunctionCallError::RespondToModel(format!("ReadSessionContext failed: {err}"))
-        })?;
-    Ok(boxed_tool_output(FunctionToolOutput::from_text(
-        format!(
-            "ReadSessionContext returned lite context for {}.\nTitle: {}\n{}",
-            input.session_id, title, extracted
-        ),
-        Some(true),
-    )))
+    Err(FunctionCallError::RespondToModel(
+        "ReadSessionContext is unavailable for this provider transport".to_string(),
+    ))
 }
 
 fn default_zcode_read_session_context_strategy() -> String {
@@ -2921,6 +2898,7 @@ async fn handle_opencode_task(
     let child_depth = next_thread_spawn_depth(&turn.session_source);
     let base_instructions = BaseInstructions {
         text: OPENCODE_SEARCH_AGENT_BASE_INSTRUCTIONS.to_string(),
+        provenance: None,
     };
     let mut config = build_agent_spawn_config(
         &base_instructions,
@@ -3036,7 +3014,9 @@ fn zcode_agent_rollout_stats(
     let mut duration_ms = 0i64;
     for item in rollout_items {
         match item {
-            RolloutItem::ResponseItem(ResponseItem::FunctionCall { .. }) => {
+            RolloutItem::ResponseItem(ResponseItemEnvelope { item, .. })
+                if matches!(item, ResponseItem::FunctionCall { .. }) =>
+            {
                 tool_uses += 1;
             }
             RolloutItem::EventMsg(EventMsg::TurnComplete(event)) => {
@@ -3051,6 +3031,7 @@ fn zcode_agent_rollout_stats(
             | RolloutItem::Compacted(_)
             | RolloutItem::TurnContext(_)
             | RolloutItem::WorldState(_)
+            | RolloutItem::SecurityRiskScore(_)
             | RolloutItem::EventMsg(_) => {}
         }
     }
@@ -5321,23 +5302,31 @@ mod tests {
     #[test]
     fn zcode_agent_rollout_stats_counts_tools_and_turn_duration() {
         let history = vec![
-            RolloutItem::ResponseItem(ResponseItem::FunctionCall {
-                id: None,
-                name: "Bash".to_string(),
-                namespace: None,
-                arguments: "{}".to_string(),
-                call_id: "call-bash".to_string(),
-                encrypted_function_args: None,
-                internal_chat_message_metadata_passthrough: None,
+            RolloutItem::ResponseItem(ResponseItemEnvelope {
+                item: ResponseItem::FunctionCall {
+                    id: None,
+                    name: "Bash".to_string(),
+                    namespace: None,
+                    arguments: "{}".to_string(),
+                    call_id: "call-bash".to_string(),
+                    encrypted_function_args: None,
+                    internal_chat_message_metadata_passthrough: None,
+                }
+                .into(),
+                metadata: None,
             }),
-            RolloutItem::ResponseItem(ResponseItem::FunctionCall {
-                id: None,
-                name: "Read".to_string(),
-                namespace: None,
-                arguments: "{}".to_string(),
-                call_id: "call-read".to_string(),
-                encrypted_function_args: None,
-                internal_chat_message_metadata_passthrough: None,
+            RolloutItem::ResponseItem(ResponseItemEnvelope {
+                item: ResponseItem::FunctionCall {
+                    id: None,
+                    name: "Read".to_string(),
+                    namespace: None,
+                    arguments: "{}".to_string(),
+                    call_id: "call-read".to_string(),
+                    encrypted_function_args: None,
+                    internal_chat_message_metadata_passthrough: None,
+                }
+                .into(),
+                metadata: None,
             }),
             RolloutItem::EventMsg(EventMsg::TurnComplete(
                 codex_protocol::protocol::TurnCompleteEvent {
