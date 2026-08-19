@@ -61,6 +61,16 @@ jobs:
           text = File.read(".github/workflows/rust-release.yml")
           raise "release workflow must build the open-interpreter bundle" unless text.include?("open-interpreter")
 
+          cargo_ci = YAML.load_file(".github/workflows/cargo-ci.yml")
+          cargo_steps = cargo_ci.fetch("jobs").fetch("fmt-build-test").fetch("steps")
+          cleanup = cargo_steps.find { |step| step["name"] == "Invalidate cached rusty_v8 build output" }
+          raise "cargo CI missing rusty_v8 cleanup" unless cleanup
+          cleanup_run = cleanup.fetch("run")
+          guard_start = cleanup_run.index("if [ -d target ]; then")
+          find_target = guard_start && cleanup_run.index("find target", guard_start)
+          guard_end = find_target && cleanup_run.index("\nfi", find_target)
+          raise "cargo CI rusty_v8 cleanup must guard an absent target directory" unless guard_start && find_target && guard_end
+
           public_ci = File.read(".github/workflows/public-ci.yml")
           %w[codex codex-code-mode-host codex-command-runner codex-windows-sandbox-setup].each do |binary|
             raise "Windows CI must build release binary #{binary}" unless public_ci.include?("--bin #{binary}")
