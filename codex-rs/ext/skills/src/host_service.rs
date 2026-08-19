@@ -16,6 +16,7 @@ use codex_protocol::protocol::SkillScope;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_plugins::PluginIdentity;
 use codex_utils_plugins::PluginSkillRoot;
+use dirs::home_dir;
 use tokio::sync::OnceCell;
 use tokio::sync::Semaphore;
 use tracing::info;
@@ -74,6 +75,7 @@ impl HostSkillsLoadInput {
 /// Source-specific model exposure remains the responsibility of the skills extension.
 pub struct HostSkillsService {
     codex_home: AbsolutePathBuf,
+    user_home: Option<AbsolutePathBuf>,
     restriction_product: Option<Product>,
     extra_roots: RwLock<Vec<AbsolutePathBuf>>,
     cache_by_cwd: RwLock<HashMap<AbsolutePathBuf, HostSkillsSnapshot>>,
@@ -119,8 +121,42 @@ impl HostSkillsService {
         bundled_skills_enabled: bool,
         restriction_product: Option<Product>,
     ) -> Self {
+        let user_home =
+            home_dir().and_then(|path| AbsolutePathBuf::from_absolute_path_checked(path).ok());
+        Self::new_inner(
+            codex_home,
+            bundled_skills_enabled,
+            restriction_product,
+            user_home,
+        )
+    }
+
+    /// Creates a skills service whose user-installed skills resolve from an explicit home.
+    ///
+    /// Isolated app runtimes use this to avoid inspecting the host process home.
+    pub fn new_with_restriction_product_and_user_home(
+        codex_home: AbsolutePathBuf,
+        bundled_skills_enabled: bool,
+        restriction_product: Option<Product>,
+        user_home: AbsolutePathBuf,
+    ) -> Self {
+        Self::new_inner(
+            codex_home,
+            bundled_skills_enabled,
+            restriction_product,
+            Some(user_home),
+        )
+    }
+
+    fn new_inner(
+        codex_home: AbsolutePathBuf,
+        bundled_skills_enabled: bool,
+        restriction_product: Option<Product>,
+        user_home: Option<AbsolutePathBuf>,
+    ) -> Self {
         let service = Self {
             codex_home,
+            user_home,
             restriction_product,
             extra_roots: RwLock::new(Vec::new()),
             cache_by_cwd: RwLock::new(HashMap::new()),
@@ -223,6 +259,7 @@ impl HostSkillsService {
             fs,
             &input.config_layer_stack,
             &input.cwd,
+            self.user_home.as_ref(),
             input.effective_skill_roots.clone(),
             self.extra_roots(),
         )
@@ -257,6 +294,7 @@ impl HostSkillsService {
             fs.clone(),
             &input.config_layer_stack,
             &input.cwd,
+            self.user_home.as_ref(),
             input.effective_skill_roots.clone(),
             self.extra_roots(),
         )
