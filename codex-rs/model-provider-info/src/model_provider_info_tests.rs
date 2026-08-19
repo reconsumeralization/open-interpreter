@@ -414,18 +414,11 @@ fn test_built_in_model_providers_include_amazon_bedrock_runtime() {
 fn test_built_in_model_providers_include_generated_catalog_providers() {
     let providers = built_in_model_providers(/*openai_base_url*/ None);
 
-    for provider_id in [
-        "anthropic",
-        "openrouter",
-        "deepseek",
-        "moonshotai",
-        "alibaba",
-        "github-models",
-        "siliconflow",
-    ] {
+    for provider in bundled_provider_catalog() {
         assert!(
-            providers.contains_key(provider_id),
-            "missing generated provider {provider_id}"
+            providers.contains_key(&provider.id),
+            "missing generated provider {}",
+            provider.id
         );
     }
 

@@ -662,9 +662,6 @@ fn test_model_client_session() -> crate::client::ModelClientSession {
         /*enable_request_compression*/ false,
         /*include_timing_metrics*/ false,
         /*beta_features_header*/ None,
-        codex_tools::Harness::Native,
-        /*harness_guidance*/ true,
-        /*item_ids_enabled*/ false,
         /*concurrent_reasoning_summaries_enabled*/ false,
         /*attestation_provider*/ None,
         HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
@@ -5931,9 +5928,6 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
             config.features.enabled(Feature::EnableRequestCompression),
             config.features.enabled(Feature::RuntimeMetrics),
             Session::build_model_client_beta_features_header(config.as_ref()),
-            codex_tools::Harness::from_config_name(config.harness.as_deref()),
-            config.harness_guidance,
-            /*item_ids_enabled*/ config.features.enabled(Feature::ItemIds),
             /*concurrent_reasoning_summaries_enabled*/
             config
                 .features
@@ -8140,9 +8134,6 @@ where
             config.features.enabled(Feature::EnableRequestCompression),
             config.features.enabled(Feature::RuntimeMetrics),
             Session::build_model_client_beta_features_header(config.as_ref()),
-            codex_tools::Harness::from_config_name(config.harness.as_deref()),
-            config.harness_guidance,
-            /*item_ids_enabled*/ config.features.enabled(Feature::ItemIds),
             /*concurrent_reasoning_summaries_enabled*/
             config
                 .features

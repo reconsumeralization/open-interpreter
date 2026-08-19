@@ -4206,19 +4206,22 @@ mod tests {
                 },
                 FileSystemAccessMode::Write,
             )]);
-        let mut environment_config = current.config.clone();
+        let mut environment_config = current.config().clone();
         environment_config.permission_profile =
             PermissionProfileSnapshot::legacy(PermissionProfile::from_runtime_permissions(
                 &file_system_sandbox_policy,
                 NetworkSandboxPolicy::Restricted,
             ));
+        let mut selection = current.selection.clone();
+        selection.cwd = workspace_root_uri.clone();
+        selection.workspace_roots = vec![workspace_root_uri];
+        selection.config =
+            codex_protocol::protocol::EnvironmentConfigState::Ready(environment_config);
         turn.environments.environments[0] = TurnEnvironmentState::Ready(TurnEnvironment::new(
-            current.environment_id,
+            selection,
+            current.config_origin,
             current.environment,
-            workspace_root_uri.clone(),
-            vec![workspace_root_uri],
             current.shell,
-            environment_config,
         ));
         let turn = Arc::new(turn);
         (

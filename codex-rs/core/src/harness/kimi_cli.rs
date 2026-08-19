@@ -1804,6 +1804,7 @@ mod tests {
             base_instructions: BaseInstructions {
                 text: "<extra_instruction>\nUse file tools first.\n</extra_instruction>\n\nCodex base prompt"
                     .to_string(),
+                provenance: None,
             },
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
@@ -2071,7 +2072,8 @@ mod tests {
             tools: vec![
                 ToolSpec::Function(ask_user_question),
                 ToolSpec::Function(shell),
-            ],
+            ]
+            .into(),
             cwd: Some(std::env::temp_dir()),
             ..Prompt::default()
         };

@@ -658,7 +658,7 @@ mod tests {
 
                 internal_chat_message_metadata_passthrough: None,
             }],
-            tools: vec![test_bash_tool()],
+            tools: vec![test_bash_tool()].into(),
             ..Prompt::default()
         };
 
@@ -732,7 +732,7 @@ mod tests {
                     internal_chat_message_metadata_passthrough: None,
                 },
             ],
-            tools: vec![test_bash_tool()],
+            tools: vec![test_bash_tool()].into(),
             ..Prompt::default()
         };
 
