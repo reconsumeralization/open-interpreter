@@ -262,11 +262,7 @@ impl KimiCronService {
                 delivery.stale,
                 &delivery.task.prompt,
             ));
-            if session
-                .try_start_turn_if_idle(vec![crate::TurnInput::ResponseItem(input)])
-                .await
-                .is_ok()
-            {
+            if session.inject_if_running(vec![input]).await.is_ok() {
                 self.complete_delivery(delivery).await;
             }
         }

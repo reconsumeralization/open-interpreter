@@ -512,6 +512,7 @@ fn http_status(error: &TransportError) -> Option<http::StatusCode> {
         TransportError::Http { status, .. } => Some(*status),
         TransportError::RetryLimit
         | TransportError::Timeout
+        | TransportError::Connection(_)
         | TransportError::Network(_)
         | TransportError::Build(_) => None,
     }

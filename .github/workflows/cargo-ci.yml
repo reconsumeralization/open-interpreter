@@ -42,6 +42,11 @@ jobs:
           df -h /
       - name: Install Linux build dependencies
         run: |
+          for sources_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$sources_file" ] && grep -qF 'http://azure.archive.ubuntu.com/ubuntu' "$sources_file"; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$sources_file"
+            fi
+          done
           sudo apt-get update -y
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends pkg-config libcap-dev
       - uses: dtolnay/rust-toolchain@a0b273b48ed29de4470960879e8381ff45632f26 # 1.93.0
@@ -70,9 +75,11 @@ jobs:
       # RUSTY_V8_ARCHIVE downloaded above into this runner's target directory.
       - name: Invalidate cached rusty_v8 build output
         run: |
-          find target -type d \
-            \( -path '*/build/v8-*' -o -path '*/.fingerprint/v8-*' \) \
-            -prune -exec rm -rf {} +
+          if [ -d target ]; then
+            find target -type d \
+              \( -path '*/build/v8-*' -o -path '*/.fingerprint/v8-*' \) \
+              -prune -exec rm -rf {} +
+          fi
       - name: cargo fmt --check
         run: cargo fmt -- --config imports_granularity=Item --check
       # Hard gate: build the whole workspace including all test code (catches
