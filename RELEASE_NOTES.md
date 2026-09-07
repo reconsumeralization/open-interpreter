@@ -15,7 +15,8 @@ stable upstream Codex `rust-v0.153.4` compatibility baseline.
   `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, and
   `gemini-3.1-flash-lite`. These are provider-documented IDs surfaced in the
   [model guide](docs/models.md), not Open Interpreter-owned model aliases.
-- **Z.AI IDs:** `glm-5.2` and `glm-5-turbo`. These are the provider-documented
+- **Anthropic IDs:** `claude-fable-5-1`, `claude-opus-5`, `claude-sonnet-5`, and `claude-haiku-4-5-20251001`. These are current active provider-documented IDs surfaced in the model guide.
+- **Z.AI IDs:** `glm-5.1`, `glm-5`, `glm-5-turbo`, and the free/lightweight `glm-4.7-flash`. These are the provider-documented
   starting IDs; use the exact ID returned by the selected Z.AI service or plan.
   Generic Z.AI uses Chat Completions, while the separate ZCode setup uses its
   compatible Messages endpoint.
