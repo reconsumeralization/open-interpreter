@@ -167,6 +167,10 @@ enum Subcommand {
     App(app_cmd::AppCommand),
 
     /// Generate shell completion scripts.
+    #[clap(
+        about = completion_about(),
+        after_help = completion_examples()
+    )]
     Completion(CompletionCommand),
 
     /// Update to the latest version.
@@ -1047,9 +1051,22 @@ fn product_command_name() -> &'static str {
 }
 
 fn product_about() -> String {
+    let command = product_command_name();
+    let display_name = codex_product_info::Product::current().display_name();
     format!(
-        "{}\n\nIf no subcommand is specified, options will be forwarded to the interactive CLI.",
-        codex_product_info::Product::current().display_name()
+        "{display_name}\n\nIf no subcommand is specified, options will be forwarded to the interactive CLI.\n\nExamples:\n  {command} completion bash > {command}.bash\n  {command} --chat-completions"
+    )
+}
+
+fn completion_about() -> String {
+    let command = product_command_name();
+    format!("Generate shell completion scripts for {command}.")
+}
+
+fn completion_examples() -> String {
+    let command = product_command_name();
+    format!(
+        "Examples:\n  source <({command} completion bash)\n  {command} completion zsh > _{command}\n  {command} completion fish > ~/.config/fish/completions/{command}.fish"
     )
 }
 

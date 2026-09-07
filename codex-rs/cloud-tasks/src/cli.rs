@@ -32,8 +32,11 @@ pub struct ExecCommand {
     #[arg(value_name = "QUERY")]
     pub query: Option<String>,
 
-    /// Target environment identifier (see `cloud` to browse).
-    #[arg(long = "env", value_name = "ENV_ID")]
+    #[arg(
+        long = "env",
+        value_name = "ENV_ID",
+        help = environment_help()
+    )]
     pub environment: String,
 
     /// Number of assistant attempts (best-of-N).
@@ -47,6 +50,11 @@ pub struct ExecCommand {
     /// Git branch to run in the hosted cloud service (defaults to current branch).
     #[arg(long = "branch", value_name = "BRANCH")]
     pub branch: Option<String>,
+}
+
+fn environment_help() -> String {
+    let command = crate::product_cloud_command();
+    format!("Target environment identifier (see `{command}` to browse).")
 }
 
 fn parse_attempts(input: &str) -> Result<usize, String> {

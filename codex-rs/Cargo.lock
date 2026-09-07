@@ -2708,6 +2708,7 @@ dependencies = [
  "codex-http-client",
  "codex-login",
  "codex-model-provider",
+ "codex-product-info",
  "codex-tui",
  "codex-utils-cli",
  "crossterm",
