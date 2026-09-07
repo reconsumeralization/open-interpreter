@@ -39,8 +39,12 @@ class OllamaQwenSmokeTest(unittest.TestCase):
         self.assertTrue(result.truncated)
         self.assertLessEqual(len(result.output), 128)
 
-    @unittest.skipUnless(os.name == "posix", "process-group semantics are POSIX-specific")
-    def test_command_runner_times_out_sparse_output_and_cleans_process_group(self) -> None:
+    @unittest.skipUnless(
+        os.name == "posix", "process-group semantics are POSIX-specific"
+    )
+    def test_command_runner_times_out_sparse_output_and_cleans_process_group(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             descendant_pid_path = Path(directory) / "descendant.pid"
             child = (
@@ -90,7 +94,9 @@ class OllamaQwenSmokeTest(unittest.TestCase):
                 "interpreter_loop",
             )
 
-    @unittest.skipUnless(os.name == "posix", "process-group semantics are POSIX-specific")
+    @unittest.skipUnless(
+        os.name == "posix", "process-group semantics are POSIX-specific"
+    )
     def test_command_runner_cleans_descendant_after_leader_exits(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             descendant_pid_path = Path(directory) / "descendant.pid"
@@ -122,7 +128,9 @@ class OllamaQwenSmokeTest(unittest.TestCase):
                         break
                 time.sleep(0.01)
             else:
-                self.fail("descendant survived cleanup after its process-group leader exited")
+                self.fail(
+                    "descendant survived cleanup after its process-group leader exited"
+                )
 
     def test_side_effect_requires_exact_content(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
