@@ -92,8 +92,9 @@ endpoint and plan-eligibility details.
 
 Use `/model` rather than maintaining a private list. The picker is generated
 from maintained provider sources and includes current GLM model IDs for the
-selected service. For example, the bundled Z.AI Coding Plan catalog currently
-includes `glm-5.2`, `glm-5.1`, `glm-5-turbo`, and lower-cost models.
+selected service. The provider-documented starting choices are `glm-5.2` and
+`glm-5-turbo`; use the exact IDs returned for the selected service rather than
+guessing a versioned alias.
 
 Z.AI may update server-side model mappings and plan eligibility independently
 of Open Interpreter. Check its [model-switching guide](https://docs.z.ai/devpack/using5.1)
