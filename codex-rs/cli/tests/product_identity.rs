@@ -101,6 +101,12 @@ fn interpreter_help_version_errors_and_completions_keep_product_identity() -> an
             "invalid argument",
             &["--definitely-not-an-interpreter-option"][..],
         ),
+        (
+            "exec invalid argument",
+            &["exec", "--definitely-not-an-interpreter-option"][..],
+        ),
+        ("login help", &["login", "--help"][..]),
+        ("cloud help", &["cloud", "--help"][..]),
         ("debug update error", &["update"][..]),
     ] {
         let (stdout, stderr) = run(&interpreter, args, &envs, &[])?;
@@ -114,9 +120,14 @@ fn interpreter_help_version_errors_and_completions_keep_product_identity() -> an
             stdout.to_ascii_lowercase().contains("interpreter"),
             "{shell} completion should target interpreter: {stdout}"
         );
+        let chat_completions_option = if shell == "fish" {
+            "chat-completions"
+        } else {
+            "--chat-completions"
+        };
         assert!(
-            stdout.contains("--chat-completions"),
-            "{shell} completion should include --chat-completions: {stdout}"
+            stdout.contains(chat_completions_option),
+            "{shell} completion should include {chat_completions_option}: {stdout}"
         );
     }
     Ok(())
