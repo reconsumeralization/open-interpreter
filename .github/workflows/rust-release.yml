@@ -1214,6 +1214,9 @@ jobs:
   build-windows:
     needs: tag-check
     uses: ./.github/workflows/rust-release-windows.yml
+    permissions:
+      contents: read
+      id-token: write
     secrets: inherit
 
   release:
