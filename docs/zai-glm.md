@@ -13,7 +13,7 @@ a native `zcode` harness for GLM coding workflows.
 | --- | --- | --- | --- |
 | Z.AI pay-as-you-go API | `zai` | `ZAI_API_KEY` | General OpenAI-compatible Chat API |
 | Z.AI GLM Coding Plan | `zai-coding-plan` | `ZAI_API_KEY` | Coding Plan OpenAI-compatible Chat API |
-| Z.AI ZCode | `zai-zcode` | `ZAI_API_KEY` and `ZAI_AUTHORIZATION` | Coding Plan Anthropic Messages API |
+| Z.AI ZCode | `zai-zcode` | `ZAI_API_KEY` | Coding Plan Anthropic Messages API |
 | Zhipu AI pay-as-you-go API | `zhipuai` | `ZHIPU_API_KEY` | General OpenAI-compatible Chat API |
 | Zhipu AI Coding Plan | `zhipuai-coding-plan` | `ZHIPU_API_KEY` | Coding Plan OpenAI-compatible Chat API |
 
@@ -71,7 +71,6 @@ config file:
 
 ```bash
 export ZAI_API_KEY="..."
-export ZAI_AUTHORIZATION="Bearer $ZAI_API_KEY"
 interpreter
 ```
 

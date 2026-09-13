@@ -11,7 +11,7 @@ Open Interpreter 包含面向全球 Z.AI 平台、其 GLM Coding Plan 以及中�
 | --- | --- | --- | --- |
 | Z.AI 按量付费 API | `zai` | `ZAI_API_KEY` | 通用 OpenAI 兼容 Chat API |
 | Z.AI GLM Coding Plan | `zai-coding-plan` | `ZAI_API_KEY` | Coding Plan 的 OpenAI 兼容 Chat API |
-| Z.AI ZCode | `zai-zcode` | `ZAI_API_KEY` 和 `ZAI_AUTHORIZATION` | Coding Plan Anthropic Messages API |
+| Z.AI ZCode | `zai-zcode` | `ZAI_API_KEY` | Coding Plan Anthropic Messages API |
 | Zhipu AI 按量付费 API | `zhipuai` | `ZHIPU_API_KEY` | 通用 OpenAI 兼容 Chat API |
 | Zhipu AI Coding Plan | `zhipuai-coding-plan` | `ZHIPU_API_KEY` | Coding Plan 的 OpenAI 兼容 Chat API |
 
@@ -54,7 +54,6 @@ harness = "zcode"
 
 ```bash
 export ZAI_API_KEY="..."
-export ZAI_AUTHORIZATION="Bearer $ZAI_API_KEY"
 interpreter
 ```
 

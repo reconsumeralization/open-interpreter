@@ -8185,9 +8185,6 @@
       "env_key": "ZAI_API_KEY",
       "base_url": "https://api.z.ai/api/anthropic",
       "wire_api": "messages",
-      "env_http_headers": {
-        "Authorization": "ZAI_AUTHORIZATION"
-      },
       "sort_priority": 37,
       "models": [
         {

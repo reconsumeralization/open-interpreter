@@ -128,13 +128,7 @@ mod tests {
         let provider = bundled_provider_catalog_entry("zai-zcode").expect("ZCode provider");
         assert_eq!(provider.base_url, "https://api.z.ai/api/anthropic");
         assert_eq!(provider.wire_api, WireApi::Messages);
-        assert_eq!(
-            provider
-                .env_http_headers
-                .as_ref()
-                .and_then(|headers| headers.get("Authorization")),
-            Some(&"ZAI_AUTHORIZATION".to_string())
-        );
+        assert!(provider.env_http_headers.is_none());
     }
 
     #[test]

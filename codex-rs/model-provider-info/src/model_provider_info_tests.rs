@@ -66,14 +66,7 @@ fn zai_zcode_preset_selects_zcode_without_changing_generic_zai_chat() {
     );
     assert_eq!(zcode.wire_api, WireApi::Messages);
     assert_eq!(zcode.env_key.as_deref(), Some("ZAI_API_KEY"));
-    assert_eq!(
-        zcode
-            .env_http_headers
-            .as_ref()
-            .and_then(|headers| headers.get("Authorization"))
-            .map(String::as_str),
-        Some("ZAI_AUTHORIZATION")
-    );
+    assert!(zcode.env_http_headers.is_none());
     assert_eq!(
         default_harness_for_provider_model("zai-zcode", zcode, Some("glm-5.1")),
         Some("zcode")
