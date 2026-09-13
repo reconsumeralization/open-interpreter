@@ -325,6 +325,30 @@
       "sort_priority": 3,
       "models": [
         {
+          "id": "gemini-3.8-flash",
+          "display_name": "Gemini 3.8 Flash",
+          "description": "gemini-flash \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 PDF input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 1048576,
+          "priority": -2
+        },
+        {
+          "id": "gemini-3.7-flash",
+          "display_name": "Gemini 3.7 Flash",
+          "description": "gemini-flash \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 PDF input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 1048576,
+          "priority": -1
+        },
+        {
           "id": "gemini-2.5-computer-use-preview-10-2025",
           "display_name": "Gemini 2.5 Computer Use Preview 10-2025",
           "description": "gemini-pro \u2022 Reasoning \u2022 Tool calling \u2022 Image input",
@@ -8152,6 +8176,63 @@
           ],
           "context_window": null,
           "priority": 13
+        }
+      ]
+    },
+    {
+      "id": "zai-zcode",
+      "name": "Z.AI ZCode",
+      "env_key": "ZAI_API_KEY",
+      "base_url": "https://api.z.ai/api/anthropic",
+      "wire_api": "messages",
+      "env_http_headers": {
+        "Authorization": "ZAI_AUTHORIZATION"
+      },
+      "sort_priority": 37,
+      "models": [
+        {
+          "id": "glm-5.1",
+          "display_name": "GLM-5.1",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 200000,
+          "priority": -1
+        },
+        {
+          "id": "glm-5-turbo",
+          "display_name": "GLM-5-Turbo",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 200000,
+          "priority": 0
+        },
+        {
+          "id": "glm-4.7",
+          "display_name": "GLM-4.7",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 204800,
+          "priority": 1
+        },
+        {
+          "id": "glm-4.5-air",
+          "display_name": "GLM-4.5-Air",
+          "description": "glm-air \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 131072,
+          "priority": 2
         }
       ]
     },

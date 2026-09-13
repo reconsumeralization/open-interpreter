@@ -11,9 +11,12 @@ use agent_client_protocol::schema::ListSessionsRequest;
 use agent_client_protocol::schema::NewSessionRequest;
 use agent_client_protocol::schema::PromptRequest;
 use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::schema::SessionConfigKind;
+use agent_client_protocol::schema::SessionConfigSelectOptions;
 use agent_client_protocol::schema::SessionModeId;
 use agent_client_protocol::schema::SessionNotification;
 use agent_client_protocol::schema::SessionUpdate;
+use agent_client_protocol::schema::SetSessionConfigOptionRequest;
 use agent_client_protocol::schema::SetSessionModeRequest;
 use agent_client_protocol::schema::StopReason;
 use agent_client_protocol::schema::TextContent;
@@ -67,6 +70,7 @@ stream_max_retries = 0
     let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
     let agent = AcpAgent::from_args([
         format!("CODEX_HOME={}", codex_home.path().display()),
+        "OPEN_INTERPRETER_BRAND=1".to_string(),
         "INTERPRETER_DISABLE_SYSTEM_IMPORT=1".to_string(),
         "TEST_ACP_API_KEY=dummy".to_string(),
         codex_bin.display().to_string(),
@@ -99,6 +103,7 @@ stream_max_retries = 0
                 .agent_info
                 .expect("initialize should include agent info");
             assert_eq!(agent_info.name, "codex-acp");
+            assert_eq!(agent_info.title.as_deref(), Some("Open Interpreter"));
             assert!(
                 initialize
                     .agent_capabilities
@@ -159,6 +164,106 @@ stream_max_retries = 0
                 .block_task()
                 .await?;
 
+            Ok(())
+        })
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn acp_session_harness_option_round_trips_through_interpreter_config() -> anyhow::Result<()> {
+    let codex_home = TempDir::new()?;
+    let cwd = TempDir::new()?;
+    fs::write(
+        codex_home.path().join("config.toml"),
+        r#"
+model = "mock-model"
+model_provider = "mock_provider"
+
+[model_providers.mock_provider]
+name = "Mock Chat provider for ACP harness test"
+base_url = "http://127.0.0.1:1/v1"
+env_key = "TEST_ACP_API_KEY"
+wire_api = "chat"
+request_max_retries = 0
+stream_max_retries = 0
+"#,
+    )?;
+
+    let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
+    let agent = AcpAgent::from_args([
+        format!("CODEX_HOME={}", codex_home.path().display()),
+        "OPEN_INTERPRETER_BRAND=1".to_string(),
+        "INTERPRETER_DISABLE_SYSTEM_IMPORT=1".to_string(),
+        "TEST_ACP_API_KEY=dummy".to_string(),
+        codex_bin.display().to_string(),
+        "acp".to_string(),
+    ])?;
+
+    Client
+        .builder()
+        .connect_with(agent, |connection: ConnectionTo<Agent>| async move {
+            connection
+                .send_request(InitializeRequest::new(ProtocolVersion::V1))
+                .block_task()
+                .await?;
+            let new_session = connection
+                .send_request(NewSessionRequest::new(cwd.path()))
+                .block_task()
+                .await?;
+            let config_options = new_session
+                .config_options
+                .as_ref()
+                .expect("ACP should advertise session config options");
+            let harness = config_options
+                .iter()
+                .find(|option| option.id.0.as_ref() == "harness")
+                .expect("ACP should advertise a harness option");
+            let select = match &harness.kind {
+                SessionConfigKind::Select(select) => select,
+                _ => panic!("ACP harness option should be a selector"),
+            };
+            assert_eq!(select.current_value.0.as_ref(), "");
+            let options = match &select.options {
+                SessionConfigSelectOptions::Ungrouped(options) => options,
+                SessionConfigSelectOptions::Grouped(_) => {
+                    panic!("ACP harness options should be ungrouped")
+                }
+            };
+            assert!(
+                options
+                    .iter()
+                    .any(|option| option.value.0.as_ref() == "minimal")
+            );
+
+            let set = connection
+                .send_request(SetSessionConfigOptionRequest::new(
+                    new_session.session_id.clone(),
+                    "harness",
+                    "minimal",
+                ))
+                .block_task()
+                .await?;
+            let harness = set
+                .config_options
+                .iter()
+                .find(|option| option.id.0.as_ref() == "harness")
+                .expect("set response should include the harness option");
+            let select = match &harness.kind {
+                SessionConfigKind::Select(select) => select,
+                _ => panic!("ACP harness option should be a selector"),
+            };
+            assert_eq!(select.current_value.0.as_ref(), "minimal");
+            assert!(
+                fs::read_to_string(codex_home.path().join("config.toml"))?
+                    .contains("harness = \"minimal\"")
+            );
+
+            connection
+                .send_request(CloseSessionRequest::new(new_session.session_id))
+                .block_task()
+                .await?;
             Ok(())
         })
         .await?;

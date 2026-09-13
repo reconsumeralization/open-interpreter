@@ -12,6 +12,8 @@ pub struct BundledProviderCatalogEntry {
     pub env_key: Option<String>,
     pub base_url: String,
     pub wire_api: WireApi,
+    #[serde(default)]
+    pub env_http_headers: Option<HashMap<String, String>>,
     pub models: Vec<BundledProviderModelEntry>,
     pub sort_priority: u16,
 }
@@ -99,6 +101,7 @@ mod tests {
         assert!(provider_ids.contains(&"moonshotai"));
         assert!(provider_ids.contains(&"zhipuai"));
         assert!(provider_ids.contains(&"zai"));
+        assert!(provider_ids.contains(&"zai-zcode"));
         assert!(provider_ids.contains(&"siliconflow"));
         assert!(provider_ids.contains(&"alibaba"));
         assert!(provider_ids.contains(&"modelscope"));
@@ -118,6 +121,20 @@ mod tests {
     fn anthropic_catalog_entry_uses_messages_wire_api() {
         let provider = bundled_provider_catalog_entry("anthropic").expect("anthropic provider");
         assert_eq!(provider.wire_api, WireApi::Messages);
+    }
+
+    #[test]
+    fn zai_zcode_catalog_entry_has_messages_endpoint_auth_metadata() {
+        let provider = bundled_provider_catalog_entry("zai-zcode").expect("ZCode provider");
+        assert_eq!(provider.base_url, "https://api.z.ai/api/anthropic");
+        assert_eq!(provider.wire_api, WireApi::Messages);
+        assert_eq!(
+            provider
+                .env_http_headers
+                .as_ref()
+                .and_then(|headers| headers.get("Authorization")),
+            Some(&"ZAI_AUTHORIZATION".to_string())
+        );
     }
 
     #[test]

@@ -150,6 +150,7 @@ refresh_interval_ms = 300000
 | `moonshotai-cn` | Moonshot AI (China) | `chat` | `MOONSHOT_API_KEY` | 7 |
 | `zhipuai` | Zhipu AI | `chat` | `ZHIPU_API_KEY` | 12 |
 | `zai` | Z.AI | `chat` | `ZAI_API_KEY` | 14 |
+| `zai-zcode` | Z.AI ZCode | `messages` | `ZAI_API_KEY` + `ZAI_AUTHORIZATION` | 4 |
 | `siliconflow` | SiliconFlow | `chat` | `SILICONFLOW_API_KEY` | 76 |
 | `siliconflow-cn` | SiliconFlow (China) | `chat` | `SILICONFLOW_CN_API_KEY` | 77 |
 | `alibaba` | Alibaba | `chat` | `DASHSCOPE_API_KEY` | 43 |

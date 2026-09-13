@@ -138,6 +138,44 @@ mod tests {
     }
 
     #[test]
+    fn bundled_provider_models_include_current_google_flash_choices() {
+        let models = bundled_provider_model_infos(&provider(
+            "Google",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "GEMINI_API_KEY",
+            WireApi::Chat,
+        ));
+
+        for model_id in ["gemini-3.8-flash", "gemini-3.7-flash"] {
+            let model = models
+                .iter()
+                .find(|model| model.slug == model_id)
+                .unwrap_or_else(|| panic!("{model_id} should be in the Google catalog"));
+            assert_eq!(model.context_window, Some(1_048_576));
+            assert!(model.input_modalities.iter().any(|modality| {
+                matches!(
+                    modality,
+                    codex_protocol::openai_models::InputModality::Image
+                )
+            }));
+            assert_eq!(model.default_reasoning_level, Some(ReasoningEffort::Medium));
+        }
+    }
+
+    #[test]
+    fn bundled_provider_models_seed_zai_zcode() {
+        let models = bundled_provider_model_infos(&provider(
+            "Z.AI ZCode",
+            "https://api.z.ai/api/anthropic",
+            "ZAI_API_KEY",
+            WireApi::Messages,
+        ));
+
+        assert!(models.iter().any(|model| model.slug == "glm-5.1"));
+        assert!(models.iter().any(|model| model.slug == "glm-5-turbo"));
+    }
+
+    #[test]
     fn bundled_provider_models_seed_anthropic_with_reasoning_and_vision() {
         let models = bundled_provider_model_infos(&provider(
             "Anthropic",

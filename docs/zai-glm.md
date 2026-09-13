@@ -13,6 +13,7 @@ a native `zcode` harness for GLM coding workflows.
 | --- | --- | --- | --- |
 | Z.AI pay-as-you-go API | `zai` | `ZAI_API_KEY` | General OpenAI-compatible Chat API |
 | Z.AI GLM Coding Plan | `zai-coding-plan` | `ZAI_API_KEY` | Coding Plan OpenAI-compatible Chat API |
+| Z.AI ZCode | `zai-zcode` | `ZAI_API_KEY` and `ZAI_AUTHORIZATION` | Coding Plan Anthropic Messages API |
 | Zhipu AI pay-as-you-go API | `zhipuai` | `ZHIPU_API_KEY` | General OpenAI-compatible Chat API |
 | Zhipu AI Coding Plan | `zhipuai-coding-plan` | `ZHIPU_API_KEY` | Coding Plan OpenAI-compatible Chat API |
 
@@ -55,23 +56,18 @@ Messages-compatible provider; selecting `zcode` on the built-in Chat provider
 does not activate that Messages route.
 
 Z.AI officially provides an Anthropic-compatible Coding Plan endpoint at
-`https://api.z.ai/api/anthropic`. To use it, add a Messages provider to
+`https://api.z.ai/api/anthropic`. Open Interpreter includes it as the explicit
+`zai-zcode` provider, so only select the provider and harness in
 `~/.openinterpreter/config.toml`:
 
 ```toml
 model_provider = "zai-zcode"
 model = "glm-5.1"
 harness = "zcode"
-
-[model_providers.zai-zcode]
-name = "Z.AI ZCode"
-base_url = "https://api.z.ai/api/anthropic"
-env_key = "ZAI_API_KEY"
-wire_api = "messages"
-env_http_headers = { Authorization = "ZAI_AUTHORIZATION" }
 ```
 
-Then expose the bearer header without writing the secret into the config file:
+Then expose the API key and bearer header without writing the secret into the
+config file:
 
 ```bash
 export ZAI_API_KEY="..."
@@ -106,7 +102,7 @@ when a model is unavailable or consumes a different quota multiplier.
 | --- | --- |
 | Simplest setup with the built-in picker | `zai-coding-plan` or `zai`, generic Chat |
 | Provider-recommended OpenAI-compatible integration | Built-in provider, `wire_api = "chat"` |
-| ZCode-shaped coding-agent behavior | Custom Messages provider plus `harness = "zcode"` |
+| ZCode-shaped coding-agent behavior | Built-in `zai-zcode` Messages provider plus `harness = "zcode"` |
 
 Do not set `wire_api = "messages"` on the OpenAI-compatible `/paas/v4`
 endpoint, and do not point the Chat provider at `/api/anthropic`. The endpoint,
