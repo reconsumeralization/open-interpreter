@@ -247,6 +247,7 @@ pub(crate) fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::AdditionalTools { .. }
+            | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::Other => {}
         }
     }

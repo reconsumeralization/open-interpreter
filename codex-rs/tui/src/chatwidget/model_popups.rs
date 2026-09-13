@@ -4,6 +4,7 @@
 //! into another, especially while Plan mode is active.
 
 use super::*;
+use crate::model_catalog::LUNA_RESERVE_MODEL;
 use codex_app_server_protocol::InterpreterHarness;
 use codex_app_server_protocol::InterpreterProvider;
 use codex_login::KIMI_CODE_PROVIDER_ID;
@@ -155,7 +156,7 @@ impl ChatWidget {
         }
     }
 
-    fn model_menu_header(&self, title: &str, subtitle: &str) -> Box<dyn Renderable> {
+    pub(super) fn model_menu_header(&self, title: &str, subtitle: &str) -> Box<dyn Renderable> {
         let title = title.to_string();
         let subtitle = subtitle.to_string();
         let mut header = ColumnRenderable::new();
@@ -196,6 +197,10 @@ impl ChatWidget {
 
     #[allow(dead_code)]
     pub(crate) fn open_model_popup_with_presets(&mut self, presets: Vec<ModelPreset>) {
+        if self.restrict_model_picker_to_luna_reserve() {
+            self.open_luna_reserve_model_popup(presets, MODEL_SELECTION_VIEW_ID);
+            return;
+        }
         let presets: Vec<ModelPreset> = presets
             .into_iter()
             .filter(|preset| preset.show_in_picker)
@@ -310,6 +315,13 @@ impl ChatWidget {
     }
 
     pub(crate) fn open_all_models_popup(&mut self) {
+        if self.restrict_model_picker_to_luna_reserve() {
+            self.open_luna_reserve_model_popup(
+                self.model_catalog.try_list_models().unwrap_or_default(),
+                ALL_MODELS_SELECTION_VIEW_ID,
+            );
+            return;
+        }
         let presets = self
             .model_catalog
             .try_list_models()
@@ -381,8 +393,17 @@ impl ChatWidget {
         let warning = effort_for_action
             .as_ref()
             .and_then(|effort| self.ultra_reasoning_concurrency_warning(effort));
+        let thread_id = self.thread_id();
         vec![Box::new(move |tx| {
-            if effort_for_action == Some(ReasoningEffortConfig::Ultra) {
+            if model_for_action == LUNA_RESERVE_MODEL {
+                // Reserve is temporary: update the active task without persisting a model default.
+                if let Some(thread_id) = thread_id {
+                    tx.send(AppEvent::UpdateLunaReserveReasoning {
+                        thread_id,
+                        effort: effort_for_action.clone(),
+                    });
+                }
+            } else if effort_for_action == Some(ReasoningEffortConfig::Ultra) {
                 tx.send(AppEvent::ApplyAdvancedReasoning {
                     model: model_for_action.clone(),
                     effort: ReasoningEffortConfig::Ultra,
@@ -414,6 +435,7 @@ impl ChatWidget {
         selected_effort: Option<ReasoningEffortConfig>,
     ) -> bool {
         if !self.collaboration_modes_enabled()
+            || selected_model == LUNA_RESERVE_MODEL
             || self.active_mode_kind() != ModeKind::Plan
             || selected_model != self.current_model()
         {
@@ -597,6 +619,11 @@ impl ChatWidget {
             .then(|| default_effort.clone());
 
         let model_slug = preset.model.to_string();
+        let model_label = if model_slug == LUNA_RESERVE_MODEL {
+            preset.display_name.clone()
+        } else {
+            model_slug.clone()
+        };
         let is_current_model = self.current_model() == preset.model.as_str();
         let highlight_choice = if is_current_model {
             if in_plan_mode {
@@ -694,7 +721,7 @@ impl ChatWidget {
 
         let mut header = ColumnRenderable::new();
         header.push(Line::from(
-            format!("Select Reasoning Level for {model_slug}").bold(),
+            format!("Select Reasoning Level for {model_label}").bold(),
         ));
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
@@ -823,30 +850,13 @@ impl ChatWidget {
         ))
     }
 
-    pub(super) fn apply_model_and_effort_without_persist(
-        &self,
-        model: String,
-        effort: Option<ReasoningEffortConfig>,
-    ) {
-        let warning = effort
-            .as_ref()
-            .and_then(|effort| self.ultra_reasoning_concurrency_warning(effort));
-        self.app_event_tx.send(AppEvent::UpdateModel(model));
-        self.app_event_tx
-            .send(AppEvent::UpdateReasoningEffort(effort));
-        if let Some(warning) = warning {
-            self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
-                history_cell::new_warning_event(warning),
-            )));
+    fn apply_model_and_effort(&self, model: String, effort: Option<ReasoningEffortConfig>) {
+        for action in self
+            .model_selection_actions(model, effort, /*should_prompt_plan_mode_scope*/ false)
+        {
+            action(&self.app_event_tx);
         }
     }
-
-    fn apply_model_and_effort(&self, model: String, effort: Option<ReasoningEffortConfig>) {
-        self.apply_model_and_effort_without_persist(model.clone(), effort.clone());
-        self.app_event_tx
-            .send(AppEvent::PersistModelSelection { model, effort });
-    }
-
     pub(crate) fn open_model_popup_for_provider(
         &mut self,
         provider_id: String,

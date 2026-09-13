@@ -684,6 +684,7 @@ async fn execute_harness_command(
 ) -> Result<serde_json::Value, FunctionCallError> {
     let handler = ExecCommandHandler::new(ExecCommandHandlerOptions {
         allow_login_shell: invocation.turn.config.permissions.allow_login_shell,
+        allow_tty: false,
         exec_permission_approvals_enabled: invocation
             .session
             .features()
@@ -3018,6 +3019,7 @@ fn zcode_agent_rollout_stats(
             | RolloutItem::SecurityRiskScore(_)
             | RolloutItem::TokenUsageRecord(_)
             | RolloutItem::RealtimeItem(_)
+            | RolloutItem::RetainedContext(_)
             | RolloutItem::EventMsg(_) => {}
         }
     }

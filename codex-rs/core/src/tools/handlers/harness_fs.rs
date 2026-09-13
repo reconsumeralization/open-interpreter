@@ -167,10 +167,10 @@ fn ensure_allowed(
     let allowed = match access {
         AccessKind::Read => candidates
             .iter()
-            .all(|candidate| policy.can_read_path_with_cwd(candidate, &cwd)),
+            .all(|candidate| policy.can_read_local_path_with_cwd(candidate, &cwd)),
         AccessKind::Write => candidates
             .iter()
-            .all(|candidate| policy.can_write_path_with_cwd(candidate, &cwd)),
+            .all(|candidate| policy.can_write_local_path_with_cwd(candidate, &cwd)),
     };
     if allowed {
         return Ok(());

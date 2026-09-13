@@ -217,7 +217,13 @@ async fn process_chat_sse(
         }
         if !state.created_sent {
             state.created_sent = true;
-            if tx_event.send(Ok(ResponseEvent::Created)).await.is_err() {
+            if tx_event
+                .send(Ok(ResponseEvent::Created {
+                    response_id: Some(state.response_id.clone()),
+                }))
+                .await
+                .is_err()
+            {
                 return;
             }
         }
@@ -617,7 +623,7 @@ mod tests {
             &events[0],
             ResponseEvent::ServerModel(model) if model == "gpt-5.2-codex"
         ));
-        assert!(matches!(&events[1], ResponseEvent::Created));
+        assert!(matches!(&events[1], ResponseEvent::Created { .. }));
         assert!(matches!(
             &events[2],
             ResponseEvent::OutputItemDone(ResponseItem::FunctionCall {
@@ -777,7 +783,7 @@ mod tests {
         ));
         assert!(matches!(
             stream.next().await.expect("created").expect("event"),
-            ResponseEvent::Created
+            ResponseEvent::Created { .. }
         ));
         assert!(matches!(
             stream

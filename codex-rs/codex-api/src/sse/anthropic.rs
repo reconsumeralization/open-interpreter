@@ -236,7 +236,13 @@ async fn process_anthropic_event(
                 {
                     return Ok(true);
                 }
-                if tx_event.send(Ok(ResponseEvent::Created)).await.is_err() {
+                if tx_event
+                    .send(Ok(ResponseEvent::Created {
+                        response_id: state.message_id.clone(),
+                    }))
+                    .await
+                    .is_err()
+                {
                     return Ok(true);
                 }
             }
@@ -591,7 +597,7 @@ mod tests {
         }
         assert!(matches!(
             events[1].as_ref().expect("created"),
-            ResponseEvent::Created
+            ResponseEvent::Created { .. }
         ));
         match events[2].as_ref().expect("added") {
             ResponseEvent::OutputItemAdded(ResponseItem::Message { content, .. }) => {
@@ -657,7 +663,7 @@ mod tests {
 
         assert!(matches!(
             events[0].as_ref().expect("created"),
-            ResponseEvent::Created
+            ResponseEvent::Created { .. }
         ));
         match events[1].as_ref().expect("done") {
             ResponseEvent::OutputItemDone(ResponseItem::FunctionCall {
@@ -715,7 +721,7 @@ mod tests {
 
         assert!(matches!(
             events[0].as_ref().expect("created"),
-            ResponseEvent::Created
+            ResponseEvent::Created { .. }
         ));
         match events[1].as_ref().expect("done") {
             ResponseEvent::OutputItemDone(ResponseItem::FunctionCall {
@@ -892,7 +898,7 @@ data: {"type":"message_stop"   }
         ));
         assert!(matches!(
             events[1].as_ref().expect("created"),
-            ResponseEvent::Created
+            ResponseEvent::Created { .. }
         ));
         match events[2].as_ref().expect("done") {
             ResponseEvent::OutputItemDone(ResponseItem::FunctionCall {

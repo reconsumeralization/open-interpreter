@@ -186,6 +186,7 @@ fn build_messages(prompt: &Prompt) -> Result<Vec<Value>, serde_json::Error> {
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::AdditionalTools { .. }
+            | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::Other => {}
         }
         item_index += 1;

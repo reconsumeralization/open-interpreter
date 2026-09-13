@@ -699,6 +699,7 @@ fn build_messages(
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::AdditionalTools { .. }
+            | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::Other => {
                 flush_pending_tool_results(
                     &mut messages,

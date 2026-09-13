@@ -608,6 +608,7 @@ impl AppServerAcpAgent {
                             ThreadSourceKind::VsCode,
                             ThreadSourceKind::Unknown,
                         ]),
+                        originators: None,
                         archived: Some(false),
                         section_id: None,
                         project_id: None,
