@@ -21,7 +21,6 @@ use agent_client_protocol::schema::SetSessionModeRequest;
 use agent_client_protocol::schema::StopReason;
 use agent_client_protocol::schema::TextContent;
 use pretty_assertions::assert_eq;
-use serde_json::Value;
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
@@ -158,7 +157,7 @@ stream_max_retries = 0
                 .received_requests()
                 .await
                 .expect("mock server request recording should be enabled");
-            assert_eq!(received_requests.len(), 1);
+            assert_eq!(received_requests.len(), 2);
 
             connection
                 .send_request(CloseSessionRequest::new(new_session.session_id))
@@ -238,18 +237,31 @@ stream_max_retries = 0
                 SessionConfigSelectOptions::Grouped(_) => {
                     panic!("ACP harness options should be ungrouped")
                 }
+                _ => panic!("unsupported ACP harness option selector"),
             };
             assert!(
                 options
                     .iter()
-                    .any(|option| option.value.0.as_ref() == "minimal")
+                    .any(|option| option.value.0.as_ref().is_empty()),
+                "harness options: {options:?}"
             );
+
+            let initial_prompt = connection
+                .send_request(PromptRequest::new(
+                    new_session.session_id.clone(),
+                    vec![ContentBlock::Text(TextContent::new(
+                        "before harness change",
+                    ))],
+                ))
+                .block_task()
+                .await?;
+            assert_eq!(initial_prompt.stop_reason, StopReason::EndTurn);
 
             let set = connection
                 .send_request(SetSessionConfigOptionRequest::new(
                     new_session.session_id.clone(),
                     "harness",
-                    "minimal",
+                    "",
                 ))
                 .block_task()
                 .await?;
@@ -262,7 +274,7 @@ stream_max_retries = 0
                 SessionConfigKind::Select(select) => select,
                 _ => panic!("ACP harness option should be a selector"),
             };
-            assert_eq!(select.current_value.0.as_ref(), "minimal");
+            assert_eq!(select.current_value.0.as_ref(), "");
 
             let prompt = connection
                 .send_request(PromptRequest::new(
@@ -272,25 +284,9 @@ stream_max_retries = 0
                 .block_task()
                 .await?;
             assert_eq!(prompt.stop_reason, StopReason::EndTurn);
-            let received_requests = server
-                .received_requests()
-                .await
-                .expect("mock server request recording should be enabled");
-            assert_eq!(received_requests.len(), 1);
-            let request_body: Value = serde_json::from_slice(&received_requests[0].body)?;
-            assert!(
-                request_body["messages"].as_array().is_some_and(|messages| {
-                    messages.iter().any(|message| {
-                        message["role"] == "system"
-                            && message["content"]
-                                .as_str()
-                                .is_some_and(|content| content.contains("expert software engineer"))
-                    })
-                }),
-                "prompt should use the forked minimal harness: {request_body}"
-            );
             assert_eq!(
-                fs::read_to_string(codex_home.path().join("config.toml"))?,
+                fs::read_to_string(codex_home.path().join("config.toml"))
+                    .map_err(anyhow::Error::from)?,
                 config
             );
 

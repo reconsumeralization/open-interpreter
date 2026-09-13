@@ -172,6 +172,7 @@ struct SessionState {
     thread_id: String,
     cwd: PathBuf,
     model: String,
+    model_provider: String,
     reasoning_effort: Option<ReasoningEffort>,
     harness: Option<String>,
     mode: AcpSessionMode,
@@ -549,6 +550,7 @@ impl AppServerAcpAgent {
             thread_id: response.thread.id,
             cwd: response.cwd.into_path_buf(),
             model: response.model,
+            model_provider: response.model_provider,
             reasoning_effort: response.reasoning_effort,
             harness: self.config.harness.clone(),
             mode: AcpSessionMode::WorkspaceWrite,
@@ -589,6 +591,7 @@ impl AppServerAcpAgent {
             thread_id: response.thread.id.clone(),
             cwd: response.cwd.into_path_buf(),
             model: response.model,
+            model_provider: response.model_provider,
             reasoning_effort: response.reasoning_effort,
             harness: self.config.harness.clone(),
             mode: AcpSessionMode::WorkspaceWrite,
@@ -1047,7 +1050,7 @@ impl AppServerAcpAgent {
             .request_typed(ClientRequest::InterpreterHarnessList {
                 request_id: next_request_id(),
                 params: InterpreterHarnessListParams {
-                    provider_id: self.config.model_provider_id.clone(),
+                    provider_id: session.model_provider.clone(),
                     model: Some(session.model.clone()),
                 },
             })
