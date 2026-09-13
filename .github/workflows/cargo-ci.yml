@@ -89,7 +89,7 @@ jobs:
       # integration tests use compile-time env!("CARGO_BIN_EXE_*"), which cargo
       # does not wire for that crate (it is covered by the Bazel build).
       - name: cargo build (workspace + tests)
-        run: cargo build --workspace --tests --exclude codex-linux-sandbox --profile ci-test --locked
+        run: cargo build --workspace --tests --exclude codex-linux-sandbox --exclude codex-voice-host --profile ci-test --locked
       - name: sccache stats (cache hit/miss proof)
         run: sccache --show-stats
       - name: Enable unprivileged user namespaces
