@@ -75,7 +75,7 @@ impl ProcThreadAttributeList {
         unsafe {
             self.update(
                 PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-                con,
+                con as *mut c_void,
                 mem::size_of::<HPCON>(),
             )
         }
@@ -105,7 +105,7 @@ impl ProcThreadAttributeList {
                 self.as_mut_ptr(),
                 0,
                 attribute,
-                value,
+                value as *mut winapi::ctypes::c_void,
                 size,
                 ptr::null_mut(),
                 ptr::null_mut(),

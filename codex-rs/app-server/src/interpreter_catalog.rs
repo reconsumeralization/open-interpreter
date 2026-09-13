@@ -50,6 +50,12 @@ const HARNESS_DEFINITIONS: &[HarnessDefinition] = &[
         wire_apis: MESSAGES_WIRE_APIS,
     },
     HarnessDefinition {
+        id: "zcode",
+        label: "ZCode",
+        description: "Use the ZCode-style tool harness.",
+        wire_apis: MESSAGES_WIRE_APIS,
+    },
+    HarnessDefinition {
         id: "kimi-cli",
         label: "Kimi CLI",
         description: "Use the Kimi CLI-style tool harness.",

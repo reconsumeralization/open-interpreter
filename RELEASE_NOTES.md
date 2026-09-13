@@ -1,9 +1,17 @@
-# Open Interpreter 0.0.42
+# Open Interpreter 0.0.43
 
-Open Interpreter 0.0.42 improves provider and transport discoverability,
-keeps the command-line experience consistently branded, and adds a reusable
-diagnostic harness for Ollama-backed Qwen tool-use checks. It is based on the
-stable upstream Codex `rust-v0.153.4` compatibility baseline.
+Open Interpreter 0.0.43 is a maintenance release based on the stable upstream
+Codex `rust-v0.154.0` compatibility baseline.
+
+## Maintenance highlights
+
+- Google now offers `gemini-3.8-flash` and `gemini-3.7-flash` in its easy model
+  choices; `glm-5.1` and the inherited OpenAI choices remain available.
+- Z.AI now has an explicit `zai-zcode` Messages preset at
+  `https://api.z.ai/api/anthropic`, alongside the existing generic Z.AI Chat
+  providers.
+- `interpreter acp` exposes Harness as a selectable session configuration and
+  persists changes through the shared interpreter harness catalog.
 
 ## Models
 
@@ -20,7 +28,7 @@ stable upstream Codex `rust-v0.153.4` compatibility baseline.
   starting IDs; use the exact ID returned by the selected Z.AI service or plan.
   Generic Z.AI uses Chat Completions, while the separate ZCode setup uses its
   compatible Messages endpoint.
-- Open Interpreter's OIX-specific work here is provider/catalog, transport,
+- Open Interpreter-specific work here is provider/catalog, transport,
   harness, and product integration. The list above is not a promise that every
   provider, region, account, wire API, or harness accepts every ID. Use `/model`
   and the active provider's model list as the final authority.

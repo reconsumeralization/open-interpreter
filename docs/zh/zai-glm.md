@@ -11,6 +11,7 @@ Open Interpreter 包含面向全球 Z.AI 平台、其 GLM Coding Plan 以及中�
 | --- | --- | --- | --- |
 | Z.AI 按量付费 API | `zai` | `ZAI_API_KEY` | 通用 OpenAI 兼容 Chat API |
 | Z.AI GLM Coding Plan | `zai-coding-plan` | `ZAI_API_KEY` | Coding Plan 的 OpenAI 兼容 Chat API |
+| Z.AI ZCode | `zai-zcode` | `ZAI_API_KEY` | Coding Plan Anthropic Messages API |
 | Zhipu AI 按量付费 API | `zhipuai` | `ZHIPU_API_KEY` | 通用 OpenAI 兼容 Chat API |
 | Zhipu AI Coding Plan | `zhipuai-coding-plan` | `ZHIPU_API_KEY` | Coding Plan 的 OpenAI 兼容 Chat API |
 
@@ -41,26 +42,18 @@ ZAI_API_KEY="..." interpreter \
 
 `zcode` 在 Open Interpreter 的原生 Rust 运行时中复现了 ZCode 形态的系统提示、Messages 请求格式、工具、待办事项、计划控制、技能、会话上下文以及子代理行为。它需要一个 Anthropic Messages 兼容的提供商；在内置 Chat 提供商上选择 `zcode` 并不会激活该 Messages 路径。
 
-Z.AI 官方提供了 Anthropic 兼容的 Coding Plan 端点，地址为 `https://api.z.ai/api/anthropic`。要使用它，请在 `~/.openinterpreter/config.toml` 中添加一个 Messages 提供商：
+Z.AI 官方提供了 Anthropic 兼容的 Coding Plan 端点，地址为 `https://api.z.ai/api/anthropic`。Open Interpreter 已将其作为明确的 `zai-zcode` 提供商内置，因此只需在 `~/.openinterpreter/config.toml` 中选择提供商和 harness：
 
 ```toml
 model_provider = "zai-zcode"
 model = "glm-5.1"
 harness = "zcode"
-
-[model_providers.zai-zcode]
-name = "Z.AI ZCode"
-base_url = "https://api.z.ai/api/anthropic"
-env_key = "ZAI_API_KEY"
-wire_api = "messages"
-env_http_headers = { Authorization = "ZAI_AUTHORIZATION" }
 ```
 
-随后在不将密钥写入配置文件的情况下暴露 bearer 头部：
+随后在不将密钥写入配置文件的情况下暴露 API 密钥和 bearer 头部：
 
 ```bash
 export ZAI_API_KEY="..."
-export ZAI_AUTHORIZATION="Bearer $ZAI_API_KEY"
 interpreter
 ```
 
@@ -80,7 +73,7 @@ Z.AI 可能会在服务器端独立于 Open Interpreter 更新模型映射和计
 | --- | --- |
 | 使用内置选择器的最简配置 | `zai-coding-plan` 或 `zai`，通用 Chat |
 | 提供商推荐的 OpenAI 兼容集成 | 内置提供商，`wire_api = "chat"` |
-| ZCode 形态的编码代理行为 | 自定义 Messages 提供商加 `harness = "zcode"` |
+| ZCode 形态的编码代理行为 | 内置 `zai-zcode` Messages 提供商加 `harness = "zcode"` |
 
 不要在 OpenAI 兼容的 `/paas/v4` 端点上设置 `wire_api = "messages"`，也不要将 Chat 提供商指向 `/api/anthropic`。端点、wire API 与 harness 必须保持一致。
 

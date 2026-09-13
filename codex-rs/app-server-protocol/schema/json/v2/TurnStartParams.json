@@ -217,6 +217,32 @@
         },
         {
           "properties": {
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "enum": [
+                "input_video"
+              ],
+              "title": "InputVideoFunctionCallOutputContentItemType",
+              "type": "string"
+            },
+            "video_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "video_url"
+          ],
+          "title": "InputVideoFunctionCallOutputContentItem",
+          "type": "object"
+        },
+        {
+          "properties": {
             "encrypted_content": {
               "type": "string"
             },

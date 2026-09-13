@@ -50,6 +50,30 @@ fn kimi_and_moonshot_providers_default_to_current_kimi_code_harness() {
 }
 
 #[test]
+fn zai_zcode_preset_selects_zcode_without_changing_generic_zai_chat() {
+    let providers = built_in_model_providers(/*openai_base_url*/ None);
+    let generic = providers.get("zai").expect("generic Z.AI provider");
+    assert_eq!(generic.wire_api, WireApi::Chat);
+    assert_eq!(
+        default_harness_for_provider_model("zai", generic, Some("glm-5.1")),
+        None
+    );
+
+    let zcode = providers.get("zai-zcode").expect("ZCode provider");
+    assert_eq!(
+        zcode.base_url.as_deref(),
+        Some("https://api.z.ai/api/anthropic")
+    );
+    assert_eq!(zcode.wire_api, WireApi::Messages);
+    assert_eq!(zcode.env_key.as_deref(), Some("ZAI_API_KEY"));
+    assert!(zcode.env_http_headers.is_none());
+    assert_eq!(
+        default_harness_for_provider_model("zai-zcode", zcode, Some("glm-5.1")),
+        Some("zcode")
+    );
+}
+
+#[test]
 fn test_deserialize_ollama_model_provider_toml() {
     let azure_provider_toml = r#"
 name = "Ollama"

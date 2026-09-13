@@ -225,6 +225,7 @@ fn build_messages(prompt: &Prompt, kind: &Terminus2RequestKind) -> Vec<Value> {
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::AdditionalTools { .. }
+            | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::Other => {}
         }
     }

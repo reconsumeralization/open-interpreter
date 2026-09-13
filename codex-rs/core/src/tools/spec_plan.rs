@@ -27,7 +27,9 @@ use crate::tools::handlers::PlanHandler;
 use crate::tools::handlers::ReadMcpResourceHandler;
 use crate::tools::handlers::RequestPermissionsHandler;
 use crate::tools::handlers::RequestPluginInstallHandler;
+use crate::tools::handlers::RequestUserInputAsyncHandler;
 use crate::tools::handlers::RequestUserInputHandler;
+use crate::tools::handlers::SendMessageToUserAsyncHandler;
 use crate::tools::handlers::SleepHandler;
 use crate::tools::handlers::TestSyncHandler;
 use crate::tools::handlers::ToolSearchHandlerCache;
@@ -995,19 +997,28 @@ fn add_core_tool_sources(context: &CoreToolPlanContext<'_>, registry: &mut ToolR
         let environment_mode = tool_environment_mode(context.environments);
         if environment_mode.has_environment() {
             let include_environment_id = matches!(environment_mode, ToolEnvironmentMode::Multiple);
-            registry.add(ExecCommandHandler::new(ExecCommandHandlerOptions {
-                allow_login_shell: any_environment_allows_login_shell(context.environments),
-                exec_permission_approvals_enabled: false,
-                include_environment_id,
-                include_shell_parameter: unified_exec_should_include_shell_parameter(
-                    turn_context,
-                    context.environments,
-                ),
-                include_windows_shell_guidance: should_include_windows_shell_guidance(
-                    context.environments,
-                ),
-            }));
-            registry.add(WriteStdinHandler);
+            if turn_context.config.features.enabled(Feature::ShellTool)
+                && turn_context.config.features.enabled(Feature::UnifiedExec)
+                && !matches!(context.model_info.shell_type, ConfigShellToolType::Disabled)
+            {
+                registry.add(ExecCommandHandler::new(ExecCommandHandlerOptions {
+                    allow_login_shell: any_environment_allows_login_shell(context.environments),
+                    allow_tty: turn_context
+                        .config
+                        .features
+                        .enabled(Feature::UnifiedExecTty),
+                    exec_permission_approvals_enabled: false,
+                    include_environment_id,
+                    include_shell_parameter: unified_exec_should_include_shell_parameter(
+                        turn_context,
+                        context.environments,
+                    ),
+                    include_windows_shell_guidance: should_include_windows_shell_guidance(
+                        context.environments,
+                    ),
+                }));
+                registry.add(WriteStdinHandler);
+            }
             if turn_context.config.features.enabled(Feature::ViewImage) {
                 registry.add(ViewImageHandler::new(ViewImageToolOptions {
                     can_request_original_image_detail: can_request_original_image_detail(
@@ -1148,6 +1159,7 @@ fn add_shell_tools(context: &CoreToolPlanContext<'_>, registry: &mut ToolRegistr
     let include_environment_id = matches!(environment_mode, ToolEnvironmentMode::Multiple);
     let options = ExecCommandHandlerOptions {
         allow_login_shell,
+        allow_tty: features.enabled(Feature::UnifiedExecTty),
         exec_permission_approvals_enabled,
         include_environment_id,
         include_shell_parameter: unified_exec_should_include_shell_parameter(
@@ -1232,6 +1244,40 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
         );
     }
 
+    if !turn_context.session_source.is_non_root_agent()
+        && context
+            .model_info
+            .experimental_supported_tools
+            .iter()
+            // Existing model catalogs still advertise the previous name.
+            .any(|tool| {
+                matches!(
+                    tool.as_str(),
+                    "request_user_input_async" | "send_user_message_async"
+                )
+            })
+    {
+        registry.add_with_exposure(
+            RequestUserInputAsyncHandler {
+                description: context
+                    .model_messages
+                    .and_then(|messages| messages.tools.as_ref())
+                    .and_then(|tools| tools.send_user_message_async.as_ref())
+                    .and_then(|tool| tool.description.clone()),
+            },
+            ToolExposure::DirectModelOnly,
+        );
+    }
+
+    if !turn_context.session_source.is_non_root_agent()
+        && context
+            .model_info
+            .experimental_supported_tools
+            .iter()
+            .any(|tool| tool == "send_message_to_user_async")
+    {
+        registry.add_with_exposure(SendMessageToUserAsyncHandler, ToolExposure::DirectModelOnly);
+    }
     if environment_mode.has_environment() && features.enabled(Feature::RequestPermissionsTool) {
         registry.add(RequestPermissionsHandler);
     }

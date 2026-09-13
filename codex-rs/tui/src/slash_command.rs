@@ -36,6 +36,7 @@ pub enum SlashCommand {
     Delete,
     Resume,
     Fork,
+    Worktree,
     App,
     Init,
     Compact,
@@ -107,6 +108,7 @@ impl SlashCommand {
             SlashCommand::Delete => "permanently delete this session and exit",
             SlashCommand::Clear => "clear the terminal and start a new chat",
             SlashCommand::Fork => "fork the current chat",
+            SlashCommand::Worktree => "start or continue a conversation in a new worktree",
             SlashCommand::App => match codex_product_info::Product::current() {
                 codex_product_info::Product::Codex => "continue this session in Codex Desktop",
                 codex_product_info::Product::OpenInterpreter => {
@@ -251,6 +253,7 @@ impl SlashCommand {
             | SlashCommand::Archive
             | SlashCommand::Delete
             | SlashCommand::Fork
+            | SlashCommand::Worktree
             | SlashCommand::Init
             | SlashCommand::Compact
             | SlashCommand::Recap

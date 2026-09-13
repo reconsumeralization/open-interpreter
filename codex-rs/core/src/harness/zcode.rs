@@ -568,6 +568,7 @@ fn build_messages_for_session(
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::AdditionalTools { .. }
+            | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::Other => flush_pending_tool_results(
                 &mut messages,
                 &mut pending_tool_results,

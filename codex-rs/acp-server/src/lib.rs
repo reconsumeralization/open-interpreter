@@ -100,6 +100,9 @@ use codex_app_server_protocol::FileChangeApprovalDecision;
 use codex_app_server_protocol::FileChangeRequestApprovalResponse;
 use codex_app_server_protocol::GetAccountParams;
 use codex_app_server_protocol::GetAccountResponse;
+use codex_app_server_protocol::InterpreterHarness;
+use codex_app_server_protocol::InterpreterHarnessListParams;
+use codex_app_server_protocol::InterpreterHarnessListResponse;
 use codex_app_server_protocol::JSONRPCErrorError;
 use codex_app_server_protocol::ModelListParams;
 use codex_app_server_protocol::ModelListResponse;
@@ -107,6 +110,8 @@ use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::SandboxPolicy;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ServerRequest;
+use codex_app_server_protocol::ThreadForkParams;
+use codex_app_server_protocol::ThreadForkResponse;
 use codex_app_server_protocol::ThreadListParams;
 use codex_app_server_protocol::ThreadListResponse;
 use codex_app_server_protocol::ThreadResumeParams;
@@ -141,6 +146,7 @@ use tokio_util::compat::TokioAsyncWriteCompatExt as _;
 
 const CONFIG_ID_MODEL: &str = "model";
 const CONFIG_ID_REASONING_EFFORT: &str = "reasoning_effort";
+const CONFIG_ID_HARNESS: &str = "harness";
 
 pub async fn run_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
     init_tracing();
@@ -166,7 +172,9 @@ struct SessionState {
     thread_id: String,
     cwd: PathBuf,
     model: String,
+    model_provider: String,
     reasoning_effort: Option<ReasoningEffort>,
+    harness: Option<String>,
     mode: AcpSessionMode,
     active_turn_id: Option<String>,
 }
@@ -471,12 +479,18 @@ impl AppServerAcpAgent {
             .list(SessionListCapabilities::new());
 
         Ok(InitializeResponse::new(ProtocolVersion::V1)
-            .agent_info(Implementation::new("codex-acp", env!("CARGO_PKG_VERSION")).title("Codex"))
+            .agent_info(
+                Implementation::new("codex-acp", env!("CARGO_PKG_VERSION"))
+                    .title(codex_product_info::Product::current().display_name()),
+            )
             .agent_capabilities(agent_capabilities)
             .auth_methods(vec![
                 AuthMethod::Agent(
                     AuthMethodAgent::new(AuthMethodId::new("chatgpt"), "Login with ChatGPT")
-                        .description("Use your ChatGPT login with Codex"),
+                        .description(format!(
+                            "Use your ChatGPT login with {}",
+                            codex_product_info::Product::current().display_name()
+                        )),
                 ),
                 AuthMethod::EnvVar(AuthMethodEnvVar::new(
                     AuthMethodId::new("codex-api-key"),
@@ -532,22 +546,25 @@ impl AppServerAcpAgent {
         };
 
         let session_id = SessionId::new(response.thread.id.clone());
-        self.sessions.lock().await.insert(
-            session_id.clone(),
-            SessionState {
-                thread_id: response.thread.id,
-                cwd: response.cwd.into_path_buf(),
-                model: response.model,
-                reasoning_effort: response.reasoning_effort,
-                mode: AcpSessionMode::WorkspaceWrite,
-                active_turn_id: None,
-            },
-        );
+        let session = SessionState {
+            thread_id: response.thread.id,
+            cwd: response.cwd.into_path_buf(),
+            model: response.model,
+            model_provider: response.model_provider,
+            reasoning_effort: response.reasoning_effort,
+            harness: self.config.harness.clone(),
+            mode: AcpSessionMode::WorkspaceWrite,
+            active_turn_id: None,
+        };
+        self.sessions
+            .lock()
+            .await
+            .insert(session_id.clone(), session.clone());
 
         Ok(NewSessionResponse::new(session_id)
             .modes(session_modes())
             .models(self.session_models().await.ok())
-            .config_options(self.config_options().await))
+            .config_options(Some(self.config_options(&session).await?)))
     }
 
     async fn load_session(
@@ -570,23 +587,26 @@ impl AppServerAcpAgent {
         };
 
         let session_id = SessionId::new(response.thread.id.clone());
-        self.sessions.lock().await.insert(
-            session_id.clone(),
-            SessionState {
-                thread_id: response.thread.id.clone(),
-                cwd: response.cwd.into_path_buf(),
-                model: response.model,
-                reasoning_effort: response.reasoning_effort,
-                mode: AcpSessionMode::WorkspaceWrite,
-                active_turn_id: None,
-            },
-        );
+        let session = SessionState {
+            thread_id: response.thread.id.clone(),
+            cwd: response.cwd.into_path_buf(),
+            model: response.model,
+            model_provider: response.model_provider,
+            reasoning_effort: response.reasoning_effort,
+            harness: self.config.harness.clone(),
+            mode: AcpSessionMode::WorkspaceWrite,
+            active_turn_id: None,
+        };
+        self.sessions
+            .lock()
+            .await
+            .insert(session_id.clone(), session.clone());
         replay_thread_history(session_id, response.thread.turns, &cx)?;
 
         Ok(LoadSessionResponse::new()
             .modes(session_modes())
             .models(self.session_models().await.ok())
-            .config_options(self.config_options().await))
+            .config_options(Some(self.config_options(&session).await?)))
     }
 
     async fn list_sessions(
@@ -608,6 +628,7 @@ impl AppServerAcpAgent {
                             ThreadSourceKind::VsCode,
                             ThreadSourceKind::Unknown,
                         ]),
+                        originators: None,
                         archived: Some(false),
                         section_id: None,
                         project_id: None,
@@ -626,8 +647,14 @@ impl AppServerAcpAgent {
             .data
             .into_iter()
             .map(|thread| {
-                SessionInfo::new(SessionId::new(thread.id), thread.cwd.into_path_buf())
-                    .title(thread.name.unwrap_or_else(|| "Codex session".to_string()))
+                SessionInfo::new(SessionId::new(thread.id), thread.cwd.into_path_buf()).title(
+                    thread.name.unwrap_or_else(|| {
+                        format!(
+                            "{} session",
+                            codex_product_info::Product::current().short_display_name()
+                        )
+                    }),
+                )
             })
             .collect();
         Ok(ListSessionsResponse::new(sessions).next_cursor(response.next_cursor))
@@ -729,26 +756,77 @@ impl AppServerAcpAgent {
         &self,
         request: SetSessionConfigOptionRequest,
     ) -> Result<SetSessionConfigOptionResponse, Error> {
-        {
-            let mut sessions = self.sessions.lock().await;
-            let session = sessions
-                .get_mut(&request.session_id)
-                .ok_or_else(|| Error::invalid_params().data("unknown session"))?;
-            match request.config_id.0.as_ref() {
-                CONFIG_ID_MODEL => {
-                    session.model = config_value_id(&request.value)
-                        .ok_or_else(|| Error::invalid_params().data("missing model value"))?
-                        .to_string();
-                }
-                CONFIG_ID_REASONING_EFFORT => {
-                    session.reasoning_effort = parse_reasoning_effort(&request.value)?;
-                }
-                _ => return Err(Error::invalid_params().data("unknown config option")),
+        let session = self.session_state(&request.session_id).await?;
+        match request.config_id.0.as_ref() {
+            CONFIG_ID_MODEL => {
+                let model = config_value_id(&request.value)
+                    .ok_or_else(|| Error::invalid_params().data("missing model value"))?
+                    .to_string();
+                let mut sessions = self.sessions.lock().await;
+                sessions
+                    .get_mut(&request.session_id)
+                    .ok_or_else(|| Error::invalid_params().data("unknown session"))?
+                    .model = model;
             }
+            CONFIG_ID_REASONING_EFFORT => {
+                let reasoning_effort = parse_reasoning_effort(&request.value)?;
+                let mut sessions = self.sessions.lock().await;
+                sessions
+                    .get_mut(&request.session_id)
+                    .ok_or_else(|| Error::invalid_params().data("unknown session"))?
+                    .reasoning_effort = reasoning_effort;
+            }
+            CONFIG_ID_HARNESS => {
+                let requested_harness = config_value_id(&request.value)
+                    .ok_or_else(|| Error::invalid_params().data("missing harness value"))?;
+                let selected_harness = self
+                    .interpreter_harnesses(&session)
+                    .await?
+                    .into_iter()
+                    .find(|harness| harness.id.as_deref().unwrap_or_default() == requested_harness)
+                    .map(|harness| harness.id);
+                if selected_harness.is_none() && !requested_harness.is_empty() {
+                    return Err(Error::invalid_params().data("unknown harness"));
+                }
+
+                let response: ThreadForkResponse = self
+                    .client
+                    .request_typed(ClientRequest::ThreadFork {
+                        request_id: next_request_id(),
+                        params: ThreadForkParams {
+                            thread_id: session.thread_id.clone(),
+                            config: Some(HashMap::from([(
+                                "harness".to_string(),
+                                serde_json::json!(selected_harness.clone()),
+                            )])),
+                            ..ThreadForkParams::default()
+                        },
+                    })
+                    .await
+                    .map_err(app_server_error)?;
+
+                let mut sessions = self.sessions.lock().await;
+                let session = sessions
+                    .get_mut(&request.session_id)
+                    .ok_or_else(|| Error::invalid_params().data("unknown session"))?;
+                session.thread_id = response.thread.id;
+                session.harness = selected_harness.flatten();
+            }
+            _ => return Err(Error::invalid_params().data("unknown config option")),
         }
+        let session = self.session_state(&request.session_id).await?;
         Ok(SetSessionConfigOptionResponse::new(
-            self.config_options().await.unwrap_or_default(),
+            self.config_options(&session).await?,
         ))
+    }
+
+    async fn session_state(&self, session_id: &SessionId) -> Result<SessionState, Error> {
+        self.sessions
+            .lock()
+            .await
+            .get(session_id)
+            .cloned()
+            .ok_or_else(|| Error::invalid_params().data("unknown session"))
     }
 
     async fn session_snapshot(
@@ -827,14 +905,17 @@ impl AppServerAcpAgent {
     ) -> Result<(), Error> {
         match request {
             ServerRequest::CommandExecutionRequestApproval { request_id, params } => {
+                let reason = params.reason.unwrap_or_else(|| {
+                    format!(
+                        "{} wants to run a command",
+                        codex_product_info::Product::current().short_display_name()
+                    )
+                });
                 let outcome = request_permission(
                     session_id,
                     cx,
                     "Run command",
-                    params
-                        .reason
-                        .as_deref()
-                        .unwrap_or("Codex wants to run a command"),
+                    &reason,
                     vec![
                         PermissionOption::new("accept", "Allow", PermissionOptionKind::AllowOnce),
                         PermissionOption::new(
@@ -859,14 +940,17 @@ impl AppServerAcpAgent {
                 .await?;
             }
             ServerRequest::FileChangeRequestApproval { request_id, params } => {
+                let reason = params.reason.unwrap_or_else(|| {
+                    format!(
+                        "{} wants to edit files",
+                        codex_product_info::Product::current().short_display_name()
+                    )
+                });
                 let outcome = request_permission(
                     session_id,
                     cx,
                     "Apply file changes",
-                    params
-                        .reason
-                        .as_deref()
-                        .unwrap_or("Codex wants to edit files"),
+                    &reason,
                     vec![
                         PermissionOption::new("accept", "Allow", PermissionOptionKind::AllowOnce),
                         PermissionOption::new(
@@ -957,29 +1041,67 @@ impl AppServerAcpAgent {
         ))
     }
 
-    async fn config_options(&self) -> Option<Vec<SessionConfigOption>> {
-        Some(vec![
+    async fn interpreter_harnesses(
+        &self,
+        session: &SessionState,
+    ) -> Result<Vec<InterpreterHarness>, Error> {
+        let response: InterpreterHarnessListResponse = self
+            .client
+            .request_typed(ClientRequest::InterpreterHarnessList {
+                request_id: next_request_id(),
+                params: InterpreterHarnessListParams {
+                    provider_id: session.model_provider.clone(),
+                    model: Some(session.model.clone()),
+                },
+            })
+            .await
+            .map_err(app_server_error)?;
+        Ok(response.data)
+    }
+
+    async fn config_options(
+        &self,
+        session: &SessionState,
+    ) -> Result<Vec<SessionConfigOption>, Error> {
+        let harness_options: Vec<_> = self
+            .interpreter_harnesses(session)
+            .await?
+            .into_iter()
+            .map(|harness| {
+                let harness_id = harness.id.unwrap_or_default();
+                SessionConfigSelectOption::new(harness_id, harness.label)
+                    .description(harness.description)
+            })
+            .collect();
+        Ok(vec![
             SessionConfigOption::select(
                 SessionConfigId::new(CONFIG_ID_MODEL),
                 "Model",
-                default_model(&self.config),
+                session.model.clone(),
                 vec![SessionConfigSelectOption::new(
-                    default_model(&self.config),
-                    default_model(&self.config),
+                    session.model.clone(),
+                    session.model.clone(),
                 )],
             )
             .category(SessionConfigOptionCategory::Model),
             SessionConfigOption::select(
                 SessionConfigId::new(CONFIG_ID_REASONING_EFFORT),
                 "Reasoning",
-                self.config
-                    .model_reasoning_effort
+                session
+                    .reasoning_effort
                     .as_ref()
                     .map(ToString::to_string)
                     .unwrap_or_else(|| "default".to_string()),
                 reasoning_options(),
             )
             .category(SessionConfigOptionCategory::ThoughtLevel),
+            SessionConfigOption::select(
+                SessionConfigId::new(CONFIG_ID_HARNESS),
+                "Harness",
+                session.harness.clone().unwrap_or_default(),
+                harness_options,
+            )
+            .category(SessionConfigOptionCategory::Other("_harness".to_string())),
         ])
     }
 }

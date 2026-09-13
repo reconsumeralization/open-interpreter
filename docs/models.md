@@ -37,6 +37,7 @@ active provider currently offers.
 | Google AI Studio | Provider `google` and `GEMINI_API_KEY` | `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite` | `chat` |
 | Anthropic | Provider `anthropic` and `ANTHROPIC_API_KEY` | `claude-fable-5-1`, `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5-20251001` | Provider default |
 | Z.AI | Provider `zai` or `zai-coding-plan` and `ZAI_API_KEY` | `glm-5.1`, `glm-5`, `glm-5-turbo`, `glm-4.7-flash` | `chat` |
+| Z.AI ZCode | Provider `zai-zcode` and `ZAI_API_KEY` | `glm-5.1`, `glm-5-turbo`, `glm-4.7`, `glm-4.5-air` | `messages` |
 
 The first row contains OpenAI-style choices inherited from the upstream
 `models-manager/models.json`; it is upstream preset metadata, not a guarantee

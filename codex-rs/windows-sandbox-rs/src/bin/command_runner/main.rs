@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+#![cfg_attr(all(target_os = "windows", not(test)), windows_subsystem = "windows")]
 
 #[cfg(target_os = "windows")]
 mod win;

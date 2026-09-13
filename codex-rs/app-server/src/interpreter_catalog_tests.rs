@@ -24,6 +24,7 @@ fn app_server_lists_all_known_product_harnesses() {
         "qwen-code",
         "swe-agent",
         "terminus-2",
+        "zcode",
     ];
     expected.sort_unstable();
 

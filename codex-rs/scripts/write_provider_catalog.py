@@ -143,6 +143,7 @@ def build_provider_entry(
             }
         )
     merge_live_provider_models(provider_id, models, overrides)
+    apply_provider_model_additions(provider_id, models, overrides)
     apply_provider_model_overrides(provider_id, models, overrides)
 
     return {
@@ -295,6 +296,89 @@ def apply_provider_model_overrides(
             model.update(metadata)
 
 
+def apply_provider_model_additions(
+    provider_id: str,
+    models: list[dict],
+    overrides: dict[str, object],
+) -> None:
+    provider_additions = overrides.get("provider_model_additions", {})
+    if not isinstance(provider_additions, dict):
+        return
+    additions = provider_additions.get(provider_id)
+    if not isinstance(additions, list):
+        return
+
+    existing = {model["id"] for model in models if isinstance(model.get("id"), str)}
+    next_priority = (
+        max(
+            (int(model.get("priority", -1)) for model in models),
+            default=-1,
+        )
+        + 1
+    )
+    for addition in additions:
+        if not isinstance(addition, dict):
+            continue
+        model_id = addition.get("id")
+        if not isinstance(model_id, str) or not model_id:
+            raise SystemExit(
+                f"provider_model_additions.{provider_id} entries need an id"
+            )
+        if model_id in existing:
+            continue
+        input_modalities = addition.get("input_modalities", ["text"])
+        if not isinstance(input_modalities, list) or not all(
+            isinstance(modality, str) and modality for modality in input_modalities
+        ):
+            raise SystemExit(
+                f"provider_model_additions.{provider_id}.{model_id}.input_modalities "
+                "must be a list of non-empty strings"
+            )
+        context_window = addition.get("context_window")
+        if context_window is not None and not isinstance(context_window, int):
+            raise SystemExit(
+                f"provider_model_additions.{provider_id}.{model_id}.context_window "
+                "must be an integer or null"
+            )
+        priority = addition.get("priority", next_priority)
+        if not isinstance(priority, int):
+            raise SystemExit(
+                f"provider_model_additions.{provider_id}.{model_id}.priority "
+                "must be an integer"
+            )
+        models.append(
+            {
+                "id": model_id,
+                "display_name": addition.get("display_name") or model_id,
+                "description": addition.get("description"),
+                "reasoning": bool(addition.get("reasoning")),
+                "input_modalities": input_modalities,
+                "context_window": context_window,
+                "priority": priority,
+            }
+        )
+        existing.add(model_id)
+        next_priority = max(next_priority, priority + 1)
+
+
+def additional_provider_entries(overrides: dict[str, object]) -> list[dict]:
+    values = overrides.get("additional_provider_entries", [])
+    if not isinstance(values, list):
+        raise SystemExit("additional_provider_entries must be a list")
+    entries = []
+    for value in values:
+        if not isinstance(value, dict):
+            raise SystemExit("additional_provider_entries entries must be objects")
+        required = {"id", "name", "base_url", "wire_api", "models", "sort_priority"}
+        missing = sorted(field for field in required if field not in value)
+        if missing:
+            raise SystemExit(
+                "additional provider entry is missing: " + ", ".join(missing)
+            )
+        entries.append(value)
+    return entries
+
+
 def wire_api_for_provider(
     provider_id: str,
     provider: dict,
@@ -397,6 +481,7 @@ def write_catalog(selected_provider_ids: set[str] | None = None) -> int:
         providers.extend(generated_providers)
     else:
         providers = generated_providers
+        providers.extend(additional_provider_entries(overrides))
     providers.sort(
         key=lambda provider: (
             int(provider["sort_priority"]),

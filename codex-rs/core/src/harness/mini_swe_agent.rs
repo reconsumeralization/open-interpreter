@@ -70,7 +70,7 @@ pub(crate) fn inject_no_tool_call_format_error(stream: ResponseStream) -> Respon
                         }
                     }
                 }
-                Ok(ResponseEvent::Created) => {
+                Ok(ResponseEvent::Created { .. }) => {
                     saw_assistant_message = false;
                     saw_tool_call = false;
                     buffered_events.clear();
@@ -380,6 +380,7 @@ fn build_messages(items: &[ResponseItem]) -> Result<Vec<Value>, serde_json::Erro
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::AdditionalTools { .. }
+            | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::Other => {}
         }
     }
@@ -797,7 +798,7 @@ mod tests {
     async fn text_only_response_is_replaced_with_retry_error() {
         let (tx_event, rx_event) = mpsc::channel(8);
         tx_event
-            .send(Ok(ResponseEvent::Created))
+            .send(Ok(ResponseEvent::Created { response_id: None }))
             .await
             .expect("send created");
         tx_event
@@ -832,7 +833,7 @@ mod tests {
         });
         assert!(matches!(
             stream.next().await,
-            Some(Ok(ResponseEvent::Created))
+            Some(Ok(ResponseEvent::Created { .. }))
         ));
         let Some(Ok(ResponseEvent::OutputItemDone(ResponseItem::Message {
             role, content, ..
@@ -858,7 +859,7 @@ mod tests {
     async fn tool_response_preserves_assistant_and_tool_call() {
         let (tx_event, rx_event) = mpsc::channel(8);
         tx_event
-            .send(Ok(ResponseEvent::Created))
+            .send(Ok(ResponseEvent::Created { response_id: None }))
             .await
             .expect("send created");
         tx_event
@@ -911,7 +912,7 @@ mod tests {
         });
         assert!(matches!(
             stream.next().await,
-            Some(Ok(ResponseEvent::Created))
+            Some(Ok(ResponseEvent::Created { .. }))
         ));
         assert!(matches!(
             stream.next().await,

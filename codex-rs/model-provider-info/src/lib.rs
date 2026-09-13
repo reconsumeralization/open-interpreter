@@ -185,6 +185,12 @@ pub fn default_harness_for_provider_model(
         .to_ascii_lowercase();
     let model = model.unwrap_or_default().to_ascii_lowercase();
 
+    if provider_id == "zai-zcode"
+        || base_url.trim_end_matches('/') == "https://api.z.ai/api/anthropic"
+    {
+        return Some("zcode");
+    }
+
     if matches!(provider.wire_api, WireApi::Messages)
         || model.contains("anthropic/")
         || model.contains("claude")
@@ -660,6 +666,7 @@ fn provider_from_bundled_catalog_entry(entry: &BundledProviderCatalogEntry) -> M
         base_url: Some(entry.base_url.clone()),
         env_key: entry.env_key.clone(),
         wire_api: entry.wire_api,
+        env_http_headers: entry.env_http_headers.clone(),
         ..Default::default()
     }
 }
