@@ -28,7 +28,7 @@ Codex `rust-v0.154.0` compatibility baseline.
   starting IDs; use the exact ID returned by the selected Z.AI service or plan.
   Generic Z.AI uses Chat Completions, while the separate ZCode setup uses its
   compatible Messages endpoint.
-- Open Interpreter's OIX-specific work here is provider/catalog, transport,
+- Open Interpreter-specific work here is provider/catalog, transport,
   harness, and product integration. The list above is not a promise that every
   provider, region, account, wire API, or harness accepts every ID. Use `/model`
   and the active provider's model list as the final authority.
