@@ -103,8 +103,6 @@ use codex_app_server_protocol::GetAccountResponse;
 use codex_app_server_protocol::InterpreterHarness;
 use codex_app_server_protocol::InterpreterHarnessListParams;
 use codex_app_server_protocol::InterpreterHarnessListResponse;
-use codex_app_server_protocol::InterpreterHarnessSetParams;
-use codex_app_server_protocol::InterpreterHarnessSetResponse;
 use codex_app_server_protocol::JSONRPCErrorError;
 use codex_app_server_protocol::ModelListParams;
 use codex_app_server_protocol::ModelListResponse;
@@ -112,6 +110,8 @@ use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::SandboxPolicy;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ServerRequest;
+use codex_app_server_protocol::ThreadForkParams;
+use codex_app_server_protocol::ThreadForkResponse;
 use codex_app_server_protocol::ThreadListParams;
 use codex_app_server_protocol::ThreadListResponse;
 use codex_app_server_protocol::ThreadResumeParams;
@@ -786,23 +786,28 @@ impl AppServerAcpAgent {
                     return Err(Error::invalid_params().data("unknown harness"));
                 }
 
-                let _: InterpreterHarnessSetResponse = self
+                let response: ThreadForkResponse = self
                     .client
-                    .request_typed(ClientRequest::InterpreterHarnessSet {
+                    .request_typed(ClientRequest::ThreadFork {
                         request_id: next_request_id(),
-                        params: InterpreterHarnessSetParams {
-                            harness: selected_harness.clone().flatten(),
-                            profile: None,
+                        params: ThreadForkParams {
+                            thread_id: session.thread_id.clone(),
+                            config: Some(HashMap::from([(
+                                "harness".to_string(),
+                                serde_json::json!(selected_harness.clone()),
+                            )])),
+                            ..ThreadForkParams::default()
                         },
                     })
                     .await
                     .map_err(app_server_error)?;
 
                 let mut sessions = self.sessions.lock().await;
-                sessions
+                let session = sessions
                     .get_mut(&request.session_id)
-                    .ok_or_else(|| Error::invalid_params().data("unknown session"))?
-                    .harness = selected_harness.flatten();
+                    .ok_or_else(|| Error::invalid_params().data("unknown session"))?;
+                session.thread_id = response.thread.id;
+                session.harness = selected_harness.flatten();
             }
             _ => return Err(Error::invalid_params().data("unknown config option")),
         }
@@ -1055,7 +1060,7 @@ impl AppServerAcpAgent {
         &self,
         session: &SessionState,
     ) -> Result<Vec<SessionConfigOption>, Error> {
-        let harness_options = self
+        let harness_options: Vec<_> = self
             .interpreter_harnesses(session)
             .await?
             .into_iter()

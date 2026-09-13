@@ -21,6 +21,7 @@ use agent_client_protocol::schema::SetSessionModeRequest;
 use agent_client_protocol::schema::StopReason;
 use agent_client_protocol::schema::TextContent;
 use pretty_assertions::assert_eq;
+use serde_json::Value;
 use tempfile::TempDir;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
@@ -175,21 +176,28 @@ stream_max_retries = 0
 async fn acp_session_harness_option_round_trips_through_interpreter_config() -> anyhow::Result<()> {
     let codex_home = TempDir::new()?;
     let cwd = TempDir::new()?;
-    fs::write(
-        codex_home.path().join("config.toml"),
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path_regex(".*/chat/completions$"))
+        .respond_with(sse_response(chat_sse("chatcmpl-1", "mock-model", "hello")))
+        .mount(&server)
+        .await;
+    let config = format!(
         r#"
 model = "mock-model"
 model_provider = "mock_provider"
 
 [model_providers.mock_provider]
 name = "Mock Chat provider for ACP harness test"
-base_url = "http://127.0.0.1:1/v1"
+base_url = "{}/v1"
 env_key = "TEST_ACP_API_KEY"
 wire_api = "chat"
 request_max_retries = 0
 stream_max_retries = 0
 "#,
-    )?;
+        server.uri()
+    );
+    fs::write(codex_home.path().join("config.toml"), &config)?;
 
     let codex_bin = codex_utils_cargo_bin::cargo_bin("codex")?;
     let agent = AcpAgent::from_args([
@@ -255,9 +263,35 @@ stream_max_retries = 0
                 _ => panic!("ACP harness option should be a selector"),
             };
             assert_eq!(select.current_value.0.as_ref(), "minimal");
+
+            let prompt = connection
+                .send_request(PromptRequest::new(
+                    new_session.session_id.clone(),
+                    vec![ContentBlock::Text(TextContent::new("say hello"))],
+                ))
+                .block_task()
+                .await?;
+            assert_eq!(prompt.stop_reason, StopReason::EndTurn);
+            let received_requests = server
+                .received_requests()
+                .await
+                .expect("mock server request recording should be enabled");
+            assert_eq!(received_requests.len(), 1);
+            let request_body: Value = serde_json::from_slice(&received_requests[0].body)?;
             assert!(
-                fs::read_to_string(codex_home.path().join("config.toml"))?
-                    .contains("harness = \"minimal\"")
+                request_body["messages"].as_array().is_some_and(|messages| {
+                    messages.iter().any(|message| {
+                        message["role"] == "system"
+                            && message["content"]
+                                .as_str()
+                                .is_some_and(|content| content.contains("expert software engineer"))
+                    })
+                }),
+                "prompt should use the forked minimal harness: {request_body}"
+            );
+            assert_eq!(
+                fs::read_to_string(codex_home.path().join("config.toml"))?,
+                config
             );
 
             connection
@@ -320,6 +354,12 @@ fn sse_response(body: String) -> ResponseTemplate {
     ResponseTemplate::new(200)
         .insert_header("content-type", "text/event-stream")
         .set_body_raw(body, "text/event-stream")
+}
+
+fn chat_sse(id: &str, model: &str, text: &str) -> String {
+    format!(
+        "data: {{\"id\":\"{id}\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"{model}\",\"choices\":[{{\"index\":0,\"delta\":{{\"role\":\"assistant\",\"content\":\"{text}\"}},\"finish_reason\":null}}]}}\n\ndata: {{\"id\":\"{id}\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"{model}\",\"choices\":[{{\"index\":0,\"delta\":{{}},\"finish_reason\":\"stop\"}}]}}\n\ndata: [DONE]\n\n"
+    )
 }
 
 fn sse(events: Vec<serde_json::Value>) -> String {
