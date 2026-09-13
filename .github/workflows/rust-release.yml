@@ -501,7 +501,6 @@ jobs:
     timeout-minutes: 45
     environment:
       name: codesigning
-      deployment: false
     permissions:
       contents: read
       id-token: write
@@ -914,7 +913,6 @@ jobs:
     timeout-minutes: 45
     environment:
       name: codesigning
-      deployment: false
     permissions:
       contents: read
       id-token: write
