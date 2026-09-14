@@ -2,6 +2,11 @@ name: rust-release-windows
 
 on:
   workflow_call:
+    inputs:
+      signing_mode:
+        description: Whether to sign or package verified unsigned Windows artifacts.
+        required: true
+        type: string
 
 env:
   WINDOWS_BINARIES: "codex codex-code-mode-host codex-responses-api-proxy codex-windows-sandbox-setup codex-command-runner codex-app-server"
@@ -181,7 +186,7 @@ jobs:
   build-windows:
     needs:
       - build-windows-binaries
-    name: Build - ${{ matrix.runner }} - ${{ matrix.target }}
+    name: Package ${{ inputs.signing_mode }} Windows artifacts - ${{ matrix.runner }} - ${{ matrix.target }}
     runs-on: ${{ matrix.runs_on }}
     environment:
       name: azure-artifact-signing
@@ -229,7 +234,7 @@ jobs:
           name: windows-binaries-${{ matrix.target }}-app-server
           path: ${{ env.CARGO_TARGET_DIR }}/${{ matrix.target }}/release
 
-      - name: Verify binaries
+      - name: Verify Windows binaries before optional signing
         shell: bash
         run: |
           set -euo pipefail
@@ -238,6 +243,7 @@ jobs:
           done
 
       - name: Sign Windows binaries with Azure Trusted Signing
+        if: ${{ inputs.signing_mode == 'signed' }}
         uses: ./.github/actions/windows-code-sign
         with:
           target: ${{ matrix.target }}
