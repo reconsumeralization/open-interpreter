@@ -7865,17 +7865,6 @@
       "sort_priority": 35,
       "models": [
         {
-          "id": "glm-5.1",
-          "display_name": "GLM-5.1",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 200000,
-          "priority": 0
-        },
-        {
           "id": "glm-5.2",
           "display_name": "GLM-5.2",
           "description": "glm \u2022 Reasoning \u2022 Tool calling",
@@ -7884,7 +7873,52 @@
             "text"
           ],
           "context_window": 1000000,
+          "priority": 0
+        },
+        {
+          "id": "glm-5.3-flash",
+          "display_name": "GLM-5.3-Flash",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 PDF input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 1000000,
           "priority": 1
+        },
+        {
+          "id": "glm-5",
+          "display_name": "GLM-5",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 204800,
+          "priority": 2
+        },
+        {
+          "id": "glm-5.1",
+          "display_name": "GLM-5.1",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 200000,
+          "priority": 3
+        },
+        {
+          "id": "glm-5.3",
+          "display_name": "GLM-5.3",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 1000000,
+          "priority": 4
         },
         {
           "id": "glm-5v-turbo",
@@ -7896,29 +7930,7 @@
             "image"
           ],
           "context_window": 200000,
-          "priority": 2
-        },
-        {
-          "id": "glm-5",
-          "display_name": "GLM-5",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 204800,
-          "priority": 3
-        },
-        {
-          "id": "glm-4.5-flash",
-          "display_name": "GLM-4.5-Flash",
-          "description": "glm-flash \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 131072,
-          "priority": 4
+          "priority": 5
         },
         {
           "id": "glm-4.7-flash",
@@ -7929,41 +7941,7 @@
             "text"
           ],
           "context_window": 200000,
-          "priority": 5
-        },
-        {
-          "id": "glm-4.5-air",
-          "display_name": "GLM-4.5-Air",
-          "description": "glm-air \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 131072,
           "priority": 6
-        },
-        {
-          "id": "glm-4.6v",
-          "display_name": "GLM-4.6V",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
-          "reasoning": true,
-          "input_modalities": [
-            "text",
-            "image"
-          ],
-          "context_window": 128000,
-          "priority": 7
-        },
-        {
-          "id": "glm-4.6",
-          "display_name": "GLM-4.6",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 204800,
-          "priority": 8
         },
         {
           "id": "glm-4.7-flashx",
@@ -7974,18 +7952,7 @@
             "text"
           ],
           "context_window": 200000,
-          "priority": 9
-        },
-        {
-          "id": "glm-4.5",
-          "display_name": "GLM-4.5",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 131072,
-          "priority": 10
+          "priority": 7
         },
         {
           "id": "glm-4.5v",
@@ -7997,7 +7964,63 @@
             "image"
           ],
           "context_window": 64000,
+          "priority": 8
+        },
+        {
+          "id": "glm-4.5",
+          "display_name": "GLM-4.5",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 131072,
+          "priority": 9
+        },
+        {
+          "id": "glm-4.5-flash",
+          "display_name": "GLM-4.5-Flash",
+          "description": "glm-flash \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 131072,
+          "priority": 10
+        },
+        {
+          "id": "glm-4.6v",
+          "display_name": "GLM-4.6V",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 128000,
           "priority": 11
+        },
+        {
+          "id": "glm-4.6",
+          "display_name": "GLM-4.6",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 204800,
+          "priority": 12
+        },
+        {
+          "id": "glm-4.5-air",
+          "display_name": "GLM-4.5-Air",
+          "description": "glm-air \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 131072,
+          "priority": 13
         },
         {
           "id": "glm-4.7",
@@ -8008,7 +8031,7 @@
             "text"
           ],
           "context_window": 204800,
-          "priority": 12
+          "priority": 14
         }
       ]
     },
@@ -8176,60 +8199,6 @@
           ],
           "context_window": null,
           "priority": 13
-        }
-      ]
-    },
-    {
-      "id": "zai-zcode",
-      "name": "Z.AI ZCode",
-      "env_key": "ZAI_API_KEY",
-      "base_url": "https://api.z.ai/api/anthropic",
-      "wire_api": "messages",
-      "sort_priority": 37,
-      "models": [
-        {
-          "id": "glm-5.1",
-          "display_name": "GLM-5.1",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 200000,
-          "priority": -1
-        },
-        {
-          "id": "glm-5-turbo",
-          "display_name": "GLM-5-Turbo",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 200000,
-          "priority": 0
-        },
-        {
-          "id": "glm-4.7",
-          "display_name": "GLM-4.7",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 204800,
-          "priority": 1
-        },
-        {
-          "id": "glm-4.5-air",
-          "display_name": "GLM-4.5-Air",
-          "description": "glm-air \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 131072,
-          "priority": 2
         }
       ]
     },
@@ -9029,6 +8998,60 @@
           ],
           "context_window": 197000,
           "priority": 69
+        }
+      ]
+    },
+    {
+      "id": "zai-zcode",
+      "name": "Z.AI ZCode",
+      "env_key": "ZAI_API_KEY",
+      "base_url": "https://api.z.ai/api/anthropic",
+      "wire_api": "messages",
+      "sort_priority": 37,
+      "models": [
+        {
+          "id": "glm-5.1",
+          "display_name": "GLM-5.1",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 200000,
+          "priority": -1
+        },
+        {
+          "id": "glm-5-turbo",
+          "display_name": "GLM-5-Turbo",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 200000,
+          "priority": 0
+        },
+        {
+          "id": "glm-4.7",
+          "display_name": "GLM-4.7",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 204800,
+          "priority": 1
+        },
+        {
+          "id": "glm-4.5-air",
+          "display_name": "GLM-4.5-Air",
+          "description": "glm-air \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 131072,
+          "priority": 2
         }
       ]
     },
@@ -36201,6 +36224,17 @@
       "sort_priority": 100,
       "models": [
         {
+          "id": "glm-5.2-highspeed",
+          "display_name": "GLM-5.2 Highspeed",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 1000000,
+          "priority": 0
+        },
+        {
           "id": "glm-4.7",
           "display_name": "GLM-4.7",
           "description": "glm \u2022 Reasoning \u2022 Tool calling",
@@ -36209,17 +36243,6 @@
             "text"
           ],
           "context_window": 204800,
-          "priority": 0
-        },
-        {
-          "id": "glm-5.1",
-          "display_name": "GLM-5.1",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 200000,
           "priority": 1
         },
         {
@@ -36234,26 +36257,26 @@
           "priority": 2
         },
         {
-          "id": "glm-5v-turbo",
-          "display_name": "GLM-5V-Turbo",
+          "id": "glm-5.3-highspeed",
+          "display_name": "GLM-5.3 Highspeed",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 1000000,
+          "priority": 3
+        },
+        {
+          "id": "glm-5.3-flash",
+          "display_name": "GLM-5.3-Flash",
           "description": "glm \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 PDF input \u2022 Video input",
           "reasoning": true,
           "input_modalities": [
             "text",
             "image"
           ],
-          "context_window": 200000,
-          "priority": 3
-        },
-        {
-          "id": "glm-4.5-air",
-          "display_name": "GLM-4.5-Air",
-          "description": "glm-air \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 131072,
+          "context_window": 1000000,
           "priority": 4
         },
         {
@@ -36266,6 +36289,17 @@
           ],
           "context_window": 200000,
           "priority": 5
+        },
+        {
+          "id": "glm-5.3",
+          "display_name": "GLM-5.3",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 1000000,
+          "priority": 6
         }
       ]
     },
@@ -37587,6 +37621,29 @@
       "sort_priority": 100,
       "models": [
         {
+          "id": "glm-5.3-highspeed",
+          "display_name": "GLM-5.3 Highspeed",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 1000000,
+          "priority": 0
+        },
+        {
+          "id": "glm-5.3-flash",
+          "display_name": "GLM-5.3-Flash",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling \u2022 Image input \u2022 PDF input \u2022 Video input",
+          "reasoning": true,
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "context_window": 1000000,
+          "priority": 1
+        },
+        {
           "id": "glm-5.1",
           "display_name": "GLM-5.1",
           "description": "glm \u2022 Reasoning \u2022 Tool calling",
@@ -37595,7 +37652,18 @@
             "text"
           ],
           "context_window": 200000,
-          "priority": 0
+          "priority": 2
+        },
+        {
+          "id": "glm-5.3",
+          "display_name": "GLM-5.3",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 1000000,
+          "priority": 3
         },
         {
           "id": "glm-5v-turbo",
@@ -37607,7 +37675,7 @@
             "image"
           ],
           "context_window": 200000,
-          "priority": 1
+          "priority": 4
         },
         {
           "id": "glm-5-turbo",
@@ -37618,18 +37686,18 @@
             "text"
           ],
           "context_window": 200000,
-          "priority": 2
+          "priority": 5
         },
         {
-          "id": "glm-4.5-air",
-          "display_name": "GLM-4.5-Air",
-          "description": "glm-air \u2022 Reasoning \u2022 Tool calling",
+          "id": "glm-5.2",
+          "display_name": "GLM-5.2",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
           "reasoning": true,
           "input_modalities": [
             "text"
           ],
-          "context_window": 131072,
-          "priority": 3
+          "context_window": 1000000,
+          "priority": 6
         },
         {
           "id": "glm-4.6v",
@@ -37641,18 +37709,7 @@
             "image"
           ],
           "context_window": 128000,
-          "priority": 4
-        },
-        {
-          "id": "glm-5.2",
-          "display_name": "GLM-5.2",
-          "description": "glm \u2022 Reasoning \u2022 Tool calling",
-          "reasoning": true,
-          "input_modalities": [
-            "text"
-          ],
-          "context_window": 1000000,
-          "priority": 5
+          "priority": 7
         },
         {
           "id": "glm-4.7",
@@ -37663,7 +37720,18 @@
             "text"
           ],
           "context_window": 204800,
-          "priority": 6
+          "priority": 8
+        },
+        {
+          "id": "glm-5.2-highspeed",
+          "display_name": "GLM-5.2 Highspeed",
+          "description": "glm \u2022 Reasoning \u2022 Tool calling",
+          "reasoning": true,
+          "input_modalities": [
+            "text"
+          ],
+          "context_window": 1000000,
+          "priority": 9
         }
       ]
     }
