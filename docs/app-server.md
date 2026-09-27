@@ -55,3 +55,6 @@ surface compatible so existing Codex app-server clients can use
 Use OpenAI's [Codex app-server docs](https://developers.openai.com/codex/app-server)
 for the full protocol shape, then apply the Open Interpreter-specific launch
 commands above.
+
+For a small local browser example with a stdio bridge, streamed text, explicit
+approval denial, and loopback safeguards, see [A tiny streaming web chat](/docs/streaming-web-chat).

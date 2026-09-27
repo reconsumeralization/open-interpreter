@@ -103,6 +103,7 @@
           "docs/zh/exec",
           "docs/zh/sdk",
           "docs/zh/app-server",
+          "docs/zh/streaming-web-chat",
           "docs/zh/acp",
           "docs/zh/mcp-server",
           "docs/zh/github-action",

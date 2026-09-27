@@ -105,6 +105,7 @@
           "docs/exec",
           "docs/sdk",
           "docs/app-server",
+          "docs/streaming-web-chat",
           "docs/acp",
           "docs/mcp-server",
           "docs/github-action",

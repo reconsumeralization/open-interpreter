@@ -1,4 +1,4 @@
-<!-- README translation source: README.md sha256=d5db2b994d859b4186348f83bf35783a86b3f79e363d0c92100dbf06707ced16 -->
+<!-- README translation source: README.md sha256=8f6c33487eca77769798677d32bce15335d0439f129c9a0413e12e0d9e70ab7a -->
 
 <h1 align="center">Open Interpreter</h1>
 
@@ -79,6 +79,8 @@ Open Interpreter 可用于[兼容 ACP 的编辑器和客户端](https://agentcli
 ```
 
 Open Interpreter 使用与 Codex 相同的 `exec` 协议。请参阅 [SDK 指南](https://www.openinterpreter.com/docs/terminal/sdk)，并运行 `scripts/test-codex-sdk-compat.sh` 完成不依赖模型服务商的本地兼容性检查。
+
+要为 Open Interpreter 制作一个小型网页聊天界面，请参阅[本地流式聊天指南](docs/zh/streaming-web-chat.md)。如果需要完整的桌面、浏览器或无界面客户端，请使用 [Interpreter Workstation](https://github.com/openinterpreter/interpreter-workstation)。
 
 ## 计算机操作
 

@@ -79,6 +79,11 @@ binary override:
 
 Open Interpreter speaks the same Codex exec protocol. See the [SDK guide](https://www.openinterpreter.com/docs/terminal/sdk) and run `scripts/test-codex-sdk-compat.sh` for a local, provider-free compatibility check.
 
+Want a small browser UI over raw Open Interpreter? Start with the
+[local streaming web chat guide](docs/streaming-web-chat.md). For a complete
+desktop, browser, or headless client, use
+[Interpreter Workstation](https://github.com/openinterpreter/interpreter-workstation).
+
 ## Portable by default
 
 Open Interpreter should fit into your existing agent setup instead of trapping

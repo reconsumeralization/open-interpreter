@@ -1,4 +1,4 @@
-<!-- README translation source: README.md sha256=d5db2b994d859b4186348f83bf35783a86b3f79e363d0c92100dbf06707ced16 -->
+<!-- README translation source: README.md sha256=8f6c33487eca77769798677d32bce15335d0439f129c9a0413e12e0d9e70ab7a -->
 
 <h1 align="center">Open Interpreter</h1>
 
@@ -79,6 +79,8 @@ Open Interpreter funciona en [editores y clientes compatibles con ACP](https://a
 ```
 
 Open Interpreter utiliza el mismo protocolo `exec` que Codex. Consulta la [guía del SDK](https://www.openinterpreter.com/docs/terminal/sdk) y ejecuta `scripts/test-codex-sdk-compat.sh` para realizar una comprobación local de compatibilidad que no requiere un proveedor.
+
+Para crear un pequeño chat web sobre Open Interpreter, consulta la [guía local de chat en streaming](docs/streaming-web-chat.md). Para un cliente completo de escritorio, navegador o ejecución sin interfaz gráfica, utiliza [Interpreter Workstation](https://github.com/openinterpreter/interpreter-workstation).
 
 ## Uso de la computadora
 

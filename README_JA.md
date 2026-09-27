@@ -1,4 +1,4 @@
-<!-- README translation source: README.md sha256=d5db2b994d859b4186348f83bf35783a86b3f79e363d0c92100dbf06707ced16 -->
+<!-- README translation source: README.md sha256=8f6c33487eca77769798677d32bce15335d0439f129c9a0413e12e0d9e70ab7a -->
 
 <h1 align="center">Open Interpreter</h1>
 
@@ -80,6 +80,8 @@ Open Interpreter は [ACP 互換のエディターやクライアント](https:/
 ```
 
 Open Interpreter は Codex と同じ exec プロトコルを話します。[SDK ガイド](https://www.openinterpreter.com/docs/terminal/sdk)を参照し、`scripts/test-codex-sdk-compat.sh` を実行すると、プロバイダー不要でローカルに互換性を確認できます。
+
+Open Interpreter 用の小さなウェブチャットを作るには、[ローカルのストリーミングチャットガイド](docs/streaming-web-chat.md)をご覧ください。デスクトップ、ブラウザー、ヘッドレスのフル機能クライアントには、[Interpreter Workstation](https://github.com/openinterpreter/interpreter-workstation)を利用してください。
 
 ## デフォルトでポータブル
 

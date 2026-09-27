@@ -27,3 +27,6 @@ Remote mode is an advanced integration surface. Most users should run
 require a daemon. If you explicitly start the optional shared daemon, the TUI
 can reuse its Unix socket when the launch settings are compatible. See
 [Daemon](/docs/daemon).
+
+To build a **local browser chat**, use the [stdio bridge example](/docs/streaming-web-chat)
+instead of exposing this WebSocket endpoint directly to a web page.

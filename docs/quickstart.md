@@ -81,6 +81,7 @@ files, run commands, review diffs, and resume work later.
 | Set an API key or understand where credentials are stored | [Authentication](/docs/authentication) |
 | Configure command, filesystem, and network boundaries | [Sandbox & approvals](/docs/sandbox) |
 | Embed Open Interpreter in an application | [SDK](/docs/sdk) |
+| Build a small local streaming browser chat | [A tiny streaming web chat](/docs/streaming-web-chat) |
 
 ## Next pages
 
