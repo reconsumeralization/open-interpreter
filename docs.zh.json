@@ -37,13 +37,21 @@
           {
             "group": "核心概念",
             "pages": [
-              "docs/zh/prompting",
-              "docs/zh/workflows",
               "docs/zh/models",
               "docs/zh/harness",
               "docs/zh/subagents"
             ]
           }
+        ]
+      },
+      {
+        "group": "指南",
+        "pages": [
+          "docs/zh/prompting",
+          "docs/zh/workflows",
+          "docs/zh/streaming-web-chat",
+          "docs/zh/github-action",
+          "docs/zh/remote"
         ]
       },
       {
@@ -103,14 +111,8 @@
           "docs/zh/exec",
           "docs/zh/sdk",
           "docs/zh/app-server",
-          "docs/zh/streaming-web-chat",
           "docs/zh/acp",
-          "docs/zh/mcp-server",
-          "docs/zh/github-action",
-          {
-            "group": "服务器部署",
-            "pages": ["docs/zh/remote"]
-          }
+          "docs/zh/mcp-server"
         ]
       },
       {

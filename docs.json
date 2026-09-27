@@ -37,13 +37,21 @@
           {
             "group": "Concepts",
             "pages": [
-              "docs/prompting",
-              "docs/workflows",
               "docs/models",
               "docs/harness",
               "docs/subagents"
             ]
           }
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "docs/prompting",
+          "docs/workflows",
+          "docs/streaming-web-chat",
+          "docs/github-action",
+          "docs/remote"
         ]
       },
       {
@@ -105,16 +113,8 @@
           "docs/exec",
           "docs/sdk",
           "docs/app-server",
-          "docs/streaming-web-chat",
           "docs/acp",
-          "docs/mcp-server",
-          "docs/github-action",
-          {
-            "group": "Server deployments",
-            "pages": [
-              "docs/remote"
-            ]
-          }
+          "docs/mcp-server"
         ]
       },
       {
