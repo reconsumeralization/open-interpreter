@@ -52,10 +52,19 @@ function call(method, params) {
 function emit(a, event) {
   if (a.closed) return;
   const line = JSON.stringify(event) + "\n";
-  a.bytes += Buffer.byteLength(line);
-  if (a.bytes > 65536 || !a.res.write(line)) {
-    a.res.end(); // bounded output: a slow reader cannot accumulate indefinitely
+  // Reserve space for an explicit error; this is a per-turn transport limit,
+  // not a limit on how many turns the app server can keep in its thread.
+  if (a.bytes + Buffer.byteLength(line) > 65536 - 256) {
+    fail(a, "Turn exceeded the 64 KiB browser stream limit; interrupted");
+    return;
   }
+  a.bytes += Buffer.byteLength(line);
+  if (!a.res.write(line)) fail(a, "Browser too slow; turn interrupted");
+}
+function fail(a, reason) {
+  if (a.closed) return;
+  a.res.end(JSON.stringify({ type: "error", fatal: true, text: reason }) + "\n");
+  interrupt(a);
 }
 function interrupt(a) {
   a.closed = true;
@@ -68,11 +77,19 @@ function notification(message) {
   const { method, params: p } = message;
   const a = active;
   if (!a || p?.threadId !== threadId) return;
+  if (a.closed) {
+    if (method === "turn/completed" && (p.turnId ?? p.turn?.id) === a.turnId)
+      active = undefined;
+    return;
+  }
   // Notifications may arrive before the turn/start *response*; queue only a
-  // bounded number until its ID is known, then filter by both IDs.
+  // bounded number and bytes until its ID is known, then filter by both IDs.
   if (!a.turnId) {
-    if (a.queue.length < 32) a.queue.push(message);
-    else { a.res.end(); interrupt(a); }
+    const size = Buffer.byteLength(JSON.stringify(message));
+    if (a.queue.length < 32 && a.queueBytes + size <= 16384) {
+      a.queue.push(message); a.queueBytes += size;
+    }
+    else fail(a, "Too many early events; turn interrupted");
     return;
   }
   if ((p.turnId ?? p.turn?.id) !== a.turnId) return;
@@ -81,8 +98,8 @@ function notification(message) {
   if (method === "turn/completed") {
     emit(a, { type: "done", status: p.turn.status,
       error: p.turn.error?.message ?? null });
+    if (!a.closed) a.res.end();
     a.closed = true;
-    a.res.end();
     active = undefined;
   }
 }
@@ -111,7 +128,7 @@ child.stdin.on("error", () => {}); // a failed child may close stdin first
 child.on("exit", () => {
   for (const p of pending.values()) p.reject(Error("app server exited"));
   pending.clear();
-  if (active) { emit(active, { type: "error", text: "app server exited" }); active.res.end(); }
+  if (active) fail(active, "app server exited");
   process.exitCode = 1;
 });
 
@@ -161,7 +178,7 @@ const server = createServer(async (req, res) => {
   if (active) { res.writeHead(409).end("Wait for the current turn"); return; }
   res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8",
     "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
-  const a = active = { res, queue: [], bytes: 0, closed: false };
+  const a = active = { res, queue: [], queueBytes: 0, bytes: 0, closed: false };
   res.on("close", () => { if (active === a && !a.closed) interrupt(a); });
   try {
     a.turnId = (await call("turn/start", {
@@ -169,10 +186,10 @@ const server = createServer(async (req, res) => {
     })).turn.id;
     if (a.closed) interrupt(a);
     for (const event of a.queue) notification(event);
-    a.queue.length = 0;
+    a.queue.length = 0; a.queueBytes = 0;
   } catch (error) {
-    emit(a, { type: "error", text: error.message });
-    a.closed = true; res.end(); active = undefined;
+    fail(a, `Turn start failed: ${error.message}`);
+    active = undefined;
   }
 });
 server.requestTimeout = 30_000;
@@ -189,43 +206,95 @@ server.listen(port, "127.0.0.1", () => console.log(origin));
 <style>
   body { max-width: 48rem; margin: 3rem auto; padding: 0 1rem;
     font: 1rem/1.5 system-ui; color: #20242c; background: #fafafa }
-  #chat { white-space: pre-wrap; min-height: 10rem; padding: 1rem;
-    background: white; border: 1px solid #ddd; border-radius: .8rem }
+  #chat { height: min(60vh, 32rem); overflow-y: auto; overflow-anchor: none;
+    padding: 1rem; background: white; border: 1px solid #ddd; border-radius: .8rem }
+  #chat > div { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 1rem }
+  .state { color: #58606c; font-size: .85rem }
   form { display: flex; gap: .6rem; margin-top: 1rem }
   textarea { flex: 1; min-height: 4rem; font: inherit }
 </style>
-<h1>Local chat</h1><div id="chat" role="log" aria-live="polite"></div>
+<h1>Local chat</h1><div id="history" class="state" aria-live="polite"></div>
+<div id="chat" role="log" aria-live="off"></div>
 <form><textarea aria-label="Your message" maxlength="4096" required></textarea>
   <button>Send</button></form>
 <script>
 const form = document.querySelector("form"), box = document.querySelector("#chat");
+const history = document.querySelector("#history");
 const input = form.querySelector("textarea"), button = form.querySelector("button");
+const nearBottom = () => box.scrollHeight - box.scrollTop - box.clientHeight < 48;
+function newTurn(prompt) {
+  const pinned = nearBottom(), row = document.createElement("div");
+  const user = document.createElement("div"), answer = document.createElement("div");
+  const state = document.createElement("div");
+  user.textContent = `You: ${prompt}`;
+  answer.textContent = "Assistant: ";
+  state.className = "state";
+  state.textContent = "Streaming…";
+  state.setAttribute("aria-live", "polite");
+  row.append(user, answer, state);
+  box.append(row);
+  while (box.children.length > 8) {
+    const oldest = box.firstElementChild, before = box.scrollHeight;
+    const oldTop = box.scrollTop;
+    oldest.remove(); // visible window only; the app-server thread is unchanged
+    history.textContent = "Earlier visible turns trimmed (conversation stays on server).";
+    if (!pinned) box.scrollTop = Math.max(0, oldTop + box.scrollHeight - before);
+  }
+  if (pinned) box.scrollTop = box.scrollHeight;
+  return { answer, state };
+}
 form.addEventListener("submit", async event => {
   event.preventDefault(); button.disabled = true;
-  box.textContent += `\nYou: ${input.value}\nAssistant: `;
+  const prompt = input.value, { answer, state } = newTurn(prompt);
+  let tail = "", trimmed = false, label = "Streaming…", frame = 0, reader;
+  function paint() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    const pinned = nearBottom();
+    answer.textContent = `Assistant: ${trimmed ? "[Earlier answer text trimmed]\n" : ""}${tail}`;
+    state.textContent = label;
+    if (pinned) box.scrollTop = box.scrollHeight; // instant, only if following
+  }
+  const schedule = () => { if (!frame) frame = requestAnimationFrame(paint); };
   try {
     const response = await fetch("/chat", { method: "POST",
-      headers: { "Content-Type": "text/plain" }, body: input.value });
+      headers: { "Content-Type": "text/plain" }, body: prompt });
     if (!response.ok) throw Error(`HTTP ${response.status}`);
     input.value = "";
-    const reader = response.body.getReader(), decoder = new TextDecoder();
-    let buffer = "";
+    reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "", finished = false, fatal = false, notice = "";
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > 70000) throw Error("Stream line too large");
       let newline;
       while ((newline = buffer.indexOf("\n")) >= 0) {
         const event = JSON.parse(buffer.slice(0, newline));
         buffer = buffer.slice(newline + 1);
-        if (event.type === "text") box.textContent += event.text;
-        if (event.type === "error") box.textContent += `\n[${event.text}]`;
-        if (event.type === "done" && event.status !== "completed")
-          box.textContent += `\n[${event.status}: ${event.error ?? "no details"}]`;
+        if (event.type === "text") {
+          if (tail.length + event.text.length > 12000) trimmed = true;
+          tail = (tail + event.text).slice(-12000); // rolling visible tail
+        } else if (event.type === "error") {
+          if (event.fatal) { finished = true; fatal = true; }
+          else notice = String(event.text).slice(0, 120);
+          label = `${event.fatal ? "Interrupted" : "Notice"}: ${String(event.text).slice(0, 300)}`;
+        } else if (event.type === "done") {
+          finished = true;
+          if (!fatal) label = event.status === "completed" ?
+            `Complete${notice ? ` (notice: ${notice})` : ""}` :
+            `${event.status}: ${String(event.error ?? "no details").slice(0, 300)}`;
+        }
+        schedule(); // at most one DOM update per animation frame
       }
     }
-  } catch (error) { box.textContent += `\n[${error.message}]`; }
-  finally { box.textContent += "\n"; button.disabled = false; }
+    if (decoder.decode() || buffer || !finished)
+      throw Error("Stream closed without a complete final event");
+  } catch (error) {
+    label = `Error: ${String(error.message).slice(0, 300)}`;
+    if (reader) await reader.cancel().catch(() => {});
+  } finally { paint(); button.disabled = false; }
 });
 </script>
 ```
@@ -242,8 +311,24 @@ delta and completion is matched to the active thread and turn; JSON-RPC
 responses are matched by request ID. Messages are rendered as text, never
 HTML. This demo **declines** command/file approvals and rejects other server
 requests; use Workstation or implement a real review UI if approvals are
-needed. It does not display tool events, images, conversation history, or
-multiple users.
+needed. It does not display tool events, images, full conversation history, or
+multiple users. The page keeps only the latest **eight visible turns** and the
+last **12,000 characters of the current answer**; older visible text leaves the
+top as the session grows. This is a small rolling display, **not** Workstation's
+virtualized, retrievable history. If the text being read is trimmed, it cannot
+be preserved; the same applies when the current answer's rolling tail replaces
+text being read. Both trims are visibly marked. Otherwise the page keeps the
+reader's position and follows new output only when already near the bottom.
+The app server retains the thread's
+conversation independently of this display. Browser writes are batched to one
+animation frame, not animated scrolls.
+
+The bridge's **64 KiB per-turn browser-stream cap** is an intentional safety
+limit, not a total session limit. Hitting it interrupts the turn and visibly
+reports an error; an unexpected EOF is never shown as success. A full client
+would implement backpressure, pagination, and cancellation. This tiny process
+starts a fresh thread on each launch; it does not implement persisted-session
+resume or rebuild previous messages in the UI.
 
 **Security boundary:** keep the bridge on loopback. Do not forward its port or
 expose the raw app-server socket publicly. The Host/Origin checks and small

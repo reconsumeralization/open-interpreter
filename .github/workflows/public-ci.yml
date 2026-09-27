@@ -25,6 +25,9 @@ jobs:
       - name: Validate localized documentation parity
         run: node scripts/check-doc-locales.mjs
 
+      - name: Test streaming web chat guide sample
+        run: node scripts/test-streaming-web-chat.mjs
+
       - name: Validate installer scripts
         run: |
           set -euo pipefail
