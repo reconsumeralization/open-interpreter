@@ -758,7 +758,9 @@ mod tests {
                         text: "Describe this screenshot.".to_string(),
                     },
                     ContentItem::InputImage {
-                        image_url: "data:image/png;base64,DEEPSEEKVISION".to_string(),
+                        image: codex_protocol::models::ImageReference::Inline {
+                            image_url: "data:image/png;base64,DEEPSEEKVISION".to_string(),
+                        },
                         detail: None,
                     },
                 ],

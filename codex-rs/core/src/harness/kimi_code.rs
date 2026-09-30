@@ -524,7 +524,9 @@ mod tests {
                         text: "Describe this image.".to_string(),
                     },
                     ContentItem::InputImage {
-                        image_url: "data:image/png;base64,AAAB".to_string(),
+                        image: codex_protocol::models::ImageReference::Inline {
+                            image_url: "data:image/png;base64,AAAB".to_string(),
+                        },
                         detail: None,
                     },
                 ],

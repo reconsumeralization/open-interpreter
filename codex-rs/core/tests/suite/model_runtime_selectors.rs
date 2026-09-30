@@ -70,7 +70,10 @@ fn tool_names(body: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-async fn wait_for_model_available(manager: &SharedModelsManager, slug: &str) -> ModelPreset {
+pub(super) async fn wait_for_model_available(
+    manager: &SharedModelsManager,
+    slug: &str,
+) -> ModelPreset {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
         if let Some(model) = manager
